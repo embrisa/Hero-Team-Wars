@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.wc3-map-mcp/schemas/build-manifest.schema.json",
+  "title": "WC3 map build manifest",
+  "type": "object",
+  "required": ["schema_version", "build_id", "project_id", "transaction_id", "revision", "source_sha256", "output_path", "output_sha256", "output_size_bytes", "runtime_status", "created_utc", "engine_result"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "build_id": { "type": "string", "format": "uuid" },
+    "project_id": { "type": "string" },
+    "transaction_id": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "source_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "output_path": { "type": "string" },
+    "output_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "output_size_bytes": { "type": "integer", "minimum": 0 },
+    "runtime_status": { "type": "string", "enum": ["untested", "process_started", "editor_opened", "game_loaded", "smoke_passed", "playtest_passed"] },
+    "created_utc": { "type": "string", "format": "date-time" },
+    "engine_result": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": true
+}

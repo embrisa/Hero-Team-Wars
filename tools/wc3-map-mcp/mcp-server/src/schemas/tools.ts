@@ -1,0 +1,21 @@
+import * as z from "zod/v4";
+import { operationSchema } from "./operations.js";
+import { projectMapSchema, sha256Schema, uuidSchema } from "./common.js";
+
+export const projectStatusSchema = z.object({ project_id: z.string().min(1).max(100) }).strict();
+export const inspectMapSchema = projectMapSchema.extend({ section: z.enum(["metadata", "players", "forces", "regions", "triggers", "variables", "scripts", "object_data", "placed_objects", "terrain_summary", "imports", "archive_members", "capabilities", "opaque_members"]).optional(), include_provenance: z.boolean().default(true), max_items_per_section: z.number().int().min(1).max(1000).default(100) }).strict();
+export const listArchiveFilesSchema = projectMapSchema.extend({ prefix: z.string().max(200).optional(), cursor: z.string().max(1000).optional(), max_items: z.number().int().min(1).max(1000).default(200) }).strict();
+export const getComponentSchema = projectMapSchema.extend({ component: z.enum(["metadata", "players", "forces", "regions", "triggers", "variables", "scripts", "object_data", "placed_objects", "terrain_summary", "imports", "archive_members", "capabilities", "opaque_members"]), filter: z.string().max(200).optional(), cursor: z.string().max(1000).optional(), max_items: z.number().int().min(1).max(1000).default(100) }).strict();
+export const validateMapSchema = projectMapSchema;
+export const compareMapsSchema = z.object({ project_id: z.string().min(1).max(100), left: z.string().min(1).max(400), right: z.string().min(1).max(400) }).strict();
+export const beginTransactionSchema = projectMapSchema.extend({ expected_source_hash: sha256Schema, label: z.string().max(100).optional() }).strict();
+export const applyOperationsSchema = z.object({ project_id: z.string().min(1).max(100), transaction_id: uuidSchema, expected_revision: z.number().int().min(0), operations: z.array(operationSchema).min(1).max(100), dry_run: z.boolean().default(false) }).strict();
+export const transactionDiffSchema = z.object({ project_id: z.string().min(1).max(100), transaction_id: uuidSchema, from_revision: z.number().int().min(0).optional(), to_revision: z.number().int().min(0).optional() }).strict();
+export const validateTransactionSchema = z.object({ project_id: z.string().min(1).max(100), transaction_id: uuidSchema, revision: z.number().int().min(0) }).strict();
+export const buildMapSchema = z.object({ project_id: z.string().min(1).max(100), transaction_id: uuidSchema, revision: z.number().int().min(0), expected_source_hash: sha256Schema, profile: z.enum(["debug", "release", "noop"]).default("debug"), label: z.string().max(60).optional() }).strict();
+export const buildReportSchema = z.object({ project_id: z.string().min(1).max(100), build_id: uuidSchema }).strict();
+export const launchSchema = z.object({ project_id: z.string().min(1).max(100), build_id: uuidSchema, expected_build_hash: sha256Schema }).strict();
+export const recordTestResultSchema = z.object({ project_id: z.string().min(1).max(100), session_id: uuidSchema, expected_build_hash: sha256Schema, milestone: z.enum(["editor_opened", "game_loaded", "smoke_test", "playtest"]), result: z.enum(["pass", "fail"]), recorder: z.enum(["user_observation", "agent_log_observation"]), notes: z.string().max(10000) }).strict();
+export const getTestSessionSchema = z.object({ project_id: z.string().min(1).max(100), session_id: uuidSchema }).strict();
+export const promoteSchema = z.object({ project_id: z.string().min(1).max(100), build_id: uuidSchema, expected_build_hash: sha256Schema, destination_id: z.literal("test_map_root"), destination_name: z.string().min(1).max(200) }).strict();
+export const discardSchema = z.object({ project_id: z.string().min(1).max(100), transaction_id: uuidSchema, expected_source_hash: sha256Schema, confirmation: z.literal(true) }).strict();

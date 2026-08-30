@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Wc3MapEngine.Cli</AssemblyName>
+    <RootNamespace>Wc3MapEngine.Cli</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Wc3MapEngine.Contracts\Wc3MapEngine.Contracts.csproj" />
+    <ProjectReference Include="..\Wc3MapEngine.Core\Wc3MapEngine.Core.csproj" />
+  </ItemGroup>
+</Project>

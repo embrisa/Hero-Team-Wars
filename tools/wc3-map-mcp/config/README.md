@@ -1,5 +1,5 @@
 # Configuration
 
-This folder will contain checked-in examples with project-relative placeholders. Machine-specific executable paths belong in an ignored local configuration file created during setup.
+The checked-in `wc3-map-mcp.example.json` targets this Hero Team Wars workspace and the observed local Warcraft III installation. Copy it to `wc3-map-mcp.local.json` only when using a machine-specific configuration; the local file is ignored.
 
-Configuration must define allowed roots and must never accept `$HOME`, the filesystem root, or an unresolved environment variable as a destructive target.
+Configuration defines the source maps, read roots, MCP-owned staging/artifact/build roots, and optional World Editor/game launch paths. Relative paths are resolved from the project root and checked with path-segment-aware containment. The server never accepts arbitrary shell commands or an unresolved environment variable as a destructive target.

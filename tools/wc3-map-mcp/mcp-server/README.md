@@ -1,6 +1,6 @@
 # MCP Server
 
-Planned TypeScript process responsible for MCP STDIO transport, tool schemas, project/path policy, transaction coordination, worker lifecycle, and normalized responses.
+TypeScript MCP STDIO process responsible for tool schemas, project/path policy, transaction coordination, worker lifecycle, and normalized responses. Binary WC3 parsing remains in the .NET worker.
 
 Expected source layout:
 
@@ -16,4 +16,6 @@ src/
   errors/
 ```
 
-No Warcraft III binary parsing belongs in this component.
+No Warcraft III binary parsing belongs in this component. Run `npm run build`, then start the built entry point with `node dist/index.js`; configure it with `WC3_MAP_MCP_CONFIG` or the checked-in example configuration.
+
+Read-only tools are always available. Mutation, build, launch, evidence, promotion, and discard tools are registered only when the configuration is not `read_only`.

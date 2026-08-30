@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.wc3-map-mcp/schemas/transaction-manifest.schema.json",
+  "title": "WC3 map transaction manifest",
+  "type": "object",
+  "required": ["schema_version", "transaction_id", "project_id", "state", "revision", "source", "staged_copy_sha256", "created_utc", "updated_utc", "operation_ids", "validation_reports", "build_ids", "test_session_ids"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "transaction_id": { "type": "string", "format": "uuid" },
+    "project_id": { "type": "string" },
+    "state": { "type": "string", "enum": ["created", "staged", "modified", "validated", "built", "tested", "promoted", "discarded", "failed"] },
+    "revision": { "type": "integer", "minimum": 0 },
+    "source": { "type": "object", "required": ["path", "size_bytes", "modified_utc", "sha256"], "additionalProperties": true },
+    "staged_copy_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "created_utc": { "type": "string", "format": "date-time" },
+    "updated_utc": { "type": "string", "format": "date-time" },
+    "operation_ids": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+    "validation_reports": { "type": "array", "items": { "type": "string" } },
+    "build_ids": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+    "test_session_ids": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+    "failure": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}

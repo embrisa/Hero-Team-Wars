@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.wc3-map-mcp/schemas/canonical-map.schema.json",
+  "title": "WC3 canonical map model",
+  "type": "object",
+  "required": ["schema_version", "source", "metadata", "players", "forces", "regions", "archive_members", "capabilities", "parse_warnings"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "source": { "$ref": "#/$defs/source" },
+    "metadata": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "players": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "forces": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "regions": { "type": "array", "items": { "$ref": "#/$defs/region" } },
+    "archive_members": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "capabilities": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "parse_warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "source": { "type": "object", "required": ["path", "size_bytes", "modified_utc", "sha256"], "properties": { "path": { "type": "string" }, "size_bytes": { "type": "integer", "minimum": 0 }, "modified_utc": { "type": "string", "format": "date-time" }, "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" } }, "additionalProperties": true },
+    "field": { "type": "object", "required": ["field", "value", "provenance", "capability"], "properties": { "field": { "type": "string" }, "value": {}, "stored_value": {}, "provenance": { "type": "string" }, "capability": { "type": "string" } }, "additionalProperties": true },
+    "region": { "type": "object", "required": ["id", "name", "min_x", "min_y", "max_x", "max_y", "provenance", "capability"], "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "min_x": { "type": "number" }, "min_y": { "type": "number" }, "max_x": { "type": "number" }, "max_y": { "type": "number" }, "provenance": { "type": "string" }, "capability": { "type": "string" } }, "additionalProperties": true }
+  }
+}

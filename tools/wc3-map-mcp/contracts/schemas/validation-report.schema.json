@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.wc3-map-mcp/schemas/validation-report.schema.json",
+  "title": "WC3 map validation report",
+  "type": "object",
+  "required": ["schema_version", "buildable", "findings"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "buildable": { "type": "boolean" },
+    "findings": { "type": "array", "items": { "type": "object", "required": ["severity", "code", "message"], "properties": { "severity": { "type": "string", "enum": ["error", "warning", "info"] }, "code": { "type": "string" }, "component": { "type": ["string", "null"] }, "target": {}, "provenance": { "type": ["string", "null"] }, "message": { "type": "string" }, "suggested_action": { "type": ["string", "null"] } }, "additionalProperties": true } }
+  },
+  "additionalProperties": true
+}

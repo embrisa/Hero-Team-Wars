@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.wc3-map-mcp/schemas/archive-inventory.schema.json",
+  "title": "WC3 map archive inventory",
+  "type": "object",
+  "required": ["schema_version", "map_path", "map_sha256", "members"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "map_path": { "type": "string" },
+    "map_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes", "compressed_size_bytes", "sha256", "named", "capability"],
+        "properties": {
+          "path": { "type": "string" },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "compressed_size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+          "named": { "type": "boolean" },
+          "capability": { "type": "string", "enum": ["parsed_read_only", "typed_write_enabled", "preserved_opaque", "unsupported_blocking"] },
+          "parser": { "type": ["string", "null"] },
+          "parser_version": { "type": ["string", "null"] },
+          "warnings": { "type": "array", "items": { "type": "string" } },
+          "error": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

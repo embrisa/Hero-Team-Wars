@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Wc3MapEngine.Core</AssemblyName>
+    <RootNamespace>Wc3MapEngine.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Wc3MapEngine.Contracts\Wc3MapEngine.Contracts.csproj" />
+    <PackageReference Include="War3Net.IO.Mpq" Version="6.0.3" />
+    <PackageReference Include="War3Net.Build.Core" Version="6.0.3" />
+  </ItemGroup>
+</Project>

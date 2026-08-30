@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.wc3-map-mcp/schemas/change-operation.schema.json",
+  "title": "WC3 typed map change operation",
+  "type": "object",
+  "required": ["operation_id", "type", "target", "rationale"],
+  "properties": {
+    "operation_id": { "type": "string", "format": "uuid" },
+    "type": { "type": "string", "enum": ["set_map_metadata", "update_region", "create_region", "delete_region", "set_player_slot", "set_force", "place_unit", "move_unit", "remove_placed_unit", "set_object_data", "set_script_source"] },
+    "target": { "type": "object", "additionalProperties": true },
+    "expected": {},
+    "value": {},
+    "rationale": { "type": "string", "minLength": 1 },
+    "design_reference": { "type": "string", "pattern": "^HTW-[0-9]{2}$" }
+  },
+  "additionalProperties": false
+}

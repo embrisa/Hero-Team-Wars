@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.wc3-map-mcp/schemas/test-session.schema.json",
+  "title": "WC3 map test session",
+  "type": "object",
+  "required": ["schema_version", "session_id", "project_id", "build_id", "build_sha256", "target", "executable", "arguments", "started_utc", "exit_state", "evidence_level", "milestones"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "session_id": { "type": "string", "format": "uuid" },
+    "project_id": { "type": "string" },
+    "build_id": { "type": "string", "format": "uuid" },
+    "build_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "target": { "type": "string", "enum": ["editor", "game"] },
+    "executable": { "type": "string" },
+    "arguments": { "type": "array", "items": { "type": "string" } },
+    "test_copy_path": { "type": "string" },
+    "test_copy_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "pid": { "type": "integer", "minimum": 1 },
+    "started_utc": { "type": "string", "format": "date-time" },
+    "exit_state": { "type": "string", "enum": ["running", "unknown", "exited"] },
+    "evidence_level": { "type": "string", "enum": ["process_started", "editor_opened", "game_loaded", "smoke_passed", "playtest_passed"] },
+    "milestones": { "type": "array", "items": { "type": "object", "required": ["milestone", "result", "recorder", "notes", "observed_utc"], "additionalProperties": true } }
+  },
+  "additionalProperties": true
+}

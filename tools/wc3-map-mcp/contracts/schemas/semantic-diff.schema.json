@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.wc3-map-mcp/schemas/semantic-diff.schema.json",
+  "title": "WC3 semantic map diff",
+  "type": "object",
+  "required": ["schema_version", "changes"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "changes": { "type": "array", "items": { "type": "object", "required": ["component", "path", "change_type", "operation_id", "provenance"], "properties": { "component": { "type": "string" }, "path": { "type": "string" }, "before": {}, "after": {}, "change_type": { "type": "string", "enum": ["added", "removed", "changed"] }, "operation_id": { "type": "string" }, "provenance": { "type": "string" } }, "additionalProperties": true } }
+  },
+  "additionalProperties": true
+}

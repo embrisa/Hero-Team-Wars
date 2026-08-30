@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "engine": {
+    "executable": "../map-engine/publish/Wc3MapEngine.Cli.exe",
+    "arguments": [],
+    "request_timeout_ms": 120000
+  },
+  "projects": {
+    "hero-team-wars": {
+      "root": "C:/Users/hp/Documents/Warcraft III/Hero Team Wars",
+      "source_maps": ["map/HeroTeamWars_M0_2Arena.w3m"],
+      "read_roots": ["map", "builds", "tools/wc3-map-mcp/artifacts"],
+      "staging_root": "tools/wc3-map-mcp/snapshots/transactions",
+      "artifact_root": "tools/wc3-map-mcp/artifacts",
+      "build_root": "builds/mcp",
+      "log_root": "tools/wc3-map-mcp/logs",
+      "test_output_root": "tools/wc3-map-mcp/artifacts/tests",
+      "world_editor": "C:/Warcraft III/_retail_/x86_64/World Editor.exe",
+      "warcraft": "C:/Warcraft III/_retail_/x86_64/Warcraft III.exe",
+      "test_map_root": "C:/Users/hp/Documents/Warcraft III/Maps/Test",
+      "enabled_tools": [],
+      "write_policy": "writes",
+      "max_map_bytes": 536870912,
+      "max_operation_count": 100
+    }
+  }
+}

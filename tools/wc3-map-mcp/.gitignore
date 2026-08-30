@@ -1,0 +1,19 @@
+# Local configuration and generated MCP state
+config/*.local.json
+artifacts/*
+!artifacts/README.md
+logs/*
+!logs/README.md
+snapshots/*
+!snapshots/README.md
+builds/mcp/*
+
+# Node and .NET build outputs
+mcp-server/node_modules/
+mcp-server/dist/
+map-engine/**/bin/
+map-engine/**/obj/
+map-engine/publish/
+
+# Temporary test output
+tests/tmp/

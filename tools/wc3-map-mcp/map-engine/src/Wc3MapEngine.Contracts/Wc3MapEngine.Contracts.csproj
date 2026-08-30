@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Wc3MapEngine.Contracts</AssemblyName>
+    <RootNamespace>Wc3MapEngine.Contracts</RootNamespace>
+  </PropertyGroup>
+</Project>
