@@ -1,0 +1,17 @@
+{
+  "id": "round_start",
+  "name": "HTW Round Start",
+  "folder_path": "MCP/Phases",
+  "enabled": true,
+  "initially_on": true,
+  "events": [{ "type": "custom_event", "name": "round_start" }],
+  "conditions": [{ "type": "always" }],
+  "actions": [
+    { "type": "call_function", "function": "HTW_Phases_Advance" },
+    { "type": "call_function", "function": "HTW_Information_Display" }
+  ],
+  "references": { "functions": ["HTW_Phases_Advance", "HTW_Information_Display"] },
+  "source_location": { "path": "triggers/round-start.trigger.json", "line": 1 },
+  "provenance": "intended_design",
+  "capability": "mcp_native_jass"
+}

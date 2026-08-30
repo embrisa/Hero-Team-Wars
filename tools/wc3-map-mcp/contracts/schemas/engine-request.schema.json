@@ -7,7 +7,7 @@
   "properties": {
     "protocol_version": { "const": "1.0" },
     "request_id": { "type": "string", "format": "uuid" },
-    "operation": { "type": "string", "enum": ["environment_status", "hash_file", "list_archive_members", "probe_map", "inspect_map", "validate_map", "validate_canonical", "apply_operations", "build_map", "compare_maps"] },
+    "operation": { "type": "string", "enum": ["environment_status", "hash_file", "list_archive_members", "probe_map", "inspect_map", "validate_map", "validate_canonical", "apply_operations", "build_map", "compare_maps", "read_script_source", "compose_gameplay_source", "validate_gameplay_source", "run_scenario"] },
     "payload": { "type": "object", "additionalProperties": true }
   },
   "additionalProperties": false

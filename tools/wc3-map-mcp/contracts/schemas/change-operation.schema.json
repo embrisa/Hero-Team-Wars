@@ -14,10 +14,52 @@
     "rationale": { "type": "string", "minLength": 1 },
     "design_reference": { "type": "string", "pattern": "^HTW-[0-9]{2}$" }
   },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "module": {
+      "type": "object",
+      "required": ["id", "source"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+        "path": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1, "maxLength": 2097152 },
+        "source_sha256": { "$ref": "#/$defs/sha256" },
+        "enabled": { "type": "boolean" },
+        "dependencies": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" }, "uniqueItems": true },
+        "public_symbols": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }, "uniqueItems": true },
+        "provenance": { "type": "string" }, "capability": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "enum": ["map_initialization", "periodic_timer", "elapsed_time", "player_chat", "unit_death", "region_entry", "player_state_change", "custom_event"] }, "period": { "type": "number", "exclusiveMinimum": 0 }, "seconds": { "type": "number", "minimum": 0 }, "player_id": { "type": "integer", "minimum": 1, "maximum": 24 }, "message": { "type": "string", "minLength": 1 }, "exact": { "type": "boolean" }, "region_id": { "type": "string" }, "region_name": { "type": "string" }, "unit_rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "state": { "type": "string" }, "operator": { "type": "string" }, "value": { "type": "number" }, "name": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "condition": { "type": "object", "required": ["type"], "properties": { "type": { "enum": ["always", "boolean_variable", "integer_compare", "real_compare", "function"] }, "variable_id": { "type": "string" }, "operator": { "type": "string" }, "value": {}, "function": { "type": "string" } }, "additionalProperties": false },
+    "action": { "type": "object", "required": ["type"], "properties": { "type": { "enum": ["set_variable", "branch", "create_timer", "unit_operation", "group_operation", "message", "phase_transition", "call_function", "return"] }, "variable_id": { "type": "string" }, "value": {}, "condition": { "$ref": "#/$defs/condition" }, "then": { "type": "array", "items": { "$ref": "#/$defs/action" } }, "else": { "type": "array", "items": { "$ref": "#/$defs/action" } }, "period": { "type": "number", "exclusiveMinimum": 0 }, "repeating": { "type": "boolean" }, "callback": { "type": "string" }, "operation": { "type": "string" }, "group_variable_id": { "type": "string" }, "text": { "type": "string" }, "phase": { "type": "integer" }, "function": { "type": "string" } }, "additionalProperties": false },
+    "trigger": {
+      "type": "object",
+      "required": ["id", "name", "folder_path", "events"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }, "name": { "type": "string", "minLength": 1 }, "folder_path": { "type": "string", "minLength": 1 }, "enabled": { "type": "boolean" }, "initially_on": { "type": "boolean" },
+        "events": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/event" } }, "conditions": { "type": "array", "items": { "$ref": "#/$defs/condition" } }, "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
+        "references": { "type": "object" }, "source_location": { "type": "object" }, "handler_name": { "type": "string" }, "dependencies": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }, "editor_encoding": { "type": "object" }, "provenance": { "type": "string" }, "capability": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "variable": {
+      "type": "object",
+      "required": ["id", "name", "type"],
+      "properties": { "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }, "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }, "type": { "enum": ["integer", "real", "boolean", "string", "handle", "timer", "trigger", "unit", "group", "region", "rect", "player", "force"] }, "initial": {}, "default_value": {}, "value": {}, "dependencies": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }, "provenance": { "type": "string" }, "capability": { "type": "string" } },
+      "additionalProperties": false
+    }
+  },
   "additionalProperties": false,
   "allOf": [
     {
-      "if": { "properties": { "type": { "const": "set_script_source" } } },
+      "if": { "required": ["type"], "properties": { "type": { "const": "set_script_source" } } },
       "then": {
         "required": ["expected", "value"],
         "properties": {
@@ -41,6 +83,34 @@
           }
         }
       }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "upsert_script_module" } } },
+      "then": { "required": ["value"], "properties": { "target": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" } }, "additionalProperties": false }, "value": { "$ref": "#/$defs/module" }, "expected": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "object", "required": ["source_sha256"], "properties": { "source_sha256": { "$ref": "#/$defs/sha256" } }, "additionalProperties": false }, { "type": "object" }] } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "remove_script_module" } } },
+      "then": { "required": ["expected"], "properties": { "target": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "create_trigger" } } },
+      "then": { "required": ["value"], "properties": { "target": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" } }, "additionalProperties": false }, "value": { "$ref": "#/$defs/trigger" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "create_variable" } } },
+      "then": { "required": ["value"], "properties": { "target": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" } }, "additionalProperties": false }, "value": { "$ref": "#/$defs/variable" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "enum": ["update_trigger", "move_trigger", "delete_trigger", "update_variable", "delete_variable"] } } },
+      "then": { "required": ["expected"], "properties": { "target": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "move_trigger" } } },
+      "then": { "required": ["value"], "properties": { "value": { "type": "object", "required": ["folder_path"], "properties": { "folder_path": { "type": "string", "minLength": 1 } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "set_trigger_mode" } } },
+      "then": { "required": ["expected", "value"], "properties": { "target": { "type": "object", "maxProperties": 0 }, "value": { "type": "object", "required": ["mode"], "properties": { "mode": { "enum": ["mcp_native", "mcp_native_jass", "editor_compatible"] } }, "additionalProperties": false } } }
     }
   ]
 }

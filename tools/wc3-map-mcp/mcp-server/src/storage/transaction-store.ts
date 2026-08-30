@@ -34,6 +34,8 @@ export interface TransactionOperationRecord {
   revision: number;
   type: string;
   target: Record<string, unknown>;
+  expected?: unknown;
+  value?: unknown;
   rationale: string;
   design_reference?: string;
 }

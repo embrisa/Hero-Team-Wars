@@ -9,6 +9,7 @@ namespace Wc3MapEngine.Core.Gameplay;
 public static class ScenarioRunner
 {
     public const string HarnessVersion = "htw-scenario-harness-1.0";
+    private const int RequiredRepeats = 2;
     private static readonly string[] KnownScenarios =
     {
         "fresh_initialization", "preparation_combat_resolution", "single_hero_death",
@@ -31,8 +32,12 @@ public static class ScenarioRunner
             if (scenario.StartsWith("six_team_", StringComparison.Ordinal) && profile != "full_6team") throw new EngineException("INVALID_ARGUMENT", $"Scenario '{scenario}' requires the full_6team profile.");
         }
 
+        scenarios = scenarios.Distinct(StringComparer.Ordinal).ToList();
         var results = new JsonArray();
-        foreach (var scenario in scenarios.Distinct(StringComparer.Ordinal)) results.Add(RunOne(scenario, profile, chunkId));
+        foreach (var scenario in scenarios)
+        {
+            for (var repeat = 1; repeat <= RequiredRepeats; repeat++) results.Add(RunOne(scenario, profile, chunkId, repeat));
+        }
         var passed = results.OfType<JsonObject>().Count(x => x["result"]?.GetValue<string>() == "pass");
         return new JsonObject
         {
@@ -41,6 +46,8 @@ public static class ScenarioRunner
             ["profile"] = profile,
             ["chunk_id"] = chunkId,
             ["scenario_count"] = results.Count,
+            ["unique_scenario_count"] = scenarios.Count,
+            ["repeat_count"] = RequiredRepeats,
             ["passed_count"] = passed,
             ["failed_count"] = results.Count - passed,
             ["evidence_level"] = "static_only",
@@ -49,7 +56,7 @@ public static class ScenarioRunner
         };
     }
 
-    private static JsonObject RunOne(string scenario, string profile, string chunkId)
+    private static JsonObject RunOne(string scenario, string profile, string chunkId, int repeat)
     {
         var routeN = profile == "full_6team" || scenario.StartsWith("six_team_", StringComparison.Ordinal) ? 6 : 2;
         var round = scenario.StartsWith("six_team_", StringComparison.Ordinal) ? 7 : 1;
@@ -77,13 +84,14 @@ public static class ScenarioRunner
         return new JsonObject
         {
             ["scenario_id"] = scenario,
+            ["repeat_index"] = repeat,
             ["chunk_id"] = chunkId,
             ["round"] = round,
             ["wave_id"] = scenario == "fresh_initialization" ? 0 : 1,
             ["team"] = fromTeam,
             ["expected"] = expected,
             ["actual"] = actual,
-            ["marker"] = $"[HTW] chunk={chunkId} scenario={scenario} round={round} wave={(scenario == "fresh_initialization" ? 0 : 1)} team={fromTeam} expected={expected} actual={actual}",
+            ["marker"] = $"[HTW] chunk={chunkId} scenario={scenario} repeat={repeat} round={round} wave={(scenario == "fresh_initialization" ? 0 : 1)} team={fromTeam} expected={expected} actual={actual}",
             ["result"] = "pass",
             ["evidence_level"] = "static_only",
             ["runtime_verified"] = false

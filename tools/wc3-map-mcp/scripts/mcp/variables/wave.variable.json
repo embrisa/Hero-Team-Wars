@@ -1,0 +1,8 @@
+{
+  "id": "wave",
+  "name": "HTW_Wave",
+  "type": "integer",
+  "initial": 0,
+  "provenance": "intended_design",
+  "capability": "mcp_native_jass"
+}

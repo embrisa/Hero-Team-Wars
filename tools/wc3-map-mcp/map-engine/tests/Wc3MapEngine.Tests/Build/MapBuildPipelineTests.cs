@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using Wc3MapEngine.Core;
+using Wc3MapEngine.Core.Gameplay;
 using Xunit;
 
 namespace Wc3MapEngine.Tests.Build;
@@ -138,6 +139,54 @@ public sealed class MapBuildPipelineTests
         }
     }
 
+    [Fact]
+    public void McpNativeGameplayBuildReopensWithSourceOwnedModel()
+    {
+        var source = FindSourceMap();
+        var sourceArchive = MapArchive.Read(source);
+        var composed = GameplaySourceComposer.Compose(Path.Combine(FindProjectRoot(), "tools", "wc3-map-mcp", "scripts", "mcp", "manifest.json"));
+        var directory = Path.Combine(Path.GetTempPath(), "wc3-map-mcp-gameplay", Guid.NewGuid().ToString("N"));
+        var canonical = Path.Combine(directory, "canonical.json");
+        var output = Path.Combine(directory, "gameplay.w3m");
+
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var model = MapInspector.Inspect(source);
+            var sourceModel = composed["canonical_model"]!.AsObject();
+            foreach (var field in new[] { "gameplay_modules", "gameplay_triggers", "gameplay_variables" }) model[field] = sourceModel[field]!.DeepClone();
+            model["trigger_mode"] = "mcp_native_jass";
+            model["gameplay_source"] = new JsonObject
+            {
+                ["schema_version"] = "1.0",
+                ["composer_version"] = composed["composer_version"]!.DeepClone(),
+                ["mode"] = composed["mode"]!.DeepClone(),
+                ["profile"] = composed["profile"]!.DeepClone(),
+                ["source_sha256"] = composed["source_sha256"]!.DeepClone(),
+                ["source_manifest_sha256"] = composed["source_manifest_sha256"]!.DeepClone(),
+                ["source_manifest"] = composed["source_manifest"]!.DeepClone(),
+                ["static_validation"] = composed["static_validation"]!.DeepClone()
+            };
+            var script = model["scripts"]!.AsArray().OfType<JsonObject>().Single(item => item["archive_path"]!.GetValue<string>() == "war3map.j");
+            script["source"] = composed["source"]!.DeepClone();
+            script["source_sha256"] = composed["source_sha256"]!.DeepClone();
+            script["sha256"] = composed["source_sha256"]!.DeepClone();
+            script["size_bytes"] = composed["source_bytes"]!.DeepClone();
+            JsonUtilities.WriteAtomic(canonical, model);
+
+            var result = MapBuilder.Build(source, canonical, output, "debug");
+
+            Assert.True(result["reopened"]!.GetValue<bool>());
+            Assert.Empty(result["semantic_differences_after_reopen"]!.AsArray());
+            Assert.Equal(sourceArchive.Find("war3map.wtg")?.Sha256, MapArchive.Read(output).Find("war3map.wtg")?.Sha256);
+            Assert.Equal(composed["source_sha256"]!.GetValue<string>(), MapArchive.Read(output).Find("war3map.j")?.Sha256);
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string FindSourceMap()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -149,5 +198,17 @@ public sealed class MapBuildPipelineTests
         }
 
         throw new FileNotFoundException("The local Hero Team Wars source fixture was not found.");
+    }
+
+    private static string FindProjectRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        for (var depth = 0; depth < 12 && current is not null; depth++)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "tools", "wc3-map-mcp", "scripts", "mcp", "manifest.json"))) return current.FullName;
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("The local Hero Team Wars project root was not found.");
     }
 }

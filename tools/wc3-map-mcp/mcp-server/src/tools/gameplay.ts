@@ -11,7 +11,7 @@ export function registerGameplayTools(gameplay: GameplayService, register: Regis
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true }
   }, async (input: any) => {
     const id = correlationId();
-    return safeCall(id, () => gameplay.compose(input.project_id, input.manifest_path, input.profile, id));
+    return safeCall(id, () => gameplay.compose(input.project_id, input.manifest_path, input.profile, id, input.expected_manifest_sha256, input.expected_module_hashes));
   });
 
   register("wc3_validate_gameplay_source", {
@@ -20,7 +20,7 @@ export function registerGameplayTools(gameplay: GameplayService, register: Regis
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true }
   }, async (input: any) => {
     const id = correlationId();
-    return safeCall(id, () => gameplay.validate(input.project_id, input.manifest_path, input.profile, id));
+    return safeCall(id, () => gameplay.validate(input.project_id, input.manifest_path, input.profile, id, input.expected_manifest_sha256, input.expected_module_hashes));
   });
 
   register("wc3_prepare_gameplay_chunk", {

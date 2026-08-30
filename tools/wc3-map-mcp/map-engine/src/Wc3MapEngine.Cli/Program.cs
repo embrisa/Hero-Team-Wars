@@ -91,8 +91,8 @@ internal static class Program
                 "apply_operations" => ApplyOperations(request.Payload),
                 "build_map" => BuildMap(request.Payload),
                 "compare_maps" => CompareMaps(request.Payload),
-                "compose_gameplay_source" => ComposeGameplaySource(request.Payload),
-                "validate_gameplay_source" => ComposeGameplaySource(request.Payload),
+                "compose_gameplay_source" => ComposeGameplaySource(request.Payload, validationOnly: false),
+                "validate_gameplay_source" => ComposeGameplaySource(request.Payload, validationOnly: true),
                 "run_scenario" => ScenarioRunner.Run(request.Payload),
                 _ => throw new EngineException("INVALID_ARGUMENT", $"Unknown engine operation '{request.Operation}'.")
             };
@@ -273,10 +273,27 @@ internal static class Program
         payload["profile"]?.GetValue<string>() ?? "debug",
         payload["validation_context"] as JsonObject);
 
-    private static JsonObject ComposeGameplaySource(JsonObject payload)
+    private static JsonObject ComposeGameplaySource(JsonObject payload, bool validationOnly)
     {
         var manifestPath = RequiredPath(payload, "manifest_path");
         var result = GameplaySourceComposer.Compose(manifestPath, payload["profile"]?.GetValue<string>());
+        var expectedManifestHash = payload["expected_manifest_sha256"]?.GetValue<string>();
+        if (expectedManifestHash is not null && !string.Equals(expectedManifestHash, result["manifest_sha256"]?.GetValue<string>(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new EngineException("PRECONDITION_FAILED", "The expected gameplay manifest SHA-256 does not match the manifest being composed.");
+        }
+        if (payload["expected_module_hashes"] is JsonObject expectedModules)
+        {
+            var modules = result["modules"] as JsonArray ?? new JsonArray();
+            foreach (var expected in expectedModules)
+            {
+                var expectedHash = expected.Value?.GetValue<string>();
+                var actualHash = modules.OfType<JsonObject>().FirstOrDefault(module => module["id"]?.GetValue<string>() == expected.Key)?["source_sha256"]?.GetValue<string>();
+                if (actualHash is null || !string.Equals(expectedHash, actualHash, StringComparison.OrdinalIgnoreCase)) throw new EngineException("PRECONDITION_FAILED", $"The expected source hash for gameplay module '{expected.Key}' does not match the composed module.");
+            }
+        }
+        result["operation"] = validationOnly ? "validate_gameplay_source" : "compose_gameplay_source";
+        result["validation_only"] = validationOnly;
         if (payload["output_source_path"]?.GetValue<string>() is { Length: > 0 } outputPath)
         {
             var directory = Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? throw new EngineException("INVALID_ARGUMENT", "Gameplay source output must have a parent directory.");
@@ -294,6 +311,7 @@ internal static class Program
         var rightPath = RequiredPath(payload, "right_path");
         var left = IsCanonical(leftPath) ? JsonUtilities.Read(leftPath) : MapInspector.Inspect(leftPath);
         var right = IsCanonical(rightPath) ? JsonUtilities.Read(rightPath) : MapInspector.Inspect(rightPath);
+        if (left is JsonObject leftCanonical && right is JsonObject rightInspection && IsCanonical(leftPath)) MergeProjectOwnedGameplay(rightInspection, leftCanonical);
         var leftMembers = left?["archive_members"] as JsonArray ?? new JsonArray();
         var rightMembers = right?["archive_members"] as JsonArray ?? new JsonArray();
         var memberChanges = new JsonArray();
@@ -370,6 +388,14 @@ internal static class Program
             ["container_differences"] = containerDifferences,
             ["semantic_differences"] = SemanticDiff.CompareCanonical(left, right, "compare")
         };
+    }
+
+    private static void MergeProjectOwnedGameplay(JsonObject destination, JsonObject source)
+    {
+        foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables" })
+        {
+            if (source[field] is JsonNode value) destination[field] = value.DeepClone();
+        }
     }
 
     private static bool IsCanonical(string path) => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);

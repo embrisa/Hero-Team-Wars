@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { AppError } from "../errors/app-error.js";
 import { isWithin, relativeProjectPath, resolveConfiguredPath, resolveContained, type ResolvedProject } from "../config/resolve-project.js";
@@ -22,22 +22,26 @@ export class GameplayService {
     private readonly launches: LaunchService
   ) {}
 
-  public async compose(projectId: string, manifestPath: string, profile: string | undefined, correlationId: string): Promise<Record<string, unknown>> {
+  public async compose(projectId: string, manifestPath: string, profile: string | undefined, correlationId: string, expectedManifestHash?: string, expectedModuleHashes?: Record<string, string>): Promise<Record<string, unknown>> {
     this.projects.assertToolAvailable(projectId, "wc3_compose_gameplay_source");
     const project = this.projectManifest(projectId, manifestPath);
     const result = await this.worker.request<Record<string, unknown>>("compose_gameplay_source", {
       manifest_path: project.manifest,
-      ...(profile ? { profile } : {})
+      ...(profile ? { profile } : {}),
+      ...(expectedManifestHash ? { expected_manifest_sha256: expectedManifestHash } : {}),
+      ...(expectedModuleHashes ? { expected_module_hashes: expectedModuleHashes } : {})
     }, correlationId);
     return this.persistComposition(project.project, result);
   }
 
-  public async validate(projectId: string, manifestPath: string, profile: string | undefined, correlationId: string): Promise<Record<string, unknown>> {
+  public async validate(projectId: string, manifestPath: string, profile: string | undefined, correlationId: string, expectedManifestHash?: string, expectedModuleHashes?: Record<string, string>): Promise<Record<string, unknown>> {
     this.projects.assertToolAvailable(projectId, "wc3_validate_gameplay_source");
     const project = this.projectManifest(projectId, manifestPath);
     const result = await this.worker.request<Record<string, unknown>>("validate_gameplay_source", {
       manifest_path: project.manifest,
-      ...(profile ? { profile } : {})
+      ...(profile ? { profile } : {}),
+      ...(expectedManifestHash ? { expected_manifest_sha256: expectedManifestHash } : {}),
+      ...(expectedModuleHashes ? { expected_module_hashes: expectedModuleHashes } : {})
     }, correlationId);
     const report = withoutSource(result);
     const sourceHash = String(result.source_sha256 ?? "").toUpperCase();
@@ -123,6 +127,7 @@ export class GameplayService {
     this.projects.assertMutationAllowed(input.project_id, "wc3_record_chunk_result");
     const loaded = this.builds.load(input.project_id, input.build_id);
     if (loaded.manifest.output_sha256.toUpperCase() !== input.expected_build_hash.toUpperCase()) throw new AppError("SOURCE_CHANGED", "The expected build hash does not match the exact build artifact.");
+    if (loaded.manifest.transaction_id !== input.transaction_id || loaded.manifest.revision !== input.revision) throw new AppError("PRECONDITION_FAILED", "The chunk result transaction and revision do not match the exact build manifest.");
     let session: unknown;
     if (input.test_session_id) {
       session = await this.launches.get(input.project_id, input.test_session_id);
@@ -161,6 +166,8 @@ export class GameplayService {
     const source = String(result.source ?? "");
     const sourceHash = String(result.source_sha256 ?? "").toUpperCase();
     if (!source || !HASH.test(sourceHash)) throw new AppError("ENGINE_PROTOCOL_ERROR", "The composer returned no valid source hash.");
+    const recomputedHash = createHash("sha256").update(source, "utf8").digest("hex").toUpperCase();
+    if (recomputedHash !== sourceHash) throw new AppError("ENGINE_PROTOCOL_ERROR", "The composer returned a source hash that does not match the returned source text.");
     const sourceArtifact = writeTextArtifact(project, artifactPath(project, `gameplay/source/${sourceHash}/war3map.j`), source, "gameplay_source");
     const report = withoutSource(result);
     const manifestArtifact = writeJsonArtifact(project, artifactPath(project, `gameplay/source/${sourceHash}/composition.json`), report, "gameplay_manifest");

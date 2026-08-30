@@ -20,7 +20,15 @@ export const recordTestResultSchema = z.object({ project_id: z.string().min(1).m
 export const getTestSessionSchema = z.object({ project_id: z.string().min(1).max(100), session_id: uuidSchema }).strict();
 export const promoteSchema = z.object({ project_id: z.string().min(1).max(100), build_id: uuidSchema, expected_build_hash: sha256Schema, destination_id: z.literal("test_map_root"), destination_name: z.string().min(1).max(200) }).strict();
 export const discardSchema = z.object({ project_id: z.string().min(1).max(100), transaction_id: uuidSchema, expected_source_hash: sha256Schema, confirmation: z.literal(true) }).strict();
-export const gameplayManifestSchema = z.object({ project_id: z.string().min(1).max(100), manifest_path: z.string().min(1).max(400), profile: z.enum(["mvp_2arena", "full_6team", "gui_compatible"]).optional() }).strict();
+export const gameplayManifestSchema = z.object({
+  project_id: z.string().min(1).max(100),
+  manifest_path: z.string().min(1).max(400),
+  profile: z.enum(["mvp_2arena", "full_6team", "gui_compatible"]).optional(),
+  expected_manifest_sha256: sha256Schema.optional(),
+  expected_module_hashes: z.record(z.string().min(1), sha256Schema).optional()
+}).strict();
 export const prepareGameplayChunkSchema = gameplayManifestSchema.extend({ transaction_id: uuidSchema, expected_revision: z.number().int().min(0), chunk_id: z.string().regex(/^HTW-[0-9]{2}$/) }).strict();
 export const runScenarioBuildSchema = z.object({ project_id: z.string().min(1).max(100), transaction_id: uuidSchema, revision: z.number().int().min(0), expected_source_hash: sha256Schema, chunk_id: z.string().regex(/^HTW-[0-9]{2}$/), scenario_ids: z.array(z.string().min(1).max(100)).max(50).optional(), profile: z.enum(["mvp_2arena", "full_6team"]).default("mvp_2arena") }).strict();
-export const recordChunkResultSchema = z.object({ project_id: z.string().min(1).max(100), chunk_id: z.string().regex(/^HTW-[0-9]{2}$/), scenario_id: z.string().min(1).max(100), transaction_id: uuidSchema, revision: z.number().int().min(0), build_id: uuidSchema, expected_build_hash: sha256Schema, result: z.enum(["pass", "fail"]), evidence_level: z.enum(["static_only", "user_observed"]).default("static_only"), test_session_id: uuidSchema.optional(), notes: z.string().max(10000) }).strict();
+export const recordChunkResultSchema = z.object({ project_id: z.string().min(1).max(100), chunk_id: z.string().regex(/^HTW-[0-9]{2}$/), scenario_id: z.string().min(1).max(100), transaction_id: uuidSchema, revision: z.number().int().min(0), build_id: uuidSchema, expected_build_hash: sha256Schema, result: z.enum(["pass", "fail"]), evidence_level: z.enum(["static_only", "user_observed"]).default("static_only"), test_session_id: uuidSchema.optional(), notes: z.string().max(10000) }).strict().superRefine((value, context) => {
+  if (value.evidence_level === "user_observed" && !value.test_session_id) context.addIssue({ code: "custom", path: ["test_session_id"], message: "user_observed chunk evidence requires an exact test_session_id." });
+});

@@ -60,6 +60,12 @@ public static class MapBuilder
         {
             MapArchive.Rebuild(sourcePath, temporaryPath, replacements);
             var reopened = MapInspector.Inspect(temporaryPath);
+            // Gameplay manifests and the composed-source record are project
+            // ownership metadata; they are deliberately not serialized as
+            // separate archive members. Reattach them before the semantic
+            // round-trip comparison while the generated war3map.j remains
+            // verified from the archive itself.
+            MergeProjectOwnedGameplay(reopened, staged);
             var semanticDifferences = SemanticDiff.CompareCanonical(staged, reopened, "build-reopen");
             if (semanticDifferences.Count != 0)
             {
@@ -98,6 +104,15 @@ public static class MapBuilder
             TryDelete(temporaryPath);
             TryDelete(outputFile);
             throw;
+        }
+    }
+
+    private static void MergeProjectOwnedGameplay(JsonObject reopened, JsonObject staged)
+    {
+        foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables" })
+        {
+            if (staged[field] is JsonNode value) reopened[field] = value.DeepClone();
+            else reopened.Remove(field);
         }
     }
 

@@ -1,0 +1,17 @@
+{
+  "id": "wave_resolved",
+  "name": "HTW Wave Resolved",
+  "folder_path": "MCP/Waves",
+  "enabled": true,
+  "initially_on": true,
+  "events": [{ "type": "custom_event", "name": "wave_resolved" }],
+  "conditions": [{ "type": "always" }],
+  "actions": [
+    { "type": "call_function", "function": "HTW_Information_Display" },
+    { "type": "call_function", "function": "HTW_Waves_Prepare" }
+  ],
+  "references": { "functions": ["HTW_Information_Display", "HTW_Waves_Prepare"] },
+  "source_location": { "path": "triggers/wave-resolved.trigger.json", "line": 1 },
+  "provenance": "intended_design",
+  "capability": "mcp_native_jass"
+}

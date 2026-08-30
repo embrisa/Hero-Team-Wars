@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using War3Net.Build.Common;
+using Wc3MapEngine.Core.Gameplay;
 using Wc3MapEngine.Core.Scripts;
 
 namespace Wc3MapEngine.Core;
@@ -45,6 +46,11 @@ public static class OperationApplier
         var allChanges = new JsonArray();
         var applied = new JsonArray();
         var operationIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var operationTypes = operations.OfType<JsonObject>().Select(operation => RequiredString(operation, "type")).ToArray();
+        if (operationTypes.Contains("set_trigger_mode", StringComparer.Ordinal) && operationTypes.Length != 1)
+        {
+            throw new EngineException("INVALID_ARGUMENT", "set_trigger_mode must be the only operation in a transaction batch.");
+        }
 
         foreach (var operationNode in operations)
         {
@@ -75,6 +81,11 @@ public static class OperationApplier
             }
 
             applied.Add(operationId);
+        }
+
+        if (operationTypes.Any(IsGameplayModelOperation))
+        {
+            FinalizeGameplayModel(working);
         }
 
         return new JsonObject
@@ -769,11 +780,19 @@ public static class OperationApplier
     {
         EnsureAllowed(target, "id");
         if (value is not JsonObject module) throw new EngineException("INVALID_ARGUMENT", "upsert_script_module requires a module object.");
-        EnsureAllowed(module, "id", "path", "dependencies", "source", "source_sha256", "enabled", "public_symbols");
+        EnsureAllowed(module, "id", "path", "dependencies", "source", "source_sha256", "enabled", "public_symbols", "provenance", "capability");
         var modules = Collection(root, "gameplay_modules");
         var id = StringValue(target["id"]) ?? StringValue(module["id"]) ?? throw new EngineException("INVALID_ARGUMENT", "A stable module id is required.");
+        if (module["id"] is not null && !string.Equals(StringValue(module["id"]), id, StringComparison.Ordinal)) throw new EngineException("INVALID_ARGUMENT", $"Module value id '{StringValue(module["id"])}' does not match target id '{id}'.");
         var existing = modules.OfType<JsonObject>().FirstOrDefault(item => StringValue(item, "id") == id);
-        EnsureExpectedOrAbsent(existing, expected, $"gameplay_modules.{id}");
+        EnsureModuleExpected(existing, expected, id);
+        if (StringValue(module, "source") is not { Length: > 0 } source) throw new EngineException("INVALID_ARGUMENT", $"upsert_script_module '{id}' requires complete source text so the composed entry point remains reproducible.");
+        var declaredSourceHash = StringValue(module, "source_sha256");
+        module["source"] = NormalizeGameplaySource(source);
+        var computedSourceHash = Hashing.Sha256(Encoding.UTF8.GetBytes(module["source"]!.GetValue<string>()));
+        if (declaredSourceHash is not null && !string.Equals(declaredSourceHash, computedSourceHash, StringComparison.OrdinalIgnoreCase)) throw new EngineException("SOURCE_CHANGED", $"Gameplay module '{id}' source_sha256 does not match its source text.");
+        module["source_sha256"] = computedSourceHash;
+        GameplayModelValidator.ValidateModule(module, requireSource: true);
         if (existing is null)
         {
             var created = module.DeepClone() as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "Module could not be cloned.");
@@ -792,7 +811,7 @@ public static class OperationApplier
         var modules = Collection(root, "gameplay_modules");
         var id = RequiredString(target, "id");
         var module = modules.OfType<JsonObject>().FirstOrDefault(item => StringValue(item, "id") == id) ?? throw new EngineException("INVALID_ARGUMENT", $"Script module '{id}' was not found.");
-        EnsureExpected(module, expected, $"gameplay_modules.{id}");
+        EnsureModuleExpected(module, expected, id);
         modules.Remove(module);
     }
 
@@ -825,9 +844,10 @@ public static class OperationApplier
             if (existing is not null) throw new EngineException("INVALID_ARGUMENT", $"{collectionName} entry '{identity}' already exists.");
             if (value is not JsonObject created) throw new EngineException("INVALID_ARGUMENT", $"{type} requires an object value.");
             EnsureAllowed(created, collectionName == "triggers"
-                ? new[] { "id", "name", "folder_path", "enabled", "initially_on", "events", "conditions", "actions", "references", "source_location", "handler_name", "dependencies" }
-                : new[] { "id", "name", "type", "default_value", "value", "dependencies" });
+                ? new[] { "id", "name", "folder_path", "folder", "enabled", "initially_on", "events", "conditions", "actions", "references", "source_location", "handler_name", "dependencies", "editor_encoding", "provenance", "capability" }
+                : new[] { "id", "name", "type", "initial", "default_value", "value", "dependencies", "provenance", "capability" });
             var clone = created.DeepClone() as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "Collection value could not be cloned.");
+            if (clone["id"] is not null && !string.Equals(StringValue(clone["id"]), identity, StringComparison.Ordinal)) throw new EngineException("INVALID_ARGUMENT", $"{collectionName} value id '{StringValue(clone["id"])}' does not match target id '{identity}'.");
             clone["id"] = identity;
             if (collectionName == "triggers") ValidateTrigger(clone);
             else ValidateVariable(clone);
@@ -844,11 +864,81 @@ public static class OperationApplier
         }
 
         if (value is not JsonObject update) throw new EngineException("INVALID_ARGUMENT", $"{type} requires an object value.");
-        EnsureAllowed(update, "name", "folder_path", "enabled", "initially_on", "events", "conditions", "actions", "references", "source_location", "handler_name", "type", "default_value", "value", "dependencies");
+        if (type == "move_trigger")
+        {
+            var move = value as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "move_trigger requires an object value.");
+            EnsureAllowed(move, "folder_path", "folder");
+            if (move["folder_path"] is null && move["folder"] is not null) move["folder_path"] = move["folder"]!.DeepClone();
+        }
+        else
+        {
+            EnsureAllowed(update, "name", "folder_path", "folder", "enabled", "initially_on", "events", "conditions", "actions", "references", "source_location", "handler_name", "dependencies", "editor_encoding", "provenance", "capability", "type", "initial", "default_value", "value");
+        }
         foreach (var property in update) existing[property.Key] = property.Value?.DeepClone();
         if (collectionName == "triggers") ValidateTrigger(existing);
         else ValidateVariable(existing);
     }
+
+    private static bool IsGameplayModelOperation(string type)
+        => type is "upsert_script_module" or "remove_script_module" or "create_trigger" or "update_trigger" or "move_trigger" or "delete_trigger" or "create_variable" or "update_variable" or "delete_variable";
+
+    private static void FinalizeGameplayModel(JsonObject root)
+    {
+        GameplayModelValidator.ValidateCollections(root, requireModuleSources: true);
+        var composition = GameplaySourceComposer.ComposeCanonical(root, StringValue(root["profile"]));
+        var source = RequiredString(composition, "source");
+        var scripts = RequiredArray(root, "scripts");
+        var script = scripts.OfType<JsonObject>().FirstOrDefault(item => string.Equals(StringValue(item, "archive_path"), "war3map.j", StringComparison.OrdinalIgnoreCase))
+            ?? throw new EngineException("UNSUPPORTED_COMPONENT", "Gameplay model changes require an existing war3map.j archive member.");
+        var bytes = Encoding.UTF8.GetBytes(source);
+        var hash = Hashing.Sha256(bytes);
+        script["language"] = "Jass";
+        script["source"] = source;
+        script["source_sha256"] = hash;
+        script["sha256"] = hash;
+        script["size_bytes"] = bytes.Length;
+        script["provenance"] = "intended_design";
+        script["capability"] = "staged_typed_write";
+        root["trigger_mode"] = GameplayModelValidator.NativeMode;
+        root["gameplay_source"] = new JsonObject
+        {
+            ["schema_version"] = "1.0",
+            ["composer_version"] = composition["composer_version"]!.DeepClone(),
+            ["mode"] = composition["mode"]!.DeepClone(),
+            ["profile"] = composition["profile"]!.DeepClone(),
+            ["source_sha256"] = hash,
+            ["source_manifest_sha256"] = composition["source_manifest_sha256"]!.DeepClone(),
+            ["source_manifest"] = composition["source_manifest"]!.DeepClone(),
+            ["static_validation"] = composition["static_validation"]!.DeepClone(),
+            ["provenance"] = "intended_design",
+            ["capability"] = "staged_typed_write"
+        };
+    }
+
+    private static void EnsureModuleExpected(JsonObject? actual, JsonNode? expected, string id)
+    {
+        if (actual is null)
+        {
+            EnsureCreateExpected(expected, $"gameplay_modules.{id}");
+            return;
+        }
+        if (expected is JsonValue value && value.TryGetValue<string>(out var hash))
+        {
+            var actualHash = StringValue(actual, "source_sha256") ?? GameplayModelValidator.Hash(actual);
+            if (!string.Equals(actualHash, hash, StringComparison.OrdinalIgnoreCase)) throw new EngineException("PRECONDITION_FAILED", $"The expected source hash for gameplay module '{id}' does not match the staged value.");
+            return;
+        }
+        if (expected is JsonObject expectedObject && expectedObject["source_sha256"] is JsonValue sourceHash && sourceHash.TryGetValue<string>(out var moduleHash))
+        {
+            var actualHash = StringValue(actual, "source_sha256") ?? GameplayModelValidator.Hash(actual);
+            if (!string.Equals(actualHash, moduleHash, StringComparison.OrdinalIgnoreCase)) throw new EngineException("PRECONDITION_FAILED", $"The expected source hash for gameplay module '{id}' does not match the staged value.");
+            return;
+        }
+        EnsureExpected(actual, expected, $"gameplay_modules.{id}");
+    }
+
+    private static string NormalizeGameplaySource(string source)
+        => source.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd() + "\n";
 
     private static string? ExpectedScriptHash(JsonNode? expected)
     {

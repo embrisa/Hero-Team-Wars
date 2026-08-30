@@ -46,14 +46,14 @@
       "shared_unit_control": false
     }
   },
-  "triggers": [
-    { "id": "map_init", "folder": "MCP/Initialization", "handler": "HTW_OnMapInit" },
-    { "id": "round_start", "folder": "MCP/Phases", "handler": "HTW_OnRoundStart" },
-    { "id": "wave_resolved", "folder": "MCP/Waves", "handler": "HTW_OnWaveResolved" }
+  "trigger_files": [
+    "triggers/map-init.trigger.json",
+    "triggers/round-start.trigger.json",
+    "triggers/wave-resolved.trigger.json"
   ],
-  "variables": [
-    { "id": "round", "name": "HTW_Round", "type": "integer" },
-    { "id": "wave", "name": "HTW_Wave", "type": "integer" },
-    { "id": "phase", "name": "HTW_Phase", "type": "integer" }
+  "variable_files": [
+    "variables/round.variable.json",
+    "variables/wave.variable.json",
+    "variables/phase.variable.json"
   ]
 }

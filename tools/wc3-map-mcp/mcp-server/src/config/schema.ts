@@ -13,6 +13,7 @@ export const projectConfigSchema = z.object({
   log_root: rootRelativePath,
   test_output_root: rootRelativePath.default("tools/wc3-map-mcp/artifacts/tests"),
   gameplay_source_roots: z.array(rootRelativePath).default(["scripts/mcp"]),
+  gameplay_manifest: rootRelativePath.default("tools/wc3-map-mcp/scripts/mcp/manifest.json"),
   world_editor: z.string().min(1).optional(),
   warcraft: z.string().min(1).optional(),
   test_map_root: z.string().min(1).optional(),

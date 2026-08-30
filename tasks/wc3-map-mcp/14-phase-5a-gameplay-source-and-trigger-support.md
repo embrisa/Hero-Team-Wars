@@ -1,6 +1,6 @@
 # Phase 5A Work Packet - MCP Gameplay Sources and Triggers
 
-Status: MCP-native composition, typed trigger/variable operations, and static validation are implemented; GUI compatibility and exact runtime acceptance remain gated.
+Status: partial — MCP-native composition, typed trigger/variable operations, static validation, and build round-trip are implemented; exact selected-map runtime/editor evidence and GUI compatibility remain gated.
 
 ## Goal
 

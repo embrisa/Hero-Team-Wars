@@ -1,0 +1,18 @@
+{
+  "id": "map_init",
+  "name": "HTW Map Initialization",
+  "folder_path": "MCP/Initialization",
+  "enabled": true,
+  "initially_on": true,
+  "events": [{ "type": "map_initialization" }],
+  "conditions": [{ "type": "always" }],
+  "actions": [
+    { "type": "call_function", "function": "HTW_State_Reset" },
+    { "type": "call_function", "function": "HTW_Heroes_Initialize" },
+    { "type": "call_function", "function": "HTW_Waves_Prepare" }
+  ],
+  "references": { "functions": ["HTW_State_Reset", "HTW_Heroes_Initialize", "HTW_Waves_Prepare"] },
+  "source_location": { "path": "triggers/map-init.trigger.json", "line": 1 },
+  "provenance": "intended_design",
+  "capability": "mcp_native_jass"
+}

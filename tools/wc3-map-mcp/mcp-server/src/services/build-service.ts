@@ -102,6 +102,7 @@ export class BuildService {
         // the artifact contract meaningful if the engine implementation is
         // replaced or its internal checks regress.
         const reopened = await this.worker.request<Record<string, unknown>>("inspect_map", { map_path: temporaryOutput }, correlationId);
+        mergeGameplayInspection(loaded.paths.canonical, reopened);
         const comparison = await this.worker.request<Record<string, unknown>>("compare_maps", {
           left_path: loaded.paths.canonical,
           right_path: temporaryOutput
@@ -326,6 +327,13 @@ function sanitizeEngineResult(project: ResolvedProject, result: Record<string, u
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+function mergeGameplayInspection(canonicalPath: string, reopened: Record<string, unknown>): void {
+  const canonical = JSON.parse(readFileSync(canonicalPath, "utf8")) as Record<string, unknown>;
+  for (const field of ["trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables"]) {
+    if (canonical[field] !== undefined) reopened[field] = canonical[field];
+  }
 }
 
 function validateManifest(manifest: BuildManifest, projectId: string, buildId: string): void {

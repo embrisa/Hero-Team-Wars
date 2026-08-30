@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Wc3MapEngine.Core.Gameplay;
 using Wc3MapEngine.Core.Scripts;
 
 namespace Wc3MapEngine.Core.Validation;
@@ -173,6 +174,7 @@ public static class ValidationPipeline
         ValidateRawcodes(root, findings);
         ValidateImports(root, findings);
         ValidateScriptEntries(root["scripts"] as JsonArray, findings);
+        ValidateGameplayModel(root, findings);
 
         if (root["opaque_members"] is not JsonArray && root["archive_members"] is not JsonArray)
         {
@@ -215,6 +217,7 @@ public static class ValidationPipeline
         }
 
         ValidateBuildableScripts(source, staged, findings);
+        ValidateGameplaySourceHashes(staged, findings);
 
         var sourceClone = source.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Could not clone source canonical map.");
         var stagedClone = staged.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Could not clone staged canonical map.");
@@ -272,6 +275,54 @@ public static class ValidationPipeline
         }
 
         _ = context;
+    }
+
+    private static void ValidateGameplayModel(JsonObject root, JsonArray findings)
+    {
+        if (root["gameplay_modules"] is null && root["gameplay_triggers"] is null && root["gameplay_variables"] is null && root["gameplay_source"] is null) return;
+        var hasGameplayEntries = (root["gameplay_modules"] as JsonArray)?.Count > 0 || (root["gameplay_triggers"] as JsonArray)?.Count > 0 || (root["gameplay_variables"] as JsonArray)?.Count > 0;
+        if (hasGameplayEntries && root["gameplay_source"] is not JsonObject)
+        {
+            Add(findings, "error", "GAMEPLAY_SOURCE_MANIFEST_MISSING", "gameplay", "gameplay_source", "Source-owned gameplay entries require a generated gameplay source manifest.", "Recompose the MCP-native gameplay source before validating or building.");
+        }
+        try
+        {
+            GameplayModelValidator.ValidateCollections(root, requireModuleSources: true);
+            ValidateGameplaySourceHashes(root, findings);
+        }
+        catch (EngineException exception)
+        {
+            Add(findings, "error", exception.Code, "gameplay", null, exception.Message, "Fix the typed gameplay source model before building.");
+        }
+    }
+
+    private static void ValidateGameplaySourceHashes(JsonObject root, JsonArray findings)
+    {
+        if (root["gameplay_source"] is not JsonObject sourceRecord) return;
+        var sourceHash = StringValue(sourceRecord["source_sha256"]);
+        var script = (root["scripts"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault(item => string.Equals(StringValue(item["archive_path"]), "war3map.j", StringComparison.OrdinalIgnoreCase));
+        var scriptHash = StringValue(script?["source_sha256"]) ?? StringValue(script?["sha256"]);
+        if (sourceHash is null || !Sha256.IsMatch(sourceHash) || scriptHash is null || !string.Equals(sourceHash, scriptHash, StringComparison.OrdinalIgnoreCase))
+        {
+            Add(findings, "error", "GAMEPLAY_SOURCE_STALE", "gameplay", "gameplay_source.source_sha256", "The gameplay source manifest hash does not match the staged war3map.j source hash.", "Recompose the MCP-native gameplay source and apply it in a fresh transaction.");
+        }
+        if (StringValue(sourceRecord["mode"]) is not (GameplayModelValidator.NativeMode or GameplayModelValidator.EditorMode))
+        {
+            Add(findings, "error", "TRIGGER_MODE_INVALID", "gameplay", "gameplay_source.mode", "The gameplay source manifest declares an unsupported trigger mode.", "Use mcp_native_jass until exact GUI fixtures are verified.");
+        }
+        if (sourceRecord["source_manifest"] is JsonNode sourceManifest)
+        {
+            var declaredManifestHash = StringValue(sourceRecord["source_manifest_sha256"]);
+            var actualManifestHash = GameplayModelValidator.Hash(sourceManifest);
+            if (!string.Equals(declaredManifestHash, actualManifestHash, StringComparison.OrdinalIgnoreCase))
+            {
+                Add(findings, "error", "GAMEPLAY_MANIFEST_STALE", "gameplay", "gameplay_source.source_manifest_sha256", "The generated source manifest hash does not match its manifest content.", "Recompose the MCP-native gameplay source before building.");
+            }
+        }
+        if (root["trigger_mode"] is JsonValue triggerMode && triggerMode.TryGetValue<string>(out var selectedMode) && !string.Equals(selectedMode, StringValue(sourceRecord["mode"]), StringComparison.Ordinal))
+        {
+            Add(findings, "error", "TRIGGER_MODE_MISMATCH", "gameplay", "trigger_mode", "The canonical trigger mode does not match the source manifest mode.", "Keep trigger_mode and gameplay_source.mode aligned in the same transaction.");
+        }
     }
 
     private static void ValidateMetadata(JsonArray? metadata, JsonArray findings)

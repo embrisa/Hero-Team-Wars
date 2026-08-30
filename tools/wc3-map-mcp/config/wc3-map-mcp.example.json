@@ -17,6 +17,7 @@
       "log_root": "tools/wc3-map-mcp/logs",
       "test_output_root": "tools/wc3-map-mcp/artifacts/tests",
       "gameplay_source_roots": ["tools/wc3-map-mcp/scripts/mcp"],
+      "gameplay_manifest": "tools/wc3-map-mcp/scripts/mcp/manifest.json",
       "world_editor": "C:/Warcraft III/_retail_/x86_64/World Editor.exe",
       "warcraft": "C:/Warcraft III/_retail_/x86_64/Warcraft III.exe",
       "test_map_root": "C:/Users/hp/Documents/Warcraft III/Maps/Test",

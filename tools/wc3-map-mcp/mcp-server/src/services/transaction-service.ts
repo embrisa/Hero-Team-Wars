@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ResolvedProject } from "../config/resolve-project.js";
-import { relativeProjectPath } from "../config/resolve-project.js";
+import { isWithin, relativeProjectPath, resolveConfiguredPath } from "../config/resolve-project.js";
 import { AppError, asAppError } from "../errors/app-error.js";
 import { sha256File } from "./artifact-service.js";
 import { writeJsonArtifact, type ArtifactRef } from "./artifact-service.js";
@@ -46,6 +46,38 @@ export class TransactionService {
           });
         }
 
+        const gameplayManifest = resolveConfiguredPath(project.root, project.config.gameplay_manifest);
+        if (existsSync(gameplayManifest) && project.config.gameplay_source_roots.some(root => isWithin(resolveConfiguredPath(project.root, root), gameplayManifest))) {
+          const composition = await this.worker.request<Record<string, unknown>>("compose_gameplay_source", { manifest_path: gameplayManifest, profile: project.config.profile }, correlationId);
+          const model = composition.canonical_model as Record<string, unknown> | undefined;
+          if (!model) throw new AppError("ENGINE_PROTOCOL_ERROR", "The gameplay composer returned no canonical source model.");
+          Object.assign(canonical, model, {
+            trigger_mode: "mcp_native_jass",
+            gameplay_source: {
+              schema_version: "1.0",
+              composer_version: composition.composer_version,
+              mode: composition.mode,
+              profile: composition.profile,
+              source_sha256: composition.source_sha256,
+              source_manifest_sha256: composition.source_manifest_sha256,
+              source_manifest: composition.source_manifest,
+              static_validation: composition.static_validation,
+              provenance: "intended_design",
+              capability: "staged_typed_write"
+            }
+          });
+          const scripts = canonical.scripts as Array<Record<string, unknown>> | undefined;
+          const script = scripts?.find(item => String(item.archive_path ?? "").toLowerCase() === "war3map.j");
+          if (script) {
+            script.source = composition.source;
+            script.source_sha256 = composition.source_sha256;
+            script.sha256 = composition.source_sha256;
+            script.size_bytes = Buffer.byteLength(String(composition.source ?? ""), "utf8");
+            script.provenance = "intended_design";
+            script.capability = "staged_typed_write";
+          }
+        }
+
         const source = canonical.source as Record<string, unknown> | undefined;
         canonical.source = { ...(source ?? {}), path: sourcePath, ...afterCopyHash };
         const environment = await this.worker.request<Record<string, unknown>>("environment_status", { configured_files: {} }, correlationId);
@@ -77,6 +109,10 @@ export class TransactionService {
     this.projects.assertMutationAllowed(projectId, "wc3_apply_operations");
     const project = this.projects.project(projectId);
     const parsedOperations = parseOperations(operations, project.config.max_operation_count, expectedRevision);
+    const modeChanges = parsedOperations.filter(operation => operation.type === "set_trigger_mode");
+    if (modeChanges.length > 0 && (expectedRevision !== 0 || parsedOperations.length !== 1)) {
+      throw new AppError("PRECONDITION_FAILED", "set_trigger_mode is only valid as the sole operation in a new revision-0 transaction based on a fresh inspection.");
+    }
     if (parsedOperations.some(operation => operation.type === "set_script_source")) {
       this.projects.assertScriptMutationAllowed(projectId);
     }
@@ -319,6 +355,8 @@ function operationRecord(operation: OperationInput, revision: number): Transacti
     revision,
     type: operation.type,
     target: operation.target,
+    ...(operation.expected !== undefined ? { expected: operation.expected } : {}),
+    ...(operation.value !== undefined ? { value: operation.value } : {}),
     rationale: operation.rationale,
     ...(operation.design_reference ? { design_reference: operation.design_reference } : {})
   };

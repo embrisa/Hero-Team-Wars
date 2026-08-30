@@ -1,0 +1,8 @@
+{
+  "id": "phase",
+  "name": "HTW_Phase",
+  "type": "integer",
+  "initial": 0,
+  "provenance": "intended_design",
+  "capability": "mcp_native_jass"
+}
