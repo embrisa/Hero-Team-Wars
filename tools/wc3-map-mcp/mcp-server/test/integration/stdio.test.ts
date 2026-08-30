@@ -113,7 +113,7 @@ describe("MCP STDIO", () => {
     const archive = response(result.lines, 5);
     expect(archive.result.structuredContent.ok).toBe(true);
     expect(archive.result.structuredContent.data.members.length).toBe(17);
-    expect(archive.result.structuredContent.data.members.some((member: any) => member.path === "war3map.w3i" && member.capability === "parsed_read_only")).toBe(true);
+    expect(archive.result.structuredContent.data.members.some((member: any) => member.path === "war3map.w3i" && member.capability === "typed_write_enabled")).toBe(true);
     const regions = response(result.lines, 6);
     expect(regions.result.structuredContent.ok).toBe(true);
     expect(regions.result.structuredContent.data.values.length).toBe(10);

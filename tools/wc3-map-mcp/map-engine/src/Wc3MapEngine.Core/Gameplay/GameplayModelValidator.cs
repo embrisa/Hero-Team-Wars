@@ -131,11 +131,19 @@ public static class GameplayModelValidator
 
     public static void ValidateVariable(JsonObject variable)
     {
-        EnsureAllowed(variable, "id", "name", "type", "initial", "default_value", "value", "dependencies", "provenance", "capability");
+        EnsureAllowed(variable, "id", "name", "type", "array", "array_size", "initial", "default_value", "value", "dependencies", "provenance", "capability");
         _ = RequiredIdentifier(variable, "id");
         _ = RequiredIdentifier(variable, "name");
         var type = StringValue(variable, "type") ?? "integer";
         if (!VariableTypes.Contains(type)) throw new EngineException("INVALID_ARGUMENT", $"Gameplay variable '{RequiredString(variable, "id")}' uses unsupported JASS type '{type}'.");
+        if (variable["array"] is not null && (variable["array"] is not JsonValue arrayNode || !arrayNode.TryGetValue<bool>(out _))) throw new EngineException("INVALID_ARGUMENT", $"Gameplay variable '{RequiredString(variable, "id")}' array must be boolean.");
+        if (variable["array"]?.GetValue<bool>() == true)
+        {
+            if (variable["array_size"] is null) throw new EngineException("INVALID_ARGUMENT", $"Gameplay array variable '{RequiredString(variable, "id")}' requires array_size.");
+            var arraySize = Integer(variable["array_size"]!, $"variable {RequiredString(variable, "id")} array_size");
+            if (arraySize is < 1 or > 8191) throw new EngineException("INVALID_ARGUMENT", $"Gameplay variable '{RequiredString(variable, "id")}' array_size must be between 1 and 8191.");
+            if (variable["initial"] is not null || variable["default_value"] is not null || variable["value"] is not null) throw new EngineException("INVALID_ARGUMENT", $"Gameplay array variable '{RequiredString(variable, "id")}' cannot declare a scalar initial value.");
+        }
         if (variable["dependencies"] is not null) ValidateStringArray(variable["dependencies"]!, "variable dependencies", Identifier);
         foreach (var field in new[] { "initial", "default_value", "value" })
         {

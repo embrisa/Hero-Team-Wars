@@ -353,7 +353,23 @@ public static class GameplaySourceComposer
             if (!File.Exists(fullPath)) throw new EngineException("FILE_NOT_FOUND", $"Gameplay {kind} manifest does not exist: {fullPath}");
             var bytes = File.ReadAllBytes(fullPath);
             if (bytes.Length > MaxManifestBytes) throw new EngineException("INVALID_ARGUMENT", $"Gameplay {kind} manifest exceeds the 2 MiB safety limit: {fullPath}");
-            result.Add(ParseObject(bytes, $"Gameplay {kind} manifest '{fullPath}'"));
+            var parsed = ParseNode(bytes, $"Gameplay {kind} manifest '{fullPath}'");
+            if (parsed is JsonObject item)
+            {
+                result.Add(item);
+            }
+            else if (parsed is JsonArray items)
+            {
+                foreach (var child in items)
+                {
+                    if (child is not JsonObject childObject) throw new EngineException("INVALID_ARGUMENT", $"Gameplay {kind} manifest array '{fullPath}' must contain objects.");
+                    result.Add(childObject.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", $"Could not clone {kind} manifest entry."));
+                }
+            }
+            else
+            {
+                throw new EngineException("INVALID_JSON", $"Gameplay {kind} manifest '{fullPath}' must contain an object or an array of objects.");
+            }
         }
         return result;
     }
@@ -387,23 +403,33 @@ public static class GameplaySourceComposer
         var customEvents = triggers.SelectMany(x => (x["events"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()).Where(x => StringValue(x, "type") == "custom_event").Select(x => StringValue(x, "name")).Where(x => x is not null).Cast<string>().Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         var variableNames = variables.Select(variable => GameplayModelValidator.RequiredString(variable, "name")).ToHashSet(StringComparer.Ordinal);
         builder.AppendLine("globals");
-        if (!variableNames.Contains("HTW_Round")) builder.AppendLine("    integer HTW_Round");
-        if (!variableNames.Contains("HTW_Wave")) builder.AppendLine("    integer HTW_Wave");
-        if (!variableNames.Contains("HTW_Phase")) builder.AppendLine("    integer HTW_Phase");
-        builder.AppendLine("    integer HTW_TeamCount");
-        builder.AppendLine("    integer array HTW_TeamMemberA");
-        builder.AppendLine("    integer array HTW_TeamMemberB");
-        builder.AppendLine("    integer array HTW_TeamForce");
-        builder.AppendLine("    string array HTW_TeamStableId");
-        builder.AppendLine("    string array HTW_TeamArena");
-        builder.AppendLine("    boolean array HTW_TeamLiving");
-        builder.AppendLine("    integer array HTW_TeamDestination");
-        builder.AppendLine("    integer HTW_LivingTeamCount");
-        builder.AppendLine("    integer array HTW_LivingTeamIds");
-        builder.AppendLine("    integer HTW_RouteOffset");
-        builder.AppendLine("    integer HTW_RouteDestinationTeam");
-        builder.AppendLine("    boolean HTW_RoutingLocked");
-        foreach (var variable in variables) builder.AppendLine($"    {GameplayModelValidator.RequiredString(variable, "type").ToLowerInvariant()} {GameplayModelValidator.RequiredString(variable, "name")}");
+        var declaredGlobals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void DeclareGlobal(string type, string name, bool array = false)
+        {
+            if (declaredGlobals.Add(name)) builder.AppendLine($"    {type}{(array ? " array" : string.Empty)} {name}");
+        }
+        DeclareGlobal("integer", "HTW_Round");
+        DeclareGlobal("integer", "HTW_Wave");
+        DeclareGlobal("integer", "HTW_Phase");
+        DeclareGlobal("integer", "HTW_TeamCount");
+        DeclareGlobal("integer", "HTW_TeamMemberA", true);
+        DeclareGlobal("integer", "HTW_TeamMemberB", true);
+        DeclareGlobal("integer", "HTW_TeamForce", true);
+        DeclareGlobal("string", "HTW_TeamStableId", true);
+        DeclareGlobal("string", "HTW_TeamArena", true);
+        DeclareGlobal("boolean", "HTW_TeamLiving", true);
+        DeclareGlobal("integer", "HTW_TeamDestination", true);
+        DeclareGlobal("integer", "HTW_LivingTeamCount");
+        DeclareGlobal("integer", "HTW_LivingTeamIds", true);
+        DeclareGlobal("integer", "HTW_RouteOffset");
+        DeclareGlobal("integer", "HTW_RouteDestinationTeam");
+        DeclareGlobal("boolean", "HTW_RoutingLocked");
+        foreach (var variable in variables)
+        {
+            var type = GameplayModelValidator.RequiredString(variable, "type").ToLowerInvariant();
+            var array = variable["array"]?.GetValue<bool>() == true;
+            DeclareGlobal(type, GameplayModelValidator.RequiredString(variable, "name"), array);
+        }
         foreach (var region in regions) builder.AppendLine($"    region {RegionHandle(GameplayModelValidator.RequiredString(region, "id"))}");
         foreach (var eventName in customEvents) builder.AppendLine($"    real {EventHandle(eventName)}");
         builder.AppendLine("endglobals");
@@ -626,7 +652,12 @@ public static class GameplaySourceComposer
     private static string? StringValue(JsonObject value, string property) => value[property] is JsonValue node && node.TryGetValue<string>(out var text) ? text : null;
     private static JsonObject ParseObject(byte[] bytes, string context)
     {
-        try { return JsonNode.Parse(Encoding.UTF8.GetString(bytes)) as JsonObject ?? throw new EngineException("INVALID_JSON", $"{context} root must be an object."); }
+        try { return ParseNode(bytes, context) as JsonObject ?? throw new EngineException("INVALID_JSON", $"{context} root must be an object."); }
+        catch (JsonException exception) { throw new EngineException("INVALID_JSON", $"{context} is not valid JSON: {exception.Message}", false, exception); }
+    }
+    private static JsonNode ParseNode(byte[] bytes, string context)
+    {
+        try { return JsonNode.Parse(Encoding.UTF8.GetString(bytes)) ?? throw new EngineException("INVALID_JSON", $"{context} is empty."); }
         catch (JsonException exception) { throw new EngineException("INVALID_JSON", $"{context} is not valid JSON: {exception.Message}", false, exception); }
     }
     private static string SafeRelativePath(string root, string relative, string context)

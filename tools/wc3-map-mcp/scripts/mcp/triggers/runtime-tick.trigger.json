@@ -1,0 +1,17 @@
+{
+  "id": "runtime_tick",
+  "name": "HTW Runtime Tick",
+  "folder_path": "MCP/Runtime",
+  "enabled": true,
+  "initially_on": true,
+  "events": [{ "type": "periodic_timer", "period": 1, "repeat": true }],
+  "conditions": [{ "type": "always" }],
+  "actions": [
+    { "type": "call_function", "function": "HTW_Phases_Tick" },
+    { "type": "call_function", "function": "HTW_Sending_ProcessQueues" }
+  ],
+  "references": { "functions": ["HTW_Phases_Tick", "HTW_Sending_ProcessQueues"] },
+  "source_location": { "path": "triggers/runtime-tick.trigger.json", "line": 1 },
+  "provenance": "source_of_truth",
+  "capability": "mcp_native_jass"
+}

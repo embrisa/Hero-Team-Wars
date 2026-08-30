@@ -24,17 +24,17 @@
     { "id": "core.events", "path": "core/events.j", "dependencies": ["core.state"] },
     { "id": "core.debug", "path": "core/debug.j", "dependencies": ["core.state"] },
     { "id": "systems.phases", "path": "systems/phases.j", "dependencies": ["core.state"] },
-    { "id": "systems.waves", "path": "systems/waves.j", "dependencies": ["systems.phases", "systems.routing"] },
-    { "id": "systems.heroes", "path": "systems/heroes.j", "dependencies": ["core.state"] },
+    { "id": "systems.waves", "path": "systems/waves.j", "dependencies": ["systems.phases", "systems.routing", "content.base-waves"] },
+    { "id": "systems.heroes", "path": "systems/heroes.j", "dependencies": ["core.state", "config.regions", "content.heroes"] },
     { "id": "systems.lives", "path": "systems/lives.j", "dependencies": ["systems.heroes"] },
     { "id": "systems.elimination", "path": "systems/elimination.j", "dependencies": ["systems.lives"] },
     { "id": "systems.economy", "path": "systems/economy.j", "dependencies": ["core.state"] },
-    { "id": "systems.sending", "path": "systems/sending.j", "dependencies": ["systems.economy", "systems.waves"] },
+    { "id": "systems.sending", "path": "systems/sending.j", "dependencies": ["systems.economy", "systems.waves", "content.send-units"] },
     { "id": "systems.routing", "path": "systems/routing.j", "dependencies": ["core.state", "systems.elimination"] },
     { "id": "systems.information", "path": "systems/information.j", "dependencies": ["core.debug", "systems.routing"] },
-    { "id": "content.base-waves", "path": "content/base-waves.j", "dependencies": ["systems.waves"] },
-    { "id": "content.send-units", "path": "content/send-units.j", "dependencies": ["systems.sending"] },
-    { "id": "content.heroes", "path": "content/heroes.j", "dependencies": ["systems.heroes"] },
+    { "id": "content.base-waves", "path": "content/base-waves.j", "dependencies": ["core.state", "config.regions", "config.objects"] },
+    { "id": "content.send-units", "path": "content/send-units.j", "dependencies": ["core.state", "config.regions"] },
+    { "id": "content.heroes", "path": "content/heroes.j", "dependencies": ["core.state", "config.regions"] },
     { "id": "content.items", "path": "content/items.j", "dependencies": ["systems.economy"] },
     { "id": "content.abilities", "path": "content/abilities.j", "dependencies": ["content.heroes"] },
     { "id": "tests.assertions", "path": "tests/assertions.j", "dependencies": ["core.debug"] },
@@ -85,11 +85,14 @@
   "trigger_files": [
     "triggers/map-init.trigger.json",
     "triggers/round-start.trigger.json",
-    "triggers/wave-resolved.trigger.json"
+    "triggers/wave-resolved.trigger.json",
+    "triggers/hero-death.trigger.json",
+    "triggers/runtime-tick.trigger.json"
   ],
   "variable_files": [
     "variables/round.variable.json",
     "variables/wave.variable.json",
-    "variables/phase.variable.json"
+    "variables/phase.variable.json",
+    "variables/runtime.variable.json"
   ]
 }

@@ -1,8 +1,12 @@
 function HTW_MCP_Bootstrap takes nothing returns nothing
+    if HTW_Bootstrapped then
+        return
+    endif
+    call HTW_Tuning_Load()
     call HTW_Teams_Initialize()
     call HTW_Regions_Initialize()
     call HTW_Objects_Initialize()
-    set HTW_Round = 0
-    set HTW_Wave = 0
-    set HTW_Phase = 0
+    call HTW_State_Reset()
+    set HTW_Bootstrapped = true
+    call HTW_Debug_LogText("bootstrap complete")
 endfunction

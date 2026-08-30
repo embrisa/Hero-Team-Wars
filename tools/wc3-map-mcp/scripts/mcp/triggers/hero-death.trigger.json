@@ -1,0 +1,14 @@
+{
+  "id": "hero_death",
+  "name": "HTW Hero Death Accounting",
+  "folder_path": "MCP/Heroes",
+  "enabled": true,
+  "initially_on": true,
+  "events": [{ "type": "unit_death" }],
+  "conditions": [{ "type": "always" }],
+  "actions": [{ "type": "call_function", "function": "HTW_Heroes_OnDeath" }],
+  "references": { "functions": ["HTW_Heroes_OnDeath"] },
+  "source_location": { "path": "triggers/hero-death.trigger.json", "line": 1 },
+  "provenance": "source_of_truth",
+  "capability": "mcp_native_jass"
+}

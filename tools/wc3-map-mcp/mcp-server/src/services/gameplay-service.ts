@@ -72,7 +72,7 @@ export class GameplayService {
       type: "set_script_source",
       target: { archive_path: "war3map.j" },
       expected,
-      value: { language: "jass", source },
+      value: { language: "jass", source, source_strategy: "composed" },
       rationale: `Compose MCP-native gameplay source for ${chunkId}.`,
       design_reference: chunkId,
       expected_revision: expectedRevision

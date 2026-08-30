@@ -28,6 +28,8 @@ writeFileSync(configPath, JSON.stringify({
       build_root: "builds/mcp",
       log_root: "tools/wc3-map-mcp/logs",
       test_output_root: "tools/wc3-map-mcp/artifacts/tests",
+      gameplay_source_roots: ["tools/wc3-map-mcp/scripts/mcp"],
+      gameplay_manifest: "tools/wc3-map-mcp/scripts/mcp/manifest.json",
       enabled_tools: [], write_policy: "writes", max_map_bytes: 536870912, max_operation_count: 100
     }
   }

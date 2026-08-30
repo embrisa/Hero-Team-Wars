@@ -55,6 +55,28 @@ public sealed class GameplayComposerTests
     }
 
     [Fact]
+    public void ScenarioHarnessCoversMvpRuntimePathsTwice()
+    {
+        var report = ScenarioRunner.Run(new JsonObject
+        {
+            ["profile"] = HtwProfileModel.MvpProfile,
+            ["chunk_id"] = "HTW-05"
+        });
+
+        Assert.Equal(20, report["scenario_count"]!.GetValue<int>());
+        Assert.Equal(20, report["passed_count"]!.GetValue<int>());
+        Assert.Equal(0, report["failed_count"]!.GetValue<int>());
+        Assert.Equal(2, report["repeat_count"]!.GetValue<int>());
+        foreach (var result in report["results"]!.AsArray().OfType<JsonObject>())
+        {
+            Assert.Contains("chunk=HTW-05", result["marker"]!.GetValue<string>());
+            Assert.Contains("expected=", result["marker"]!.GetValue<string>());
+            Assert.Contains("actual=", result["marker"]!.GetValue<string>());
+            Assert.Equal("pass", result["result"]!.GetValue<string>());
+        }
+    }
+
+    [Fact]
     public void GameplayOperationRegeneratesEntryPointFromCanonicalSourceModel()
     {
         var composed = GameplaySourceComposer.Compose(FindManifest());

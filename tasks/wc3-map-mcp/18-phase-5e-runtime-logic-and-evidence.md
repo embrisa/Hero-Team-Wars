@@ -1,6 +1,6 @@
 # Phase 5E Work Packet - Runtime Logic, Scenarios, and Evidence
 
-Status: Deterministic source modules, static scenario harness, and hash-linked evidence tools are implemented; the harness does not simulate Warcraft III headlessly and exact runtime acceptance remains gated.
+Status: HTW-01 through HTW-05 are implemented through deterministic source modules, repeatable model scenarios, and hash-linked static evidence; exact World Editor/Warcraft III runtime acceptance remains gated.
 
 ## Goal
 
@@ -83,4 +83,48 @@ ID and preserve the reviewable diff/validation/build sequence.
 The logic/evidence packet is complete when HTW-01 through HTW-05 can be built
 from source manifests, tested with repeatable scenarios, and recorded without
 manual source copying. Full HTW-06 remains gated on the six-team map/profile
+packet.
+
+## Implementation evidence (2026-08-30)
+
+The packet is implemented through the MCP source and transaction pipeline:
+
+- The manifest at `tools/wc3-map-mcp/scripts/mcp/manifest.json` composes the
+  deterministic JASS package, typed runtime variables, trigger declarations,
+  dependency order, and the `mvp_2arena` profile. Runtime modules cover
+  bootstrap, tuning, state, phases, waves, heroes, lives, elimination,
+  routing, economy, purchases, queues, staggered sends, information, cleanup,
+  and debug markers.
+- `wc3_compose_gameplay_source`, `wc3_validate_gameplay_source`,
+  `wc3_prepare_gameplay_chunk`, `wc3_run_scenario_build`, and
+  `wc3_record_chunk_result` preserve source, transaction, revision, build,
+  scenario, and optional observation-session identifiers. The composed source
+  is marked as generated; replacing it directly detaches the generated model
+  instead of pairing arbitrary script text with stale gameplay metadata.
+- HTW-01 through HTW-05 are exercised by
+  `tools/wc3-map-mcp/mcp-server/test/integration/gameplay-phase5e.test.ts`.
+  That test creates a fresh reviewed transaction for each chunk, validates the
+  revision, builds the assigned scenarios, checks two repeats, verifies the
+  structured markers, and records static-only evidence tied to the exact build
+  hash. No manual source copying is used.
+- The deterministic MVP harness reports 20 scenarios, 20 passed, 0 failed,
+  and 2 repeats. It covers fresh initialization, phase transitions, hero
+  deaths, the three-life wipe penalty, duplicate/deferred callbacks, timeout,
+  cleanup, elimination/victory/draw, personal gold isolation, opposing-arena
+  routing, two-arena repeatability, and six-team route/elimination/no-carryover
+  model paths.
+- Observed automated verification: 60/60 .NET tests passed; 39/39 MCP tests
+  passed; the Phase 5E integration test passed; and the published CLI harness
+  reported 20/20 scenarios passed with `evidence_level=static_only` and
+  `runtime_verified=false`.
+- The approved source map was not modified. Its SHA-256 before and after the
+  implementation is
+  `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`.
+
+This is source/static acceptance evidence, not Warcraft III runtime evidence.
+No editor-open, game-load, smoke-test, or playtest milestone was observed in
+this implementation pass, so those gates remain explicitly unclaimed. The
+six-team model scenarios validate routing and elimination behavior, but the
+checked-in playable map/profile remains the approved four-player,
+two-team/two-arena MVP; HTW-06 therefore remains gated on its map/profile
 packet.

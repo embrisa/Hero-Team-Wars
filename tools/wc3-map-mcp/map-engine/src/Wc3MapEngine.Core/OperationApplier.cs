@@ -90,6 +90,24 @@ public static class OperationApplier
             working["team_registry"] = HtwProfileModel.BuildTeamRegistry(teamRecords);
         }
 
+        // A direct source replacement is authoritative for war3map.j. If it
+        // was not produced by GameplayService.prepare, discard the generated
+        // source manifest so validation cannot silently pair unrelated JASS
+        // text with the old module graph. The profile/team metadata remains
+        // staged and can still be validated independently.
+        var directScriptReplacement = operationTypes.Contains("set_script_source", StringComparer.Ordinal)
+            && !operations.OfType<JsonObject>().Any(operation =>
+                operation["type"]?.GetValue<string>() == "set_script_source"
+                && operation["value"] is JsonObject value
+                && value["source_strategy"]?.GetValue<string>() == "composed");
+        if (directScriptReplacement && HasGameplayModel(working))
+        {
+            foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables" })
+            {
+                working.Remove(field);
+            }
+        }
+
         if (operationTypes.Any(type => type != "rename_region" && IsGeneratedGameplayOperation(type))
             || operationTypes.Contains("rename_region", StringComparer.Ordinal) && HasGameplayModel(working)
             || operationTypes.Any(IsTeamStructureOperation) && HasGameplayModel(working))
@@ -690,11 +708,16 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", "set_script_source requires an object value with language and source.");
         }
-        EnsureAllowed(sourceValue, "language", "source");
+        EnsureAllowed(sourceValue, "language", "source", "source_strategy");
         var language = RequiredString(sourceValue, "language");
         if (!language.Equals("jass", StringComparison.OrdinalIgnoreCase))
         {
             throw new EngineException("UNSUPPORTED_OPERATION", "The first MCP-owned gameplay source strategy supports JASS only.");
+        }
+
+        if (sourceValue["source_strategy"] is JsonValue strategy && strategy.TryGetValue<string>(out var selectedStrategy) && selectedStrategy != "composed")
+        {
+            throw new EngineException("INVALID_ARGUMENT", "set_script_source source_strategy must be 'composed' when supplied.");
         }
 
         var source = RequiredString(sourceValue, "source");

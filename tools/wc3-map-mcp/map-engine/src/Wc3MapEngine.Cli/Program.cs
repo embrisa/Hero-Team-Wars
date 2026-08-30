@@ -401,11 +401,28 @@ internal static class Program
 
     private static void MergeProjectOwnedGameplay(JsonObject destination, JsonObject source)
     {
-        foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables", "profile", "profile_spec", "profiles", "teams", "team_registry" })
+        foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables", "profile", "profile_spec", "profiles", "teams", "team_registry", "region_roles" })
         {
             if (source[field] is JsonNode value) destination[field] = value.DeepClone();
+            else destination.Remove(field);
+        }
+
+        if (source["regions"] is JsonArray sourceRegions && destination["regions"] is JsonArray destinationRegions)
+        {
+            var sourceById = sourceRegions.OfType<JsonObject>().ToDictionary(RegionIdentity, StringComparer.Ordinal);
+            foreach (var region in destinationRegions.OfType<JsonObject>())
+            {
+                if (!sourceById.TryGetValue(RegionIdentity(region), out var sourceRegion)) continue;
+                foreach (var field in new[] { "references", "codec_version", "provenance", "capability" })
+                {
+                    if (sourceRegion[field] is JsonNode value) region[field] = value.DeepClone();
+                }
+            }
         }
     }
+
+    private static string RegionIdentity(JsonObject region)
+        => region["id"]?.GetValue<string>() ?? $"region:{region["creation_number"]?.GetValue<int>() ?? -1}";
 
     private static bool IsCanonical(string path) => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
 

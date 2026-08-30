@@ -25,6 +25,8 @@ writeFileSync(configPath, JSON.stringify({
       build_root: "builds/mcp",
       log_root: "tools/wc3-map-mcp/logs",
       test_output_root: "tools/wc3-map-mcp/artifacts/tests",
+      gameplay_source_roots: ["tools/wc3-map-mcp/scripts/mcp"],
+      gameplay_manifest: "tools/wc3-map-mcp/scripts/mcp/manifest.json",
       enabled_tools: [], write_policy: "writes", script_policy: "mcp_owned_jass", max_map_bytes: 536870912, max_operation_count: 100
     }
   }
@@ -202,6 +204,9 @@ describe("MCP transaction and build workflow", () => {
     const begin = await client.call("wc3_begin_transaction", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", expected_source_hash: before, label: "jass-source" });
     expect(begin.structuredContent.ok).toBe(true);
     transactionId = begin.structuredContent.data.transaction_id as string;
+    const stagedCanonical = JSON.parse(readFileSync(join(projectRoot, begin.structuredContent.data.paths.canonical), "utf8"));
+    const stagedScriptHash = stagedCanonical.scripts.find((item: any) => item.archive_path === "war3map.j").sha256;
+    expect(stagedScriptHash).toMatch(/^[0-9A-F]{64}$/i);
 
     const apply = await client.call("wc3_apply_operations", {
       project_id: "hero-team-wars",
@@ -211,7 +216,7 @@ describe("MCP transaction and build workflow", () => {
         operation_id: randomUUID(),
         type: "set_script_source",
         target: { archive_path: "war3map.j" },
-        expected: source.structuredContent.data.sha256,
+        expected: stagedScriptHash,
         value: { language: "jass", source: updatedSource },
         rationale: "Verify MCP-owned gameplay source replacement."
       }]

@@ -48,7 +48,7 @@ const objectTargetSchema = z.object({ id: z.string().min(1).optional(), category
 const placementTargetSchema = z.object({ id: z.string().regex(/^(unit|doodad):[0-9]+$/).optional(), creation_number: z.number().int().nonnegative().optional() }).strict().refine(value => Object.keys(value).length > 0, "Placement target requires id or creation_number.");
 const objectReferenceValueSchema = z.union([rawcode, z.object({ rawcode }).strict(), z.number().int().nonnegative(), z.object({ player_id: z.number().int().min(1).max(24) }).strict(), z.object({ region_id: z.union([z.number().int().nonnegative(), z.string().regex(/^region:[0-9]+$/)]) }).strict()]);
 
-const scriptSourceValue = z.object({ language: z.string().regex(/^jass$/i), source: z.string().min(1).max(16 * 1024 * 1024) }).strict();
+const scriptSourceValue = z.object({ language: z.string().regex(/^jass$/i), source: z.string().min(1).max(16 * 1024 * 1024), source_strategy: z.literal("composed").optional() }).strict();
 const scriptExpectedValue = z.union([sha256Schema, z.object({ sha256: sha256Schema }).strict()]);
 
 const eventSchema = z.discriminatedUnion("type", [
@@ -283,7 +283,7 @@ export const operationSchema = z.object({
   if (operation.type !== "set_script_source") return;
   if (operation.target.archive_path !== "war3map.j") context.addIssue({ code: "custom", path: ["target", "archive_path"], message: "set_script_source targets only the existing war3map.j member." });
   if (!scriptExpectedValue.safeParse(operation.expected).success) context.addIssue({ code: "custom", path: ["expected"], message: "set_script_source requires the current war3map.j SHA-256 as expected or expected.sha256." });
-  if (!scriptSourceValue.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_script_source requires { language: 'jass', source: '...' }." });
+  if (!scriptSourceValue.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_script_source requires { language: 'jass', source: '...' } and only permits source_strategy: 'composed'." });
 });
 
 export type OperationInput = z.infer<typeof operationSchema>;
