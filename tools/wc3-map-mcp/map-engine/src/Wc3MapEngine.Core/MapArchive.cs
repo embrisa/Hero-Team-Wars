@@ -95,6 +95,11 @@ public static class MapArchive
 
     public static void Rebuild(string sourcePath, string outputPath, IReadOnlyDictionary<string, byte[]> replacements)
     {
+        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(outputPath), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new EngineException("BUILD_FAILED", "A map archive cannot be rebuilt over its source path.");
+        }
+
         if (File.Exists(outputPath))
         {
             throw new EngineException("OUTPUT_EXISTS", $"Refusing to overwrite an existing build: {outputPath}");
@@ -105,6 +110,17 @@ public static class MapArchive
         {
             using var archive = MpqArchive.Open(sourcePath, loadListFile: true);
             var sourceFiles = archive.GetMpqFiles().ToList();
+            var sourceNames = sourceFiles.OfType<MpqKnownFile>()
+                .Select(file => MapArchiveSnapshot.NormalizePath(file.FileName))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var replacement in replacements.Keys)
+            {
+                if (!sourceNames.Contains(MapArchiveSnapshot.NormalizePath(replacement)))
+                {
+                    throw new EngineException("BUILD_FAILED", $"The build plan names archive member '{replacement}', but it is not present in the source archive.");
+                }
+            }
+
             var outputFiles = new List<MpqFile>(sourceFiles.Count);
             foreach (var file in sourceFiles)
             {

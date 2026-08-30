@@ -204,7 +204,10 @@ internal static class Program
 
     private static JsonObject Validate(JsonObject payload) => MapValidator.ValidateMap(RequiredPath(payload, "map_path"));
 
-    private static JsonObject ValidateCanonical(JsonObject payload) => MapValidator.ValidateCanonical(RequiredPath(payload, "canonical_path"));
+    private static JsonObject ValidateCanonical(JsonObject payload) => MapValidator.ValidateCanonical(
+        RequiredPath(payload, "canonical_path"),
+        payload["source_map_path"]?.GetValue<string>(),
+        payload["validation_context"] as JsonObject);
 
     private static JsonObject ApplyOperations(JsonObject payload)
     {
@@ -222,7 +225,9 @@ internal static class Program
     private static JsonObject BuildMap(JsonObject payload) => MapBuilder.Build(
         RequiredPath(payload, "source_map_path"),
         RequiredPath(payload, "canonical_path"),
-        RequiredPath(payload, "output_path"));
+        RequiredPath(payload, "output_path"),
+        payload["profile"]?.GetValue<string>() ?? "debug",
+        payload["validation_context"] as JsonObject);
 
     private static JsonObject CompareMaps(JsonObject payload)
     {
@@ -323,7 +328,7 @@ internal static class Program
             Code = exception.Code,
             Message = exception.Message,
             Retryable = exception.Retryable,
-            Details = new JsonObject()
+            Details = exception.Details.DeepClone() as JsonObject ?? new JsonObject()
         }
     };
 

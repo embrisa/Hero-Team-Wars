@@ -1,6 +1,6 @@
 # ADR 0002: Map script ownership
 
-Status: accepted limitation for the first release
+Status: accepted limitation for the first release; enforced by Phase 3
 
 ## Context
 
@@ -9,6 +9,8 @@ The current map contains `war3map.j`, `war3map.wct`, and `war3map.wtg`. Archive 
 ## Decision
 
 The first release is editor-owned for scripts. The MCP may inspect script-member metadata and preserve script-related members byte-for-byte, but it does not expose `set_script_source`, generic archive patching, or JASS/Lua injection. Script mutation is disabled until a copied-map round-trip proves the ownership and entry-point behavior.
+
+Phase 3 enforces this decision in both layers: the validator reports opaque script limits and missing/ambiguous/disconnected entry-point evidence, while the build plan rejects staged script/trigger changes as unsupported. The engine performs strict read-only trigger-string integrity checks where possible and never compiles or injects script text.
 
 The engine can build proven metadata and region changes while carrying the current script and trigger members through the archive. `war3map.j`, `war3map.wct`, and `war3map.wtg` are therefore preserved opaque for mutation purposes, not treated as absent.
 
@@ -19,7 +21,7 @@ The engine can build proven metadata and region changes while carrying the curre
 
 ## Consequences
 
-The toolchain can support safe inspection and a narrow no-op/metadata/region build, but it cannot yet implement the Hero Team Wars gameplay chunks. The limitation is explicit in capability reports and tool errors rather than guessed from opaque bytes.
+The toolchain supports safe inspection and a narrow no-op/metadata/region build, but it cannot yet implement the Hero Team Wars gameplay chunks. The limitation is explicit in capability reports and tool errors rather than guessed from opaque bytes. Phase 3's opaque-member comparison proves preservation, not semantic understanding or gameplay correctness.
 
 ## Unlock criteria
 

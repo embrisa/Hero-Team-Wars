@@ -1,12 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/server";
-import { correlationId } from "../schemas/common.js";
-import * as schemas from "../schemas/tools.js";
 import { InspectionService } from "../services/inspection-service.js";
 import { ProjectService } from "../services/project-service.js";
 import { TransactionService } from "../services/transaction-service.js";
 import { BuildService } from "../services/build-service.js";
 import { LaunchService } from "../services/launch-service.js";
-import { safeCall } from "./response.js";
 import type { Wc3Config } from "../config/schema.js";
 import { registerProjectStatus } from "./project-status.js";
 import { registerInspectMap } from "./inspect-map.js";
@@ -15,6 +12,7 @@ import { registerGetComponent } from "./get-component.js";
 import { registerValidateMap } from "./validate-map.js";
 import { registerCompareMaps } from "./compare-maps.js";
 import { registerTransactionTools } from "./transactions.js";
+import { registerBuildTools } from "./builds.js";
 
 export interface ToolServices {
   config: Wc3Config;
@@ -43,11 +41,5 @@ export function registerTools(server: McpServer, services: ToolServices): void {
   if (enabled("wc3_compare_maps")) registerCompareMaps(server, services.inspections);
 
   registerTransactionTools(server, services.transactions, enabled);
-  register("wc3_build_map", { description: "Build a uniquely named map artifact from an exact validated transaction revision. The result starts with runtime status untested.", inputSchema: schemas.buildMapSchema, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, async input => safeCall(correlationId(), () => services.builds.build(input.project_id, input.transaction_id, input.revision, input.expected_source_hash, input.profile, input.label, correlationId())));
-  register("wc3_build_report", { description: "Read and rehash a build manifest before using the artifact.", inputSchema: schemas.buildReportSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => safeCall(correlationId(), async () => services.builds.report(input.project_id, input.build_id)));
-  register("wc3_launch_editor", { description: "Launch exactly one hash-checked build in the configured World Editor. Process start is not editor-open evidence.", inputSchema: schemas.launchSchema, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, async input => safeCall(correlationId(), async () => services.launches.launchEditor(input.project_id, input.build_id, input.expected_build_hash)));
-  register("wc3_launch_test_map", { description: "Copy and launch exactly one hash-checked build in Warcraft III using the configured test root; never terminates an existing process.", inputSchema: schemas.launchSchema, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, async input => safeCall(correlationId(), async () => services.launches.launchGame(input.project_id, input.build_id, input.expected_build_hash)));
-  register("wc3_record_test_result", { description: "Attach an explicitly observed editor/game/smoke/playtest milestone to a matching build session; process start alone cannot pass it.", inputSchema: schemas.recordTestResultSchema, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, async input => safeCall(correlationId(), async () => services.launches.record(input.project_id, input.session_id, input.expected_build_hash, input.milestone, input.result, input.recorder, input.notes)));
-  register("wc3_get_test_session", { description: "Read a persisted hash-linked test session and its current evidence level.", inputSchema: schemas.getTestSessionSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => safeCall(correlationId(), async () => services.launches.get(input.project_id, input.session_id)));
-  register("wc3_promote_build", { description: "Copy a selected hash-checked build to one configured explicit destination and verify the copy hash.", inputSchema: schemas.promoteSchema, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, async input => safeCall(correlationId(), async () => services.builds.promote(input.project_id, input.build_id, input.expected_build_hash, input.destination_id, input.destination_name)));
+  registerBuildTools(register, services.builds, services.launches);
 }

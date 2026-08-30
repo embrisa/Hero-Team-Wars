@@ -1,13 +1,12 @@
 ﻿using System.Globalization;
-using System.Text;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using War3Net.Build;
 using War3Net.Build.Common;
 using War3Net.Build.Environment;
 using War3Net.Build.Extensions;
 using War3Net.Build.Info;
 using War3Net.IO.Mpq;
+using Wc3MapEngine.Core.Scripts;
 
 namespace Wc3MapEngine.Core;
 
@@ -258,7 +257,7 @@ public static class MapInspector
         }
 
         var result = new JsonArray();
-        foreach (var field in new[] { "title", "suggested_players", "author", "description", "recommended_players", "map_flags", "tileset", "script_language", "camera_bounds", "playable_map_area" })
+        foreach (var field in new[] { "title", "suggested_players", "author", "description", "recommended_players", "map_flags", "tileset", "script_language", "camera_bounds", "playable_map_area", "format_version", "map_version", "editor_version", "game_version" })
         {
             if (info[field] is JsonObject value && value.ContainsKey("value"))
             {
@@ -532,17 +531,7 @@ public static class MapInspector
     }
 
     private static Dictionary<string, string> ParseTriggerStrings(byte[] bytes)
-    {
-        var text = Encoding.UTF8.GetString(bytes);
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (Match match in Regex.Matches(text, @"STRING\s+(\d+)\s*\{(?<value>[\s\S]*?)\}", RegexOptions.CultureInvariant))
-        {
-            var token = $"TRIGSTR_{match.Groups[1].Value.PadLeft(3, '0')}";
-            result[token] = match.Groups["value"].Value.Trim();
-        }
-
-        return result;
-    }
+        => new(ScriptOwnership.ParseTriggerStrings(bytes), StringComparer.OrdinalIgnoreCase);
 
     private static int? TryParseSuggestedPlayers(string? recommendedPlayers)
     {

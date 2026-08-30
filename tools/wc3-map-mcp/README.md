@@ -2,9 +2,9 @@
 
 Project scaffold for the local Warcraft III map MCP described in `../../tasks/wc3-map-mcp/README.md`.
 
-Status: Phase 2 transactional writer implemented and verified. The map engine uses War3Net 6.0.3 for MPQ access and WC3 metadata/region parsing; the checked-in example configuration remains safely read-only with six inspection tools, while an explicitly approved `write_policy: "writes"` configuration exposes the transactional writer and later build/test tools.
+Status: Phase 3 build and validation implementation complete; manual editor/game compatibility evidence remains pending. The map engine uses War3Net 6.0.3 for MPQ access and WC3 metadata/region parsing; the checked-in example configuration remains safely read-only with six inspection tools, while an explicitly approved `write_policy: "writes"` configuration exposes the transactional writer, build, test, and approval-gated promotion tools.
 
-Current evidence: the local source has 17 classified archive members; `war3map.w3i`, `war3map.w3r`, and `war3map.wts` parse read-only; the Phase 2 suite stages an isolated copy, applies and diffs typed metadata/player/force/region changes atomically, validates, rolls back failed batches, and discards with an audit tombstone; a no-op rebuild reopened successfully with all member content hashes preserved; and the original source hash remained `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. World Editor/game runtime evidence is still a manual gate, and script/object/trigger mutation remains disabled.
+Current evidence: the local source has 17 classified archive members; `war3map.w3i`, `war3map.w3r`, and `war3map.wts` parse read-only; the transaction suite stages an isolated copy, applies and diffs typed metadata/player/force/region changes atomically, validates, rolls back failed batches, and discards with an audit tombstone; Phase 3 adds deterministic no-op/minimal builds, full member/preservation comparisons, persisted validation/build reports, failure cleanup, exact-hash reinspection, and explicit test evidence sessions. The source hash remained `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. World Editor/game runtime evidence is still a manual gate, and script/object/trigger mutation remains disabled under ADR 0002.
 
 ## Agent entry point
 

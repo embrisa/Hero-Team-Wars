@@ -226,15 +226,41 @@ export class TransactionService {
       this.assertActive(loaded.manifest);
       this.assertSourceUnchanged(project, loaded.manifest, loaded.paths.sourceMap);
       if (loaded.manifest.revision !== revision) throw new AppError("PRECONDITION_FAILED", `Transaction revision ${loaded.manifest.revision} does not match expected revision ${revision}.`);
-      const report = await this.worker.request<Record<string, unknown>>("validate_canonical", { canonical_path: loaded.paths.canonical }, correlationId);
+      const rawReport = await this.worker.request<Record<string, unknown>>("validate_canonical", {
+        canonical_path: loaded.paths.canonical,
+        source_map_path: loaded.paths.sourceMap,
+        validation_context: {
+          project_id: projectId,
+          ...(projectId === "hero-team-wars" ? { protected_region_names: ["Arena_A", "Camp_A_Player1"], explicit_teams: [[1, 2], [3, 4]] } : {})
+        }
+      }, correlationId);
       const reportPath = join(loaded.paths.reports, `validation-${revision.toString().padStart(4, "0")}.json`);
+      const report: Record<string, unknown> = {
+        ...rawReport,
+        transaction_id: transactionId,
+        revision,
+        source_sha256: loaded.manifest.source.sha256,
+        validator_version: String(rawReport.validator_version ?? "unknown"),
+        target: String(rawReport.target ?? "transaction_build")
+      };
       const artifact = writeJsonArtifact(project, relativeProjectPath(project, reportPath), report, "validation_report");
       const manifest = loaded.manifest;
       manifest.validation_reports = Array.from(new Set([...manifest.validation_reports, artifact.path]));
       manifest.state = report.buildable === true ? "validated" : "modified";
       this.store.update(loaded.paths, manifest);
-      if (report.buildable !== true) throw new AppError("VALIDATION_FAILED", "The transaction contains validation errors.", false, { report_path: artifact.path });
-      return { transaction_id: transactionId, revision, source_sha256: manifest.source.sha256, report, artifact };
+      if (report.buildable !== true) throw new AppError("VALIDATION_FAILED", "The transaction contains validation errors.", false, { report_path: artifact.path, report_sha256: artifact.sha256 });
+      return {
+        transaction_id: transactionId,
+        revision,
+        source_sha256: manifest.source.sha256,
+        validator_version: report.validator_version,
+        target: report.target,
+        buildable: report.buildable,
+        report_path: artifact.path,
+        report_sha256: artifact.sha256,
+        report,
+        artifact
+      };
     });
   }
 

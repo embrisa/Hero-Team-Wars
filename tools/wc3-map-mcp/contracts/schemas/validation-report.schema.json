@@ -2,12 +2,52 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.wc3-map-mcp/schemas/validation-report.schema.json",
   "title": "WC3 map validation report",
+  "description": "Stable Phase 3 validation output. Transaction fields are present for staged validation; map-only validation omits them.",
   "type": "object",
-  "required": ["schema_version", "buildable", "findings"],
+  "required": ["schema_version", "validator_version", "target", "buildable", "findings", "summary"],
   "properties": {
     "schema_version": { "const": "1.0" },
+    "validator_version": { "type": "string", "minLength": 1 },
+    "target": { "type": "string", "enum": ["map", "canonical_map", "transaction_build"] },
+    "transaction_id": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "map_path": { "type": "string" },
+    "map_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "source_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "map_hash": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "size_bytes": { "type": "integer", "minimum": 0 },
+    "modified_utc": { "type": "string", "format": "date-time" },
+    "report_path": { "type": "string" },
+    "report_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
     "buildable": { "type": "boolean" },
-    "findings": { "type": "array", "items": { "type": "object", "required": ["severity", "code", "message"], "properties": { "severity": { "type": "string", "enum": ["error", "warning", "info"] }, "code": { "type": "string" }, "component": { "type": ["string", "null"] }, "target": {}, "provenance": { "type": ["string", "null"] }, "message": { "type": "string" }, "suggested_action": { "type": ["string", "null"] } }, "additionalProperties": true } }
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings", "info"],
+      "properties": {
+        "errors": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 },
+        "info": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["severity", "code", "component", "message", "suggested_action"],
+      "properties": {
+        "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+        "component": { "type": ["string", "null"] },
+        "target": {},
+        "provenance": { "type": ["string", "null"] },
+        "message": { "type": "string", "minLength": 1 },
+        "suggested_action": { "type": "string", "minLength": 1 },
+        "suggested_remediation": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
 }

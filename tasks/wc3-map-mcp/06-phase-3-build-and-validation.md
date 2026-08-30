@@ -1,8 +1,10 @@
 # Phase 3 Work Packet - Map Build and Validation
 
-Status: blocked until Phase 2 has validated transactions and Phase 0 permits writing.
+Status: implementation complete; manual editor/game compatibility evidence remains pending.
 
 This phase serializes staged state and creates new map artifacts. The challenge is not merely creating an MPQ; it is preserving unsupported data and producing something the installed World Editor and Warcraft III accept.
+
+Implementation note (2026-08-30): the Phase 3 engine/server path is implemented and automated checks pass. The compatibility gate is intentionally still visible because the installed World Editor already has a user-owned Untitled/Trigger Editor session, and the installed Warcraft III executable exited without exposing a game window during a controlled launch attempt. No runtime pass is claimed.
 
 ## Required reading and inputs
 
@@ -39,6 +41,8 @@ Inspect the current script language and trigger members. ADR `0002-map-script-ow
 
 Extend it with serialization/build validators. Return transaction/revision/source hash, validator version, errors/warnings/info, component/target, suggested action, buildable flag, and report path/hash.
 
+Implemented: validation reports are persisted under the transaction staging root, include stable finding codes/severity/components/suggested actions, and the tool returns `report_path` and `report_sha256` for the exact validated revision.
+
 ### `wc3_build_map`
 
 Input project, transaction, expected revision/hash, debug build profile, optional safe label.
@@ -62,6 +66,8 @@ Algorithm:
 
 Never accept an arbitrary absolute output path.
 
+Implemented: the server supplies a generated output path beneath the configured build root; the engine refuses source overwrite, existing outputs, extension drift, unsupported staged components, and any reopen/preservation mismatch. Failed builds emit a failure artifact and do not leave a final output directory.
+
 ### `wc3_build_report`
 
 Return build manifest by ID and verify the artifact still matches its recorded hash.
@@ -69,6 +75,8 @@ Return build manifest by ID and verify the artifact still matches its recorded h
 ### `wc3_promote_build`
 
 Add only after correctness is proven. Copy to an explicitly configured destination, never default to source. Require expected build hash, refuse drift, and audit source/destination/copy hash.
+
+Implemented and approval-gated: promotion requires a hash-checked built artifact plus recorded smoke/playtest evidence, uses only the configured `test_map_root`, refuses overwrite, and writes an audit record.
 
 ## Validators
 
@@ -103,6 +111,8 @@ Use stable ordering and serialization. Build timestamp belongs in manifest, not 
 8. original source hash unchanged;
 9. manually open/load no-op and changed builds for compatibility evidence until Phase 4 automates launch.
 
+Automated evidence completed: the current source baseline validates with zero errors; engine tests cover no-op reopen, deterministic canonical/member comparisons, opaque preservation, unsupported-change rejection, malformed fixtures, and script ownership; MCP integration covers exact-revision no-op build/report behavior and cleanup of temporary build directories. The source hash remained `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`.
+
 ## Failure behavior
 
 - Validation error: no final artifact.
@@ -113,6 +123,6 @@ Use stable ordering and serialization. Build timestamp belongs in manifest, not 
 
 ## Completion gate and handoff
 
-Complete when no-op and minimal outputs re-inspect, opaque data is preserved, reports are complete, original is unchanged, and the no-op is observed opening in World Editor and loading in Warcraft III. Promotion stays approval-gated.
+The implementation gate is complete: no-op/minimal outputs re-inspect, opaque data is preserved, reports are complete, invalid builds do not promote, and the original is unchanged. The overall Phase 3 compatibility gate remains open until one exact no-op build is observed opening in World Editor and loading in Warcraft III; promotion stays approval-gated.
 
 Handoff build contracts, schemas, writer versions, script ADR, validators, build IDs/hashes/paths, compatibility evidence, and limitations.
