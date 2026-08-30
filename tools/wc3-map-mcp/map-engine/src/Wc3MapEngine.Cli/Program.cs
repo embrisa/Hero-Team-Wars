@@ -401,7 +401,7 @@ internal static class Program
 
     private static void MergeProjectOwnedGameplay(JsonObject destination, JsonObject source)
     {
-        foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables" })
+        foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables", "profile", "profile_spec", "profiles", "teams", "team_registry" })
         {
             if (source[field] is JsonNode value) destination[field] = value.DeepClone();
         }

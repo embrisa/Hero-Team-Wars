@@ -85,8 +85,14 @@ public static class OperationApplier
             applied.Add(operationId);
         }
 
-        if (operationTypes.Any(IsGameplayModelOperation)
-            && (operationTypes.Any(type => type != "rename_region") || HasGameplayModel(working)))
+        if (operationTypes.Any(IsTeamStructureOperation) && working["teams"] is JsonArray teamRecords)
+        {
+            working["team_registry"] = HtwProfileModel.BuildTeamRegistry(teamRecords);
+        }
+
+        if (operationTypes.Any(type => type != "rename_region" && IsGeneratedGameplayOperation(type))
+            || operationTypes.Contains("rename_region", StringComparer.Ordinal) && HasGameplayModel(working)
+            || operationTypes.Any(IsTeamStructureOperation) && HasGameplayModel(working))
         {
             FinalizeGameplayModel(working);
         }
@@ -448,18 +454,26 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", "set_player_slot requires an object value.");
         }
-        EnsureAllowed(update, "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask");
+        EnsureAllowed(update, "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "observer", "locked", "slot_status");
         if (update["name"] is not null) RequireStringValue(update["name"]!, "name");
         if (update["controller"] is not null) RequireStringValue(update["controller"]!, "controller");
         if (update["race"] is not null) RequireStringValue(update["race"]!, "race");
+        if (update["observer"] is not null) throw new EngineException("UNSUPPORTED_OPERATION", "war3map.w3i has no proven observer-slot representation.");
+        if (update["slot_status"] is not null) throw new EngineException("UNSUPPORTED_OPERATION", "slot_status is derived from the native controller field and cannot be set directly.");
         if (update["flags"] is not null) _ = RequiredIntValue(update["flags"]!, "flags", 0, int.MaxValue);
+        if (update["locked"] is JsonValue lockedNode && !lockedNode.TryGetValue<bool>(out _)) throw new EngineException("INVALID_ARGUMENT", "Player locked must be a boolean.");
         if (update["start"] is not null) ValidateStart(update["start"]!);
         foreach (var mask in new[] { "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask" })
         {
             if (update[mask] is not null) _ = RequiredIntValue(update[mask]!, mask, 0, int.MaxValue);
         }
+        if (update["locked"] is JsonValue locked && locked.TryGetValue<bool>(out var isLocked))
+        {
+            var currentFlags = RequiredIntValue(player["flags"] ?? JsonValue.Create(0), "flags", 0, int.MaxValue);
+            update["flags"] = isLocked ? currentFlags | 1 : currentFlags & ~1;
+        }
 
-        foreach (var field in new[] { "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask" })
+        foreach (var field in new[] { "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "locked" })
         {
             if (update[field] is not null)
             {
@@ -470,6 +484,7 @@ public static class OperationApplier
 
         player["provenance"] = "intended_design";
         player["capability"] = "typed_write_enabled";
+        UpdatePlayerDerivedFields(player);
     }
 
     private static void CreatePlayer(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
@@ -480,19 +495,24 @@ public static class OperationApplier
         var id = RequiredInt(target, "id", 1, 24);
         var players = RequiredArray(root, "players");
         if (players.OfType<JsonObject>().Any(item => IntValue(item["id"]) == id)) throw new EngineException("INVALID_ARGUMENT", $"Player {id} already exists.");
-        EnsureAllowed(player, "id", "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask");
+        EnsureAllowed(player, "id", "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "observer", "locked", "slot_status");
+        if (player["observer"] is not null) throw new EngineException("UNSUPPORTED_OPERATION", "war3map.w3i has no proven observer-slot representation.");
+        if (player["slot_status"] is not null) throw new EngineException("UNSUPPORTED_OPERATION", "slot_status is derived from the native controller field and cannot be set directly.");
         if (player["id"] is not null && RequiredIntValue(player["id"]!, "id", 1, 24) != id) throw new EngineException("INVALID_ARGUMENT", "Player target id and value id differ.");
         var created = player.DeepClone() as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "Player object could not be cloned.");
         created["id"] = id;
         created["name"] = StringValue(created["name"]) ?? $"Player {id}";
         created["controller"] = StringValue(created["controller"]) ?? "User";
         created["race"] = StringValue(created["race"]) ?? "Selectable";
-        created["flags"] = IntValue(created["flags"]) == int.MinValue ? 0 : created["flags"]!.DeepClone();
+        created["flags"] ??= 0;
+        if (created["flags"] is not JsonValue flagsValue || !flagsValue.TryGetValue<int>(out var flags) || flags < 0) throw new EngineException("INVALID_ARGUMENT", "Player flags must be a non-negative integer.");
+        if (created["locked"] is JsonValue locked && locked.TryGetValue<bool>(out var isLocked)) created["flags"] = isLocked ? flags | 1 : flags & ~1;
         created["start"] = created["start"]?.DeepClone() ?? new JsonObject { ["x"] = 0, ["y"] = 0 };
         foreach (var mask in new[] { "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask" }) created[mask] ??= 0;
         ValidateStart(created["start"]!);
         created["provenance"] = "intended_design";
         created["capability"] = "typed_write_enabled";
+        UpdatePlayerDerivedFields(created);
         players.Add(created);
     }
 
@@ -525,13 +545,14 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", "set_force requires an object value.");
         }
-        EnsureAllowed(update, "name", "flags", "player_ids", "player_mask");
+        EnsureAllowed(update, "name", "flags", "player_ids", "player_mask", "alliance", "shared_vision", "shared_unit_control");
         if (update["name"] is not null) RequireStringValue(update["name"]!, "name");
         if (update["flags"] is not null) _ = RequiredIntValue(update["flags"]!, "flags", 0, int.MaxValue);
         if (update["player_mask"] is not null) _ = RequiredIntValue(update["player_mask"]!, "player_mask", int.MinValue, int.MaxValue);
         if (update["player_ids"] is not null) ValidatePlayerIds(update["player_ids"]!);
+        MergeForceFlags(update, force["flags"]);
 
-        foreach (var field in new[] { "name", "flags", "player_ids", "player_mask" })
+        foreach (var field in new[] { "name", "flags", "player_ids", "player_mask", "alliance", "shared_vision", "shared_unit_control" })
         {
             if (update[field] is not null)
             {
@@ -545,6 +566,7 @@ public static class OperationApplier
 
         force["provenance"] = "intended_design";
         force["capability"] = "typed_write_enabled";
+        UpdateForceDerivedFields(force);
     }
 
     private static void CreateForce(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
@@ -555,17 +577,19 @@ public static class OperationApplier
         var forces = RequiredArray(root, "forces");
         if (forces.OfType<JsonObject>().Any(item => IntValue(item["index"]) == index)) throw new EngineException("INVALID_ARGUMENT", $"Force {index} already exists.");
         if (value is not JsonObject force) throw new EngineException("INVALID_ARGUMENT", "create_force requires a force object.");
-        EnsureAllowed(force, "index", "name", "stored_name", "flags", "player_ids", "player_mask");
+        EnsureAllowed(force, "index", "name", "stored_name", "flags", "player_ids", "player_mask", "alliance", "shared_vision", "shared_unit_control");
         var created = force.DeepClone() as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "Force object could not be cloned.");
         created["index"] = index;
         created["name"] = StringValue(created["name"]) ?? $"Force {index + 1}";
         created["flags"] ??= 0;
+        MergeForceFlags(created, created["flags"]);
         created["player_ids"] ??= new JsonArray();
         ValidatePlayerIds(created["player_ids"]!);
         created["player_mask"] = created["player_mask"]?.DeepClone() ?? PlayerMask(created["player_ids"]!);
         ValidateForceRecord(created);
         created["provenance"] = "intended_design";
         created["capability"] = "typed_write_enabled";
+        UpdateForceDerivedFields(created);
         forces.Add(created);
     }
 
@@ -594,6 +618,7 @@ public static class OperationApplier
         created["member_player_ids"] ??= new JsonArray();
         EnsureAllowed(team, "id", "name", "member_player_ids", "force_index", "arena_id", "hero_ids", "life_state", "routing_state");
         ValidatePlayerIds(created["member_player_ids"]!);
+        ValidateTeamRecord(created);
         created["provenance"] = "intended_design";
         created["capability"] = "typed_write_enabled";
         teams.Add(created);
@@ -941,8 +966,11 @@ public static class OperationApplier
         else ValidateVariable(existing);
     }
 
-    private static bool IsGameplayModelOperation(string type)
+    private static bool IsGeneratedGameplayOperation(string type)
         => type is "upsert_script_module" or "remove_script_module" or "create_trigger" or "update_trigger" or "move_trigger" or "delete_trigger" or "create_variable" or "update_variable" or "delete_variable" or "rename_region";
+
+    private static bool IsTeamStructureOperation(string type)
+        => type is "create_player_slot" or "set_player_slot" or "delete_player_slot" or "create_force" or "set_force" or "delete_force" or "create_team" or "set_team" or "delete_team" or "set_team_arena" or "set_team_members";
 
     private static bool HasGameplayModel(JsonObject root)
         => root["gameplay_source"] is JsonObject
@@ -966,6 +994,10 @@ public static class OperationApplier
         script["provenance"] = "intended_design";
         script["capability"] = "staged_typed_write";
         root["trigger_mode"] = GameplayModelValidator.NativeMode;
+        root["profile"] = composition["profile"]!.DeepClone();
+        root["profile_spec"] = composition["profile_spec"]!.DeepClone();
+        root["teams"] = composition["teams"]!.DeepClone();
+        root["team_registry"] = composition["team_registry"]!.DeepClone();
         root["gameplay_source"] = new JsonObject
         {
             ["schema_version"] = "1.0",
@@ -1517,10 +1549,61 @@ public static class OperationApplier
     private static void ValidateForceRecord(JsonObject force)
     {
         ValidatePlayerIds(force["player_ids"] ?? throw new EngineException("INVALID_ARGUMENT", "Force player_ids must be an array."));
-        if (force["player_mask"] is JsonValue mask && mask.TryGetValue<int>(out var value) && value >= 0 && value != PlayerMask(force["player_ids"]!))
+        if (force["player_mask"] is JsonValue mask && mask.TryGetValue<int>(out var value))
         {
-            throw new EngineException("INVALID_ARGUMENT", "Force player_mask must match player_ids.");
+            var expected = PlayerMask(force["player_ids"]!);
+            if (value >= 0 && value != expected || value < 0 && (value & expected) != expected) throw new EngineException("INVALID_ARGUMENT", "Force player_mask must match player_ids.");
         }
+    }
+
+    private static void MergeForceFlags(JsonObject force, JsonNode? existingFlags)
+    {
+        var flags = existingFlags is JsonValue value && value.TryGetValue<int>(out var parsed) && parsed >= 0 ? parsed : 0;
+        foreach (var (field, bit) in new[] { ("alliance", 1), ("shared_vision", 8), ("shared_unit_control", 16) })
+        {
+            if (force[field] is not JsonValue boolean || !boolean.TryGetValue<bool>(out var enabled)) continue;
+            flags = enabled ? flags | bit : flags & ~bit;
+        }
+        if (force["flags"] is null || force.Any(property => property.Key is "alliance" or "shared_vision" or "shared_unit_control")) force["flags"] = flags;
+    }
+
+    private static void UpdatePlayerDerivedFields(JsonObject player)
+    {
+        var flags = IntValue(player["flags"]);
+        player["observer"] = null;
+        player["locked"] = flags != int.MinValue && (flags & 1) != 0;
+        player["slot_status"] = StringValue(player["controller"]) switch
+        {
+            "None" => "closed",
+            "Neutral" => "neutral",
+            "Rescuable" => "rescuable",
+            _ => "active"
+        };
+        player["codec_version"] = MapComponentCodec.CodecVersion;
+    }
+
+    private static void UpdateForceDerivedFields(JsonObject force)
+    {
+        var flags = IntValue(force["flags"]);
+        if (flags == int.MinValue) flags = 0;
+        force["alliance"] = (flags & 1) != 0;
+        force["shared_vision"] = (flags & 8) != 0;
+        force["shared_unit_control"] = (flags & 16) != 0;
+        force["codec_version"] = MapComponentCodec.CodecVersion;
+    }
+
+    private static void ValidateTeamRecord(JsonObject team)
+    {
+        foreach (var field in new[] { "id", "name", "member_player_ids", "force_index", "arena_id", "hero_ids", "life_state", "routing_state" })
+        {
+            if (team[field] is null) throw new EngineException("INVALID_ARGUMENT", $"Team records require '{field}'.");
+        }
+        if (string.IsNullOrWhiteSpace(StringValue(team, "id")) || string.IsNullOrWhiteSpace(StringValue(team, "name"))) throw new EngineException("INVALID_ARGUMENT", "Team id and name must be non-empty strings.");
+        ValidatePlayerIds(team["member_player_ids"]!);
+        if (RequiredIntValue(team["force_index"]!, "force_index", 0, 23) < 0) throw new EngineException("INVALID_ARGUMENT", "Team force_index must be a valid force index.");
+        if (string.IsNullOrWhiteSpace(StringValue(team, "arena_id"))) throw new EngineException("INVALID_ARGUMENT", "Team arena_id must be a non-empty stable arena ID.");
+        if (team["hero_ids"] is not JsonArray) throw new EngineException("INVALID_ARGUMENT", "Team hero_ids must be an array.");
+        if (string.IsNullOrWhiteSpace(StringValue(team, "life_state")) || string.IsNullOrWhiteSpace(StringValue(team, "routing_state"))) throw new EngineException("INVALID_ARGUMENT", "Team life_state and routing_state must be non-empty strings.");
     }
 
     private static void ValidateTrigger(JsonObject trigger)

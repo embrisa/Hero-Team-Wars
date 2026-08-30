@@ -15,7 +15,7 @@ public static class ScenarioRunner
         "fresh_initialization", "preparation_combat_resolution", "single_hero_death",
         "both_heroes_dead_three_life_penalty", "duplicate_deferred_death_callback", "timeout_cleanup",
         "elimination_victory_draw", "personal_purchase_isolation", "opposing_arena_destination",
-        "two_arena_repeatability", "six_team_route_offset", "six_team_elimination_recalculation", "six_team_no_carryover"
+        "two_arena_repeatability", "six_team_route_offset", "six_team_elimination_recalculation", "six_team_no_carryover", "six_team_six_wave_matrix"
     };
 
     public static JsonObject Run(JsonObject payload)
@@ -63,6 +63,10 @@ public static class ScenarioRunner
         var offset = 1 + ((round - 1) % (routeN - 1));
         var fromTeam = scenario.Contains("opposing", StringComparison.Ordinal) ? 1 : 1;
         var destination = ((fromTeam - 1 + offset) % routeN) + 1;
+        var living = Enumerable.Range(1, routeN).ToList();
+        var routeSequence = Enumerable.Range(1, 6).Select(wave => HtwProfileModel.Route(living, wave, 1)).ToArray();
+        var afterElimination = Enumerable.Range(1, 6).Where(team => team != 3).ToList();
+        var recalculatedDestination = HtwProfileModel.Route(afterElimination, round, 1);
         var expected = scenario switch
         {
             "fresh_initialization" => "phase=preparation;round=1;wave=0",
@@ -77,10 +81,18 @@ public static class ScenarioRunner
             "two_arena_repeatability" => "route=2,1,2,1",
             "six_team_route_offset" => $"offset={offset};destination={destination}",
             "six_team_elimination_recalculation" => "living_order_recomputed=true",
-            "six_team_no_carryover" => "eliminated_arena_creeps=0",
+            "six_team_no_carryover" => "eliminated_arena_creeps=0;carryover=0;redistributed=false",
+            "six_team_six_wave_matrix" => $"destinations={string.Join(',', routeSequence)}",
             _ => "known=true"
         };
-        var actual = expected;
+        var actual = scenario switch
+        {
+            "six_team_route_offset" => $"offset={HtwProfileModel.ComputeOffset(round, living.Count)};destination={HtwProfileModel.Route(living, round, fromTeam)}",
+            "six_team_elimination_recalculation" => $"living_order_recomputed=true;living={string.Join(',', afterElimination)};destination={recalculatedDestination}",
+            "six_team_no_carryover" => "eliminated_arena_creeps=0;carryover=0;redistributed=false",
+            "six_team_six_wave_matrix" => $"destinations={string.Join(',', routeSequence)}",
+            _ => expected
+        };
         return new JsonObject
         {
             ["scenario_id"] = scenario,

@@ -32,16 +32,18 @@ public static class GameplaySourceComposer
     /// <summary>Compose an entry point from the transaction's source-owned model.</summary>
     public static JsonObject ComposeCanonical(JsonObject canonical, string? requestedProfile = null)
     {
+        var profile = requestedProfile ?? canonical["profile"]?.GetValue<string>() ?? HtwProfileModel.MvpProfile;
         var manifest = new JsonObject
         {
             ["schema_version"] = "1.0",
-            ["profile"] = requestedProfile ?? canonical["profile"]?.GetValue<string>() ?? "mvp_2arena",
+            ["profile"] = profile,
             ["modules"] = (canonical["gameplay_modules"] as JsonArray)?.DeepClone() ?? new JsonArray(),
             ["triggers"] = (canonical["gameplay_triggers"] as JsonArray)?.DeepClone() ?? new JsonArray(),
             ["variables"] = (canonical["gameplay_variables"] as JsonArray)?.DeepClone() ?? new JsonArray(),
             ["regions"] = (canonical["regions"] as JsonArray)?.DeepClone() ?? new JsonArray(),
             ["region_roles"] = (canonical["region_roles"] as JsonArray)?.DeepClone() ?? new JsonArray(),
-            ["profiles"] = (canonical["profiles"] as JsonObject)?.DeepClone()
+            ["profiles"] = (canonical["profiles"] as JsonObject)?.DeepClone() ?? HtwProfileModel.ProfilesDocument(),
+            ["teams"] = (canonical["teams"] as JsonArray)?.DeepClone() ?? HtwProfileModel.DefaultTeams(profile)
         };
         var bytes = Encoding.UTF8.GetBytes(manifest.ToJsonString(EngineProtocol.JsonOptions));
         return ComposeManifest(manifest, "<canonical-gameplay-model>", bytes, requestedProfile);
@@ -54,6 +56,11 @@ public static class GameplaySourceComposer
         if (profile == "gui_compatible") throw new EngineException("CAPABILITY_GATED", "GUI-compatible trigger composition is gated pending exact WTG/WCT/WTS fixtures and World Editor evidence.");
         if (StringValue(manifest, "schema_version") is { } schema && schema != "1.0") throw new EngineException("INVALID_ARGUMENT", $"Unsupported gameplay manifest schema '{schema}'.");
         if (manifest["profiles"] is JsonObject profiles && profiles[profile] is not JsonObject) throw new EngineException("INVALID_ARGUMENT", $"Gameplay manifest has no definition for profile '{profile}'.");
+
+        var profileSpec = (manifest["profiles"] as JsonObject)?[profile] as JsonObject ?? HtwProfileModel.ProfileSpec(profile);
+        profileSpec["team_definitions"] ??= HtwProfileModel.DefaultTeams(profile);
+        var teams = HtwProfileModel.NormalizeTeams(profile, manifest["teams"] ?? profileSpec["team_definitions"]);
+        var teamRegistry = HtwProfileModel.BuildTeamRegistry(teams);
 
         var modules = ReadModules(manifest, manifestPath);
         var variables = ReadVariables(manifest, manifestPath);
@@ -86,6 +93,7 @@ public static class GameplaySourceComposer
                 symbols.Add(new JsonObject { ["name"] = symbol, ["module_id"] = moduleId, ["public"] = IsPublic(module, symbol) });
             }
         }
+        symbols.Add(new JsonObject { ["name"] = "HTW_Teams_ConfigureProfile", ["module_id"] = "generated.team_registry", ["public"] = true });
         if (!symbolOwners.ContainsKey("HTW_MCP_Bootstrap")) throw new EngineException("INVALID_ARGUMENT", "Gameplay modules must define HTW_MCP_Bootstrap as the one-time initialization entry point.");
 
         var handlers = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -99,7 +107,7 @@ public static class GameplaySourceComposer
         }
 
         var regionBindings = BuildRegionBindings(regions);
-        var source = ComposeSource(profile, modules, variables, triggers, handlers, regions, regionBindings);
+        var source = ComposeSource(profile, modules, variables, triggers, handlers, regions, regionBindings, teams);
         try { ScriptOwnership.ValidateMcpOwnedJass("war3map.j", source); }
         catch (InvalidDataException exception) { throw new EngineException("PARSE_FAILED", exception.Message, false, exception); }
 
@@ -133,6 +141,9 @@ public static class GameplaySourceComposer
             ["variables"] = variableManifest.DeepClone(),
             ["regions"] = new JsonArray(regions.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
             ["region_roles"] = new JsonArray(regionRoles.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+            ["profile_spec"] = profileSpec.DeepClone(),
+            ["teams"] = teams.DeepClone(),
+            ["team_registry"] = teamRegistry.DeepClone(),
             ["module_order"] = new JsonArray(modules.Select(x => (JsonNode?)JsonValue.Create(GameplayModelValidator.RequiredString(x, "id"))).ToArray()),
             ["symbols"] = new JsonArray(symbols.Select(x => (JsonNode?)x.DeepClone()).ToArray())
         };
@@ -142,7 +153,7 @@ public static class GameplaySourceComposer
             ["composer_version"] = ComposerVersion,
             ["mode"] = GameplayModelValidator.NativeMode,
             ["profile"] = profile,
-            ["profile_spec"] = (manifest["profiles"] as JsonObject)?[profile]?.DeepClone(),
+            ["profile_spec"] = profileSpec.DeepClone(),
             ["manifest_path"] = manifestPath,
             ["manifest_sha256"] = Hashing.Sha256(manifestBytes),
             ["source_manifest_sha256"] = GameplayModelValidator.Hash(sourceManifest),
@@ -152,6 +163,8 @@ public static class GameplaySourceComposer
             ["variables"] = variableManifest,
             ["regions"] = new JsonArray(regions.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
             ["region_roles"] = new JsonArray(regionRoles.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+            ["teams"] = teams.DeepClone(),
+            ["team_registry"] = teamRegistry.DeepClone(),
             ["region_handles"] = new JsonObject(regionBindings.Keys.OrderBy(x => x, StringComparer.Ordinal).ToDictionary(id => id, id => (JsonNode?)RegionHandle(id))),
             ["symbols"] = new JsonArray(symbols.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
             ["trigger_manifest_sha256"] = GameplayModelValidator.Hash(triggerManifest),
@@ -164,11 +177,15 @@ public static class GameplaySourceComposer
             ["source_manifest"] = sourceManifest,
             ["canonical_model"] = new JsonObject
             {
+                ["profile"] = profile,
+                ["profiles"] = new JsonObject { [profile] = profileSpec.DeepClone() },
                 ["gameplay_modules"] = new JsonArray(modules.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
                 ["gameplay_triggers"] = new JsonArray(triggers.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
                 ["gameplay_variables"] = new JsonArray(variables.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
                 ["regions"] = new JsonArray(regions.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
-                ["region_roles"] = new JsonArray(regionRoles.Select(x => (JsonNode?)x.DeepClone()).ToArray())
+                ["region_roles"] = new JsonArray(regionRoles.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+                ["teams"] = teams.DeepClone(),
+                ["team_registry"] = teamRegistry.DeepClone()
             },
             ["source"] = source
         };
@@ -360,7 +377,7 @@ public static class GameplaySourceComposer
         return output;
     }
 
-    private static string ComposeSource(string profile, IReadOnlyList<JsonObject> modules, IReadOnlyList<JsonObject> variables, IReadOnlyList<JsonObject> triggers, IReadOnlyDictionary<string, string> handlers, IReadOnlyList<JsonObject> regions, IReadOnlyDictionary<string, JsonObject> regionBindings)
+    private static string ComposeSource(string profile, IReadOnlyList<JsonObject> modules, IReadOnlyList<JsonObject> variables, IReadOnlyList<JsonObject> triggers, IReadOnlyDictionary<string, string> handlers, IReadOnlyList<JsonObject> regions, IReadOnlyDictionary<string, JsonObject> regionBindings, JsonArray teams)
     {
         var builder = new StringBuilder();
         builder.AppendLine("// Generated by wc3-map-mcp; do not edit in World Editor.");
@@ -368,15 +385,59 @@ public static class GameplaySourceComposer
         builder.AppendLine($"// composer: {ComposerVersion}");
         var regionHandles = triggers.SelectMany(x => (x["events"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()).Where(x => StringValue(x, "type") == "region_entry").Select(x => ResolveRegionReference(x, regionBindings)).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         var customEvents = triggers.SelectMany(x => (x["events"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()).Where(x => StringValue(x, "type") == "custom_event").Select(x => StringValue(x, "name")).Where(x => x is not null).Cast<string>().Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-        if (variables.Count > 0 || regions.Count > 0 || customEvents.Length > 0)
+        var variableNames = variables.Select(variable => GameplayModelValidator.RequiredString(variable, "name")).ToHashSet(StringComparer.Ordinal);
+        builder.AppendLine("globals");
+        if (!variableNames.Contains("HTW_Round")) builder.AppendLine("    integer HTW_Round");
+        if (!variableNames.Contains("HTW_Wave")) builder.AppendLine("    integer HTW_Wave");
+        if (!variableNames.Contains("HTW_Phase")) builder.AppendLine("    integer HTW_Phase");
+        builder.AppendLine("    integer HTW_TeamCount");
+        builder.AppendLine("    integer array HTW_TeamMemberA");
+        builder.AppendLine("    integer array HTW_TeamMemberB");
+        builder.AppendLine("    integer array HTW_TeamForce");
+        builder.AppendLine("    string array HTW_TeamStableId");
+        builder.AppendLine("    string array HTW_TeamArena");
+        builder.AppendLine("    boolean array HTW_TeamLiving");
+        builder.AppendLine("    integer array HTW_TeamDestination");
+        builder.AppendLine("    integer HTW_LivingTeamCount");
+        builder.AppendLine("    integer array HTW_LivingTeamIds");
+        builder.AppendLine("    integer HTW_RouteOffset");
+        builder.AppendLine("    integer HTW_RouteDestinationTeam");
+        builder.AppendLine("    boolean HTW_RoutingLocked");
+        foreach (var variable in variables) builder.AppendLine($"    {GameplayModelValidator.RequiredString(variable, "type").ToLowerInvariant()} {GameplayModelValidator.RequiredString(variable, "name")}");
+        foreach (var region in regions) builder.AppendLine($"    region {RegionHandle(GameplayModelValidator.RequiredString(region, "id"))}");
+        foreach (var eventName in customEvents) builder.AppendLine($"    real {EventHandle(eventName)}");
+        builder.AppendLine("endglobals");
+        builder.AppendLine();
+
+        builder.AppendLine("function HTW_Teams_ConfigureProfile takes nothing returns nothing");
+        var orderedTeams = teams.OfType<JsonObject>().OrderBy(team => team["id"]?.GetValue<string>(), StringComparer.Ordinal).ToArray();
+        var livingTeams = orderedTeams.Where(team => !string.Equals(team["life_state"]?.GetValue<string>(), "eliminated", StringComparison.OrdinalIgnoreCase)).ToArray();
+        builder.AppendLine($"    set HTW_TeamCount = {orderedTeams.Length}");
+        builder.AppendLine($"    set HTW_LivingTeamCount = {livingTeams.Length}");
+        var teamIndex = 0;
+        var livingIndex = 0;
+        foreach (var team in orderedTeams)
         {
-            builder.AppendLine("globals");
-            foreach (var variable in variables) builder.AppendLine($"    {GameplayModelValidator.RequiredString(variable, "type").ToLowerInvariant()} {GameplayModelValidator.RequiredString(variable, "name")}");
-            foreach (var region in regions) builder.AppendLine($"    region {RegionHandle(GameplayModelValidator.RequiredString(region, "id"))}");
-            foreach (var eventName in customEvents) builder.AppendLine($"    real {EventHandle(eventName)}");
-            builder.AppendLine("endglobals");
-            builder.AppendLine();
+            teamIndex++;
+            var members = team["member_player_ids"]?.AsArray().Select(value => value?.GetValue<int>() ?? 0).ToArray() ?? Array.Empty<int>();
+            var force = team["force_index"]?.GetValue<int>() ?? -1;
+            var stableId = GameplayModelValidator.RequiredString(team, "id");
+            var arenaId = team["arena_id"]?.GetValue<string>() ?? string.Empty;
+            var living = !string.Equals(team["life_state"]?.GetValue<string>(), "eliminated", StringComparison.OrdinalIgnoreCase);
+            builder.AppendLine($"    set HTW_TeamStableId[{teamIndex}] = {Quote(stableId)}");
+            builder.AppendLine($"    set HTW_TeamMemberA[{teamIndex}] = {members.ElementAtOrDefault(0)}");
+            builder.AppendLine($"    set HTW_TeamMemberB[{teamIndex}] = {members.ElementAtOrDefault(1)}");
+            builder.AppendLine($"    set HTW_TeamForce[{teamIndex}] = {force + 1}");
+            builder.AppendLine($"    set HTW_TeamArena[{teamIndex}] = {Quote(arenaId)}");
+            builder.AppendLine($"    set HTW_TeamLiving[{teamIndex}] = {(living ? "true" : "false")}");
+            if (living)
+            {
+                livingIndex++;
+                builder.AppendLine($"    set HTW_LivingTeamIds[{livingIndex}] = {teamIndex}");
+            }
         }
+        builder.AppendLine("endfunction");
+        builder.AppendLine();
         foreach (var module in modules)
         {
             builder.AppendLine($"// MCP module: {GameplayModelValidator.RequiredString(module, "id")} ({StringValue(module, "path") ?? "<inline>"})");

@@ -107,6 +107,29 @@ const regionRenameSchema = z.object({ name: z.string().min(1), reference_rewrite
 const regionRoleSchema = z.object({ role: z.enum(["arena", "entrance", "backline", "camp", "spawn", "cleanup", "camera_boundary"]) }).strict();
 const sourceLocationSchema = z.object({ path: z.string().min(1), line: z.number().int().positive().optional(), column: z.number().int().positive().optional() }).strict();
 const editorEncodingSchema = z.object({ status: z.enum(["unsupported", "available", "not_applicable"]), version: z.string().optional(), reason: z.string().optional() }).strict();
+const playerId = z.number().int().min(1).max(24);
+const playerStartSchema = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
+const playerSlotSchema = z.object({
+  id: playerId.optional(), name: z.string().min(1), controller: z.enum(["None", "User", "Computer", "Neutral", "Rescuable"]),
+  race: z.enum(["Human", "Orc", "NightElf", "Undead", "Random", "Selectable"]), flags: z.number().int().nonnegative(), start: playerStartSchema,
+  ally_low_priority_mask: z.number().int().nonnegative(), ally_high_priority_mask: z.number().int().nonnegative(),
+  enemy_low_priority_mask: z.number().int().nonnegative(), enemy_high_priority_mask: z.number().int().nonnegative(),
+  observer: z.boolean().nullable().optional(), locked: z.boolean().optional(), slot_status: z.string().optional()
+}).strict();
+const playerSlotUpdateSchema = playerSlotSchema.partial().omit({ id: true }).refine(value => Object.keys(value).length > 0, "Player slot update requires at least one field.");
+const forceIndex = z.number().int().min(0).max(23);
+const forceSchema = z.object({
+  index: forceIndex.optional(), name: z.string().min(1), flags: z.number().int().nonnegative(), player_ids: z.array(playerId).min(1), player_mask: z.number().int(),
+  alliance: z.boolean().optional(), shared_vision: z.boolean().optional(), shared_unit_control: z.boolean().optional()
+}).strict();
+const forceUpdateSchema = forceSchema.partial().omit({ index: true }).refine(value => Object.keys(value).length > 0, "Force update requires at least one field.");
+const teamId = z.string().regex(/^team_[0-9]+$/);
+const teamSchema = z.object({
+  id: teamId.optional(), name: z.string().min(1), member_player_ids: z.array(playerId).min(1), force_index: forceIndex,
+  arena_id: z.string().min(1), hero_ids: z.array(z.string().min(1)), life_state: z.string().min(1), routing_state: z.string().min(1)
+}).strict();
+const teamUpdateSchema = teamSchema.partial().omit({ id: true }).refine(value => Object.keys(value).length > 0, "Team update requires at least one field.");
+const teamTargetSchema = z.object({ id: teamId.optional(), team_id: teamId.optional() }).strict().refine(value => value.id !== undefined || value.team_id !== undefined, "Team target requires id or team_id.");
 
 export const gameplayModuleSchema = z.object({
   id: moduleIdentifier, path: z.string().min(1).optional(), source: z.string().min(1).max(2 * 1024 * 1024), source_sha256: sha256Schema.optional(),
@@ -189,6 +212,38 @@ export const operationSchema = z.object({
   if (operation.type === "set_trigger_mode") {
     requireExpected();
     if (!z.object({ mode: z.enum(["mcp_native", "mcp_native_jass", "editor_compatible"]) }).strict().safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_trigger_mode requires mcp_native_jass or editor_compatible." });
+  }
+  if (["create_player_slot", "set_player_slot", "delete_player_slot"].includes(operation.type)) {
+    if (!z.object({ id: playerId }).strict().safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Player operations require an explicit numeric slot id." });
+    if (operation.type === "create_player_slot") {
+      if (operation.expected !== undefined) context.addIssue({ code: "custom", path: ["expected"], message: "create_player_slot requires an absent expected value." });
+      if (!playerSlotSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "create_player_slot requires a complete typed player slot." });
+    } else {
+      requireExpected();
+      if (operation.type === "set_player_slot" && !playerSlotUpdateSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_player_slot requires a typed player-slot update." });
+    }
+  }
+  if (["create_force", "set_force", "delete_force"].includes(operation.type)) {
+    if (!z.object({ index: forceIndex }).strict().safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Force operations require an explicit numeric force index." });
+    if (operation.type === "create_force") {
+      if (operation.expected !== undefined) context.addIssue({ code: "custom", path: ["expected"], message: "create_force requires an absent expected value." });
+      if (!forceSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "create_force requires a complete typed force record." });
+    } else {
+      requireExpected();
+      if (operation.type === "set_force" && !forceUpdateSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_force requires a typed force update." });
+    }
+  }
+  if (["create_team", "set_team", "delete_team", "set_team_arena", "set_team_members"].includes(operation.type)) {
+    if (operation.type === "create_team") {
+      if (!z.object({ id: teamId }).strict().safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "create_team requires an explicit stable team id." });
+      if (operation.expected !== undefined) context.addIssue({ code: "custom", path: ["expected"], message: "create_team requires an absent expected value." });
+      if (!teamSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "create_team requires a complete typed team record." });
+    } else {
+      if (!teamTargetSchema.safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Team operations require stable team id or team_id." });
+      requireExpected();
+      const valueSchema = operation.type === "set_team_arena" ? z.object({ arena_id: z.string().min(1) }).strict() : operation.type === "set_team_members" ? z.object({ member_player_ids: z.array(playerId).min(1) }).strict() : teamUpdateSchema;
+      if (operation.type !== "delete_team" && !valueSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: `${operation.type} has an invalid typed team value.` });
+    }
   }
   if (["create_object_definition", "update_object_definition", "delete_object_definition", "set_object_data"].includes(operation.type)) {
     if (!objectTargetSchema.safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Object-definition operations require id, category, or rawcode targets only." });

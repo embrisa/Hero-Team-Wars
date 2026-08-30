@@ -66,7 +66,9 @@ public static class ValidationPipeline
             try
             {
                 sourceInspection = MapInspector.Inspect(sourcePath);
-                ValidateInspection(sourceInspection, findings, context);
+                var sourceContext = context?.DeepClone() as JsonObject;
+                sourceContext?.Remove("profile");
+                ValidateInspection(sourceInspection, findings, sourceContext);
                 ValidateBuildableChanges(sourceInspection, root, findings, context);
             }
             catch (EngineException exception)
@@ -254,6 +256,8 @@ public static class ValidationPipeline
         stagedClone.Remove("parse_warnings");
         sourceClone.Remove("profile");
         stagedClone.Remove("profile");
+        sourceClone.Remove("profile_spec");
+        stagedClone.Remove("profile_spec");
         sourceClone.Remove("profiles");
         stagedClone.Remove("profiles");
         sourceClone.Remove("teams");
@@ -488,6 +492,25 @@ public static class ValidationPipeline
                 Add(findings, "error", "PLAYER_ID_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), "Player IDs must be unique values from 1 through 24.", "Use explicit numeric player slots.");
             }
 
+            foreach (var field in new[] { "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask" })
+            {
+                if (player[field] is null) Add(findings, "error", "PLAYER_FIELD_MISSING", "players", id?.ToString(CultureInfo.InvariantCulture), $"Player slot {id?.ToString(CultureInfo.InvariantCulture) ?? "?"} is missing required field '{field}'.", "Regenerate the slot from the proven map-info codec or provide the complete slot record.");
+            }
+
+            if (player["name"] is not null && StringValue(player["name"]) is null) Add(findings, "error", "PLAYER_NAME_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), "Player names must be exact strings.", "Use the decoded map-info player name.");
+
+            var controller = StringValue(player["controller"]);
+            if (controller is not null && controller is not ("None" or "User" or "Computer" or "Neutral" or "Rescuable")) Add(findings, "error", "PLAYER_CONTROLLER_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), $"Player controller '{controller}' is not a supported Warcraft III controller value.", "Use None, User, Computer, Neutral, or Rescuable.");
+            var race = StringValue(player["race"]);
+            if (race is not null && race is not ("Human" or "Orc" or "NightElf" or "Undead" or "Random" or "Selectable")) Add(findings, "error", "PLAYER_RACE_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), $"Player race '{race}' is not a supported Warcraft III race value.", "Use a value exposed by the pinned MapInfo reader.");
+            if (IntegerValue(player["flags"]) is < 0) Add(findings, "error", "PLAYER_FLAGS_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), "Player flags must be a non-negative integer.", "Use the native PlayerFlags value.");
+            foreach (var mask in new[] { "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask" })
+            {
+                if (IntegerValue(player[mask]) is < 0) Add(findings, "error", "PLAYER_MASK_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), $"Player {mask} must be a non-negative integer.", "Use a 32-bit player mask.");
+            }
+            if (!IsNullOrBoolean(player["locked"])) Add(findings, "error", "PLAYER_LOCKED_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), "Player locked must be a boolean when present.", "Use the derived locked value from the map-info codec.");
+            if (!IsNullOrBoolean(player["observer"])) Add(findings, "error", "PLAYER_OBSERVER_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), "Player observer must be null or a boolean.", "Keep observer null until a native observer representation is proven.");
+
             foreach (var field in new[] { "controller", "race" })
             {
                 if (player[field] is not null && StringValue(player[field]) is null)
@@ -541,6 +564,22 @@ public static class ValidationPipeline
                 Add(findings, "error", "FORCE_INDEX_INVALID", "forces", index?.ToString(CultureInfo.InvariantCulture), "Force indices must be unique values from 0 through 23.", "Use explicit force indices.");
             }
 
+            foreach (var field in new[] { "name", "flags", "player_ids", "player_mask" })
+            {
+                if (force[field] is null) Add(findings, "error", "FORCE_FIELD_MISSING", "forces", index?.ToString(CultureInfo.InvariantCulture), $"Force {index?.ToString(CultureInfo.InvariantCulture) ?? "?"} is missing required field '{field}'.", "Regenerate the force from the proven map-info codec.");
+            }
+            if (string.IsNullOrWhiteSpace(StringValue(force["name"]))) Add(findings, "error", "FORCE_NAME_INVALID", "forces", index?.ToString(CultureInfo.InvariantCulture), "Force names must be non-empty exact strings.", "Set an explicit force name.");
+            if (IntegerValue(force["flags"]) is < 0) Add(findings, "error", "FORCE_FLAGS_INVALID", "forces", index?.ToString(CultureInfo.InvariantCulture), "Force flags must be a non-negative integer.", "Use the native ForceFlags value.");
+            foreach (var flag in new[] { "alliance", "shared_vision", "shared_unit_control" })
+            {
+                if (force[flag] is not null && (force[flag] is not JsonValue boolean || !boolean.TryGetValue<bool>(out _))) Add(findings, "error", "FORCE_FLAG_INVALID", "forces", index?.ToString(CultureInfo.InvariantCulture), $"Force {flag} must be a boolean when present.", "Use the derived alliance/vision/control flags.");
+            }
+            var forceFlags = IntegerValue(force["flags"]);
+            foreach (var (flag, bit) in new[] { ("alliance", 1), ("shared_vision", 8), ("shared_unit_control", 16) })
+            {
+                if (forceFlags is not null && force[flag] is JsonValue flagValue && flagValue.TryGetValue<bool>(out var enabled) && enabled != ((forceFlags.Value & bit) != 0)) Add(findings, "error", "FORCE_FLAG_CONTRADICTION", "forces", index?.ToString(CultureInfo.InvariantCulture), $"Force {flag} disagrees with the native force flags bitset.", "Update the named flag and flags together.");
+            }
+
             if (force["player_ids"] is JsonArray playerIdsInForce)
             {
                 var seenPlayers = new HashSet<int>();
@@ -567,7 +606,8 @@ public static class ValidationPipeline
 
                 var mask = IntegerValue(force["player_mask"]);
                 var expectedMask = seenPlayers.Where(x => x is >= 1 and <= 24).Aggregate(0, (value, id) => value | (1 << (id - 1)));
-                if (mask is >= 0 && mask.Value != expectedMask)
+                var knownMask = playerIds.Aggregate(0, (value, id) => value | (1 << (id - 1)));
+                if (mask is null || mask.Value >= 0 && (mask.Value & knownMask) != expectedMask || mask.Value < 0 && (mask.Value & expectedMask) != expectedMask)
                 {
                     Add(findings, "error", "FORCE_MASK_CONTRADICTION", "forces", index?.ToString(CultureInfo.InvariantCulture), "The explicit force player IDs disagree with player_mask.", "Regenerate the force assignment with matching explicit player IDs and mask.");
                 }
@@ -576,6 +616,11 @@ public static class ValidationPipeline
             {
                 Add(findings, "error", "FORCE_PLAYER_ID_INVALID", "forces", index?.ToString(CultureInfo.InvariantCulture), "Force player_ids must be an array.", "Use explicit numeric player IDs.");
             }
+        }
+
+        foreach (var playerId in playerIds.OrderBy(id => id))
+        {
+            if (!assigned.Contains(playerId)) Add(findings, "error", "PLAYER_FORCE_MISSING", "forces", playerId.ToString(CultureInfo.InvariantCulture), $"Player {playerId} is declared but is not assigned to any force.", "Assign every declared player to exactly one force.");
         }
 
         _ = context;
@@ -960,10 +1005,17 @@ public static class ValidationPipeline
 
     private static void ValidateTeams(JsonObject inspection, JsonArray findings, JsonObject? context)
     {
-        if (inspection["teams"] is not JsonArray teams) return;
+        var profile = StringValue(inspection["profile"]) ?? StringValue(context?["profile"]);
+        if (inspection["teams"] is not JsonArray teams)
+        {
+            if (HtwProfileModel.IsKnown(profile)) Add(findings, "error", "TEAMS_MISSING", "teams", profile, "The active Hero Team Wars profile has no logical team registry.", "Compose the profile and provide explicit team records.");
+            return;
+        }
         var players = inspection["players"]?.AsArray().OfType<JsonObject>().Select(item => IntegerValue(item["id"])).Where(value => value.HasValue).Select(value => value!.Value).ToHashSet() ?? new HashSet<int>();
+        var forces = inspection["forces"]?.AsArray().OfType<JsonObject>().GroupBy(item => IntegerValue(item["index"]) ?? -1).ToDictionary(group => group.Key, group => group.First()["player_ids"]?.AsArray().OfType<JsonValue>().Select(IntegerValue).Where(value => value.HasValue).Select(value => value!.Value).ToHashSet() ?? new HashSet<int>()) ?? new Dictionary<int, HashSet<int>>();
         var teamIds = new HashSet<string>(StringComparer.Ordinal);
         var assigned = new HashSet<int>();
+        var teamById = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
         foreach (var node in teams)
         {
             if (node is not JsonObject team)
@@ -973,6 +1025,12 @@ public static class ValidationPipeline
             }
             var id = StringValue(team["id"]) ?? StringValue(team["team_id"]);
             if (id is null || !teamIds.Add(id)) Add(findings, "error", "TEAM_ID_INVALID", "teams", id, "Logical team IDs must be unique and explicit.", "Use stable team IDs independent of player color.");
+            else teamById[id] = team;
+            foreach (var field in new[] { "name", "member_player_ids", "force_index", "arena_id", "hero_ids", "life_state", "routing_state" })
+            {
+                if (team[field] is null) Add(findings, "error", "TEAM_FIELD_MISSING", "teams", id, $"Team '{id ?? "?"}' is missing required field '{field}'.", "Provide the complete logical team record.");
+            }
+            if (string.IsNullOrWhiteSpace(StringValue(team["name"]))) Add(findings, "error", "TEAM_NAME_INVALID", "teams", id, "Logical team names must be non-empty.", "Set an exact team name.");
             if (team["member_player_ids"] is not JsonArray members)
             {
                 Add(findings, "error", "TEAM_MEMBERS_MISSING", "teams", id, "Every team must declare member_player_ids.", "Assign explicit player slots to the team.");
@@ -984,11 +1042,66 @@ public static class ValidationPipeline
                 if (playerId is null || !players.Contains(playerId.Value)) Add(findings, "error", "TEAM_PLAYER_REFERENCE_INVALID", "teams", id, "A logical team references a missing player slot.", "Use declared player IDs only.");
                 else if (!assigned.Add(playerId.Value)) Add(findings, "error", "PLAYER_TEAM_CONTRADICTION", "teams", playerId.Value.ToString(CultureInfo.InvariantCulture), "A player is assigned to multiple logical teams.", "Assign each player to exactly one explicit team.");
             }
+            var teamForceIndex = IntegerValue(team["force_index"]);
+            if (teamForceIndex is null or < 0 or > 23) Add(findings, "error", "TEAM_FORCE_INVALID", "teams", id, "Every logical team must reference a valid force index.", "Set force_index to the force containing the same players.");
+            if (string.IsNullOrWhiteSpace(StringValue(team["arena_id"]))) Add(findings, "error", "TEAM_ARENA_MISSING", "teams", id, "Every logical team must have an explicit arena assignment.", "Set a stable arena_id before building.");
+            if (team["hero_ids"] is not JsonArray) Add(findings, "error", "TEAM_HERO_IDS_INVALID", "teams", id, "Team hero_ids must be an array.", "Provide the explicit hero identity list, even when empty.");
+            if (string.IsNullOrWhiteSpace(StringValue(team["life_state"]))) Add(findings, "error", "TEAM_LIFE_STATE_INVALID", "teams", id, "Team life_state must be explicit.", "Use active or eliminated.");
+            if (string.IsNullOrWhiteSpace(StringValue(team["routing_state"]))) Add(findings, "error", "TEAM_ROUTING_STATE_INVALID", "teams", id, "Team routing_state must be explicit.", "Use unassigned or a locked route state.");
+            var forceIndex = IntegerValue(team["force_index"]);
+            if (forceIndex is not null && !forces.ContainsKey(forceIndex.Value))
+            {
+                Add(findings, "error", "TEAM_FORCE_REFERENCE_INVALID", "teams", id, $"Logical team '{id}' references missing force {forceIndex.Value}.", "Create the referenced force or update the team to an existing force index.");
+            }
+            else if (forceIndex is not null && forces.TryGetValue(forceIndex.Value, out var forceMembers))
+            {
+                var teamMembers = members?.OfType<JsonValue>().Select(IntegerValue).Where(value => value.HasValue).Select(value => value!.Value).ToHashSet() ?? new HashSet<int>();
+                if (!forceMembers.SetEquals(teamMembers)) Add(findings, "error", "TEAM_FORCE_MEMBERSHIP_CONTRADICTION", "teams", id, "Logical team membership differs from its referenced force membership.", "Update the team and force together with complete expected prior values.");
+            }
         }
 
-        var profile = StringValue(inspection["profile"]) ?? StringValue(context?["profile"]);
         if (profile == "mvp_2arena" && teams.Count != 2) Add(findings, "error", "PROFILE_TEAM_COUNT_INVALID", "teams", profile, "The mvp_2arena profile requires exactly two logical teams.", "Use two explicit teams of two players.");
         if (profile == "full_6team" && teams.Count != 6) Add(findings, "error", "PROFILE_TEAM_COUNT_INVALID", "teams", profile, "The full_6team profile requires exactly six logical teams.", "Use six explicit teams of two players.");
+
+        if (HtwProfileModel.IsKnown(profile))
+        {
+            var expected = HtwProfileModel.DefaultTeams(profile!).OfType<JsonObject>().ToDictionary(team => team["id"]!.GetValue<string>(), StringComparer.Ordinal);
+            foreach (var (expectedId, expectedTeam) in expected)
+            {
+                if (!teamById.TryGetValue(expectedId, out var actualTeam))
+                {
+                    Add(findings, "error", "PROFILE_TEAM_MISSING", "teams", expectedId, $"Profile '{profile}' is missing logical team '{expectedId}'.", "Use the profile's stable team IDs.");
+                    continue;
+                }
+                if (!JsonUtilities.Equal(actualTeam["member_player_ids"], expectedTeam["member_player_ids"])) Add(findings, "error", "PROFILE_TEAM_MEMBERS_INVALID", "teams", expectedId, $"Profile '{profile}' assigns the wrong player slots to '{expectedId}'.", "Keep profile team membership explicit and color-independent.");
+                if (IntegerValue(actualTeam["force_index"]) != IntegerValue(expectedTeam["force_index"])) Add(findings, "error", "PROFILE_TEAM_FORCE_INVALID", "teams", expectedId, $"Profile '{profile}' assigns '{expectedId}' to the wrong force.", "Use the profile force index.");
+                if (!string.Equals(StringValue(actualTeam["arena_id"]), StringValue(expectedTeam["arena_id"]), StringComparison.Ordinal)) Add(findings, "error", "PROFILE_TEAM_ARENA_INVALID", "teams", expectedId, $"Profile '{profile}' assigns '{expectedId}' to the wrong arena.", "Use the profile's explicit arena ID.");
+            }
+
+            var expectedPlayers = expected.Values.SelectMany(team => team["member_player_ids"]!.AsArray().Select(value => value!.GetValue<int>())).ToHashSet();
+            foreach (var playerId in expectedPlayers)
+            {
+                var player = inspection["players"]?.AsArray().OfType<JsonObject>().FirstOrDefault(item => IntegerValue(item["id"]) == playerId);
+                var controller = StringValue(player?["controller"]);
+                if (player is null || controller is not ("User" or "Computer")) Add(findings, "error", "PROFILE_ACTIVE_SLOT_INVALID", "players", playerId.ToString(CultureInfo.InvariantCulture), $"Profile '{profile}' requires active user or computer slot {playerId}.", "Declare every active profile slot with controller User or Computer.");
+                if (!assigned.Contains(playerId)) Add(findings, "error", "PLAYER_TEAM_MISSING", "teams", playerId.ToString(CultureInfo.InvariantCulture), $"Active player {playerId} is not assigned to a logical team.", "Assign every active profile player exactly once.");
+            }
+            foreach (var player in inspection["players"]?.AsArray().OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
+            {
+                var playerId = IntegerValue(player["id"]);
+                var controller = StringValue(player["controller"]);
+                if (playerId is not null && !expectedPlayers.Contains(playerId.Value) && controller is "User" or "Computer") Add(findings, "error", "PROFILE_ACTIVE_SLOT_EXTRA", "players", playerId.Value.ToString(CultureInfo.InvariantCulture), $"Profile '{profile}' contains active player slot {playerId.Value} outside its declared active slot set.", "Close or remove slots outside the active profile.");
+            }
+            if (forces.Count != expected.Count) Add(findings, "error", "PROFILE_FORCE_COUNT_INVALID", "forces", profile, $"Profile '{profile}' requires exactly {expected.Count} forces.", "Provide one explicit force for each logical team.");
+            if (profile == HtwProfileModel.MvpProfile)
+            {
+                var regionNames = Regions(inspection).Select(RegionName).ToHashSet(StringComparer.Ordinal);
+                foreach (var camp in new[] { "Camp_A_Player1", "Camp_A_Player2", "Camp_B_Player3", "Camp_B_Player4" })
+                {
+                    if (!regionNames.Contains(camp)) Add(findings, "error", "TEAM_CAMP_MISSING", "regions", camp, $"The MVP profile is missing required camp assignment region '{camp}'.", "Preserve the exact case-sensitive camp region names.");
+                }
+            }
+        }
     }
 
     private static void ValidatePlayerFields(JsonArray? players, JsonArray findings)
@@ -997,7 +1110,7 @@ public static class ValidationPipeline
         {
             foreach (var field in player.Select(item => item.Key))
             {
-                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "provenance" or "capability")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "players", IntegerValue(player["id"])?.ToString(CultureInfo.InvariantCulture), $"Player field '{field}' has no proven typed serializer.", "Use only fields supported by the map-info codec.");
+                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "observer" or "locked" or "slot_status" or "codec_version" or "provenance" or "capability")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "players", IntegerValue(player["id"])?.ToString(CultureInfo.InvariantCulture), $"Player field '{field}' has no proven typed serializer.", "Use only fields supported by the map-info codec.");
             }
         }
     }
@@ -1008,7 +1121,7 @@ public static class ValidationPipeline
         {
             foreach (var field in force.Select(item => item.Key))
             {
-                if (field is not ("index" or "name" or "stored_name" or "flags" or "player_ids" or "player_mask" or "provenance" or "capability")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "forces", IntegerValue(force["index"])?.ToString(CultureInfo.InvariantCulture), $"Force field '{field}' has no proven typed serializer.", "Use only fields supported by the map-info codec.");
+                if (field is not ("index" or "name" or "stored_name" or "flags" or "player_ids" or "player_mask" or "alliance" or "shared_vision" or "shared_unit_control" or "codec_version" or "provenance" or "capability")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "forces", IntegerValue(force["index"])?.ToString(CultureInfo.InvariantCulture), $"Force field '{field}' has no proven typed serializer.", "Use only fields supported by the map-info codec.");
             }
         }
     }
@@ -1204,8 +1317,9 @@ public static class ValidationPipeline
 
     private static void ValidateHtwInvariants(JsonObject inspection, JsonArray findings, JsonObject context)
     {
+        var profile = StringValue(inspection["profile"]) ?? StringValue(context["profile"]);
         var protectedNames = context["protected_region_names"]?.AsArray().Select(x => x?.GetValue<string>()).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray()
-            ?? new[] { "Arena_A", "Camp_A_Player1" };
+            ?? (profile == HtwProfileModel.FullProfile ? Array.Empty<string>() : new[] { "Arena_A", "Camp_A_Player1" });
         var regionNames = Regions(inspection).Select(RegionName).ToHashSet(StringComparer.Ordinal);
         foreach (var name in protectedNames)
         {
@@ -1215,7 +1329,9 @@ public static class ValidationPipeline
             }
         }
 
-        var teams = context["explicit_teams"]?.AsArray()
+        var teams = HtwProfileModel.IsKnown(profile)
+            ? HtwProfileModel.DefaultTeams(profile!).OfType<JsonObject>().Select(team => team["member_player_ids"]!.AsArray().Select(x => x!.GetValue<int>()).ToHashSet()).ToArray()
+            : context["explicit_teams"]?.AsArray()
             .Select(team => team?.AsArray().Select(x => x?.GetValue<int>()).Where(x => x.HasValue).Select(x => x!.Value).ToHashSet() ?? new HashSet<int>())
             .Where(team => team.Count > 0).ToArray()
             ?? new[] { new HashSet<int> { 1, 2 }, new HashSet<int> { 3, 4 } };
@@ -1290,6 +1406,9 @@ public static class ValidationPipeline
     private static int? IntegerValue(JsonNode? node) => node is JsonValue value && value.TryGetValue<int>(out var integer) ? integer : null;
 
     private static string? StringValue(JsonNode? node) => node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+
+    private static bool IsNullOrBoolean(JsonNode? node)
+        => node is null || node is JsonValue value && value.TryGetValue<bool>(out _);
 
     private static JsonObject Report(JsonArray findings, JsonObject? source = null, string? requestedPath = null, string target = "map")
     {

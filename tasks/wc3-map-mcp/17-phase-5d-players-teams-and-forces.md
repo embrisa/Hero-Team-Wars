@@ -1,6 +1,6 @@
 # Phase 5D Work Packet - Players, Teams, and Forces
 
-Status: Player/force map-info serialization, logical team operations, profile metadata, and MVP round-trip coverage are implemented; the full six-team map fixture and exact runtime acceptance remain gated.
+Status: Typed player/force/team operations, profile-driven team registries, exact format-33 map-info writes, the full six-team fixture, and static/build round-trip coverage are implemented. World Editor/game runtime acceptance and six-arena geometry remain external HTW-06 gates.
 
 ## Goal
 
@@ -73,6 +73,23 @@ arena; no creep carryover or redistribution is allowed.
   waves of route calculation, elimination cleanup, and next-preparation
   recalculation.
 - Confirm generated JASS team IDs never depend on player colors.
+
+## Implementation evidence
+
+- `map-engine/src/Wc3MapEngine.Core/Gameplay/HtwProfileModel.cs` is the shared
+  source for `mvp_2arena` and `full_6team` player/team definitions, stable
+  logical IDs, living-team order, and the locked routing formula.
+- `map-engine/src/Wc3MapEngine.Core/MapComponentCodec.cs` and
+  `MapInspector.cs` expose typed player/force writes only for the proven
+  `war3map.w3i` format 33 and report unsupported formats as read-only.
+- `map-engine/tests/Wc3MapEngine.Tests/Gameplay/Phase5dPlayersTeamsForcesTests.cs`
+  builds the 12-player/six-force profile, validates contradiction rejection,
+  exercises six-wave/elimination routing, and verifies the source map remains
+  unchanged. The checked-in profile fixture is
+  `tests/fixtures/expected/phase5d-full-6team-profile.json`.
+- The .NET engine suite passes 57 tests and the MCP server suite passes 38
+  tests. No World Editor or Warcraft III runtime test was performed in this
+  environment, so runtime evidence remains `static_only`.
 
 ## Completion gate
 

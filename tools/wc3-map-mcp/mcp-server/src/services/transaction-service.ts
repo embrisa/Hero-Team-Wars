@@ -270,7 +270,7 @@ export class TransactionService {
         source_map_path: loaded.paths.sourceMap,
         validation_context: {
           project_id: projectId,
-          ...(projectId === "hero-team-wars" ? { protected_region_names: ["Arena_A", "Camp_A_Player1"], explicit_teams: [[1, 2], [3, 4]] } : {})
+          ...(projectId === "hero-team-wars" ? { profile: project.config.profile } : {})
         }
       }, correlationId);
       const reportPath = join(loaded.paths.reports, `validation-${revision.toString().padStart(4, "0")}.json`);

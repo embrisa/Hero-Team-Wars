@@ -121,9 +121,9 @@ public static class MapInspector
                 switch (member.Path.ToLowerInvariant())
                 {
                     case "war3map.w3i":
-                        _ = ReadInfo(member.Bytes);
-                        status = "parsed_read_only";
-                        parser = "War3Net.Build.Core: MapInfo";
+                        var mapInfo = ReadInfo(member.Bytes);
+                        status = MapComponentCodec.IsMapInfoWriteSupported(mapInfo) ? "typed_write_enabled" : "parsed_read_only";
+                        parser = $"War3Net.Build.Core: MapInfo ({MapComponentCodec.CodecVersion}; format {(int)mapInfo.FormatVersion})";
                         break;
                     case "war3map.w3r":
                         _ = ReadRegions(member.Bytes);
@@ -377,10 +377,10 @@ public static class MapInspector
                 : ComponentStatus("parsed_read_only", "observed_archive", "war3map.w3i was parsed read-only; metadata values are observed archive data."),
             ["players"] = info is null
                 ? ComponentStatus("unsupported_blocking", "unknown", infoError ?? "Player data is unavailable because war3map.w3i was not parsed.")
-                : ComponentStatus("parsed_read_only", "observed_archive", "Player slots were parsed read-only from war3map.w3i."),
+                : ComponentStatus(IsMapInfoJsonWriteSupported(info) ? "typed_write_enabled" : "parsed_read_only", "observed_archive", IsMapInfoJsonWriteSupported(info) ? $"Player slots were parsed with the proven war3map.w3i format-{MapComponentCodec.ProvenMapInfoFormatVersion} codec and can be serialized with explicit IDs." : "Player slots were parsed, but this map-info format is not proven for typed writes."),
             ["forces"] = info is null
                 ? ComponentStatus("unsupported_blocking", "unknown", infoError ?? "Force data is unavailable because war3map.w3i was not parsed.")
-                : ComponentStatus("parsed_read_only", "observed_archive", "Forces were parsed read-only from war3map.w3i."),
+                : ComponentStatus(IsMapInfoJsonWriteSupported(info) ? "typed_write_enabled" : "parsed_read_only", "observed_archive", IsMapInfoJsonWriteSupported(info) ? $"Forces were parsed with the proven war3map.w3i format-{MapComponentCodec.ProvenMapInfoFormatVersion} codec and can be serialized with explicit IDs." : "Forces were parsed, but this map-info format is not proven for typed writes."),
             ["regions"] = regions is null
                 ? ComponentStatus("unsupported_blocking", "unknown", regionError ?? "war3map.w3r was not available for read-only parsing.")
                 : ComponentStatus("typed_write_enabled", "observed_archive", $"Regions were parsed with the versioned {RegionSupport.CodecVersion} codec and can be serialized without changing unrelated fields."),
@@ -699,4 +699,7 @@ public static class MapInspector
         var digits = new string(recommendedPlayers.Where(char.IsDigit).ToArray());
         return int.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : null;
     }
+
+    private static bool IsMapInfoJsonWriteSupported(JsonObject info)
+        => info["format_version"] is JsonValue value && value.TryGetValue<int>(out var format) && format == MapComponentCodec.ProvenMapInfoFormatVersion;
 }

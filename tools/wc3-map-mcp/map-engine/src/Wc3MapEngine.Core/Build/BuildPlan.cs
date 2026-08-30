@@ -78,7 +78,7 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
 
         var sourceClone = source.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Could not clone source canonical map.");
         var stagedClone = staged.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Could not clone staged canonical map.");
-        foreach (var property in new[] { "source", "metadata", "regions", "players", "forces", "object_data", "object_data_members", "placed_objects", "scripts", "archive_members", "capabilities", "component_status", "opaque_members", "parse_warnings", "profile", "profiles", "teams", "team_registry", "region_roles", "gameplay_source", "gameplay_triggers", "gameplay_variables", "gameplay_modules", "trigger_mode" })
+        foreach (var property in new[] { "source", "metadata", "regions", "players", "forces", "object_data", "object_data_members", "placed_objects", "scripts", "archive_members", "capabilities", "component_status", "opaque_members", "parse_warnings", "profile", "profile_spec", "profiles", "teams", "team_registry", "region_roles", "gameplay_source", "gameplay_triggers", "gameplay_variables", "gameplay_modules", "trigger_mode" })
         {
             sourceClone.Remove(property);
             stagedClone.Remove(property);
@@ -202,7 +202,7 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
         {
             foreach (var field in player.Select(item => item.Key))
             {
-                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "provenance" or "capability"))
+                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "observer" or "locked" or "slot_status" or "codec_version" or "provenance" or "capability"))
                 {
                     throw new EngineException("BUILD_UNSUPPORTED", $"Player field '{field}' has no proven typed serializer.");
                 }
@@ -216,7 +216,7 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
         {
             foreach (var field in force.Select(item => item.Key))
             {
-                if (field is not ("index" or "name" or "stored_name" or "flags" or "player_ids" or "player_mask" or "provenance" or "capability"))
+                if (field is not ("index" or "name" or "stored_name" or "flags" or "player_ids" or "player_mask" or "alliance" or "shared_vision" or "shared_unit_control" or "codec_version" or "provenance" or "capability"))
                 {
                     throw new EngineException("BUILD_UNSUPPORTED", $"Force field '{field}' has no proven typed serializer.");
                 }

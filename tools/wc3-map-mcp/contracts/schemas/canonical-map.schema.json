@@ -31,6 +31,11 @@
     "metadata": { "type": "array", "items": { "$ref": "#/$defs/field" } },
     "players": { "type": "array", "items": { "$ref": "#/$defs/player" } },
     "forces": { "type": "array", "items": { "$ref": "#/$defs/force" } },
+    "profile": { "type": "string", "enum": ["mvp_2arena", "full_6team", "gui_compatible"] },
+    "profile_spec": { "$ref": "#/$defs/profile_spec" },
+    "profiles": { "type": "object", "additionalProperties": { "$ref": "#/$defs/profile_spec" } },
+    "teams": { "type": "array", "items": { "$ref": "#/$defs/team" } },
+    "team_registry": { "$ref": "#/$defs/team_registry" },
     "regions": { "type": "array", "items": { "$ref": "#/$defs/region" } },
     "region_roles": { "type": "array", "items": { "$ref": "#/$defs/region_role" } },
     "cameras": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
@@ -106,23 +111,77 @@
     },
     "player": {
       "type": "object",
-      "required": ["id", "provenance", "capability"],
+      "required": ["id", "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "provenance", "capability"],
       "properties": {
         "id": { "type": "integer", "minimum": 1, "maximum": 24 },
+        "name": { "type": "string", "minLength": 1 },
+        "stored_name": { "type": "string" },
+        "controller": { "enum": ["None", "User", "Computer", "Neutral", "Rescuable"] },
+        "race": { "enum": ["Human", "Orc", "NightElf", "Undead", "Random", "Selectable"] },
+        "flags": { "type": "integer", "minimum": 0 },
+        "start": { "type": "object", "required": ["x", "y"], "properties": { "x": { "type": "number" }, "y": { "type": "number" } }, "additionalProperties": false },
+        "ally_low_priority_mask": { "type": "integer", "minimum": 0 }, "ally_high_priority_mask": { "type": "integer", "minimum": 0 },
+        "enemy_low_priority_mask": { "type": "integer", "minimum": 0 }, "enemy_high_priority_mask": { "type": "integer", "minimum": 0 },
+        "observer": { "type": ["boolean", "null"] }, "locked": { "type": "boolean" }, "slot_status": { "type": "string" }, "codec_version": { "type": "string" },
         "provenance": { "$ref": "#/$defs/provenance" },
         "capability": { "$ref": "#/$defs/capability_name" }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "force": {
       "type": "object",
-      "required": ["index", "provenance", "capability"],
+      "required": ["index", "name", "flags", "player_ids", "player_mask", "provenance", "capability"],
       "properties": {
         "index": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string", "minLength": 1 }, "stored_name": { "type": "string" },
+        "flags": { "type": "integer", "minimum": 0 }, "player_ids": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 24 }, "uniqueItems": true }, "player_mask": { "type": "integer" },
+        "alliance": { "type": "boolean" }, "shared_vision": { "type": "boolean" }, "shared_unit_control": { "type": "boolean" }, "codec_version": { "type": "string" },
         "provenance": { "$ref": "#/$defs/provenance" },
         "capability": { "$ref": "#/$defs/capability_name" }
       },
+      "additionalProperties": false
+    },
+    "profile_spec": {
+      "type": "object",
+      "required": ["active_player_ids", "team_ids", "arena_ids", "shared_team_lives", "shared_vision", "shared_unit_control", "team_definitions"],
+      "properties": {
+        "active_player_ids": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 24 }, "uniqueItems": true },
+        "team_ids": { "type": "array", "items": { "type": "string", "pattern": "^team_[0-9]+$" }, "uniqueItems": true },
+        "arena_ids": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "shared_team_lives": { "type": "integer", "minimum": 0 },
+        "shared_vision": { "type": "boolean" },
+        "shared_unit_control": { "type": "boolean" },
+        "team_definitions": { "type": "array", "items": { "$ref": "#/$defs/profile_team" } }
+      },
       "additionalProperties": true
+    },
+    "profile_team": {
+      "type": "object",
+      "required": ["id", "name", "member_player_ids", "force_index", "arena_id", "hero_ids", "life_state", "routing_state"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^team_[0-9]+$" }, "name": { "type": "string", "minLength": 1 },
+        "member_player_ids": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 24 }, "uniqueItems": true },
+        "force_index": { "type": "integer", "minimum": 0, "maximum": 23 }, "arena_id": { "type": "string", "minLength": 1 },
+        "hero_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "life_state": { "type": "string", "minLength": 1 }, "routing_state": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "team": {
+      "type": "object",
+      "required": ["id", "name", "member_player_ids", "force_index", "arena_id", "hero_ids", "life_state", "routing_state", "provenance", "capability"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^team_[0-9]+$" }, "name": { "type": "string", "minLength": 1 },
+        "member_player_ids": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 24 }, "uniqueItems": true },
+        "force_index": { "type": "integer", "minimum": 0, "maximum": 23 }, "arena_id": { "type": "string", "minLength": 1 },
+        "hero_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "life_state": { "type": "string", "minLength": 1 }, "routing_state": { "type": "string", "minLength": 1 },
+        "provenance": { "$ref": "#/$defs/provenance" }, "capability": { "$ref": "#/$defs/capability_name" }
+      },
+      "additionalProperties": false
+    },
+    "team_registry": {
+      "type": "object", "required": ["schema_version", "identity", "teams", "living_team_order", "provenance", "capability"],
+      "properties": { "schema_version": { "const": "1.0" }, "identity": { "const": "logical_team_id" }, "teams": { "type": "array", "items": { "$ref": "#/$defs/team" } }, "living_team_order": { "type": "array", "items": { "type": "string" } }, "provenance": { "$ref": "#/$defs/provenance" }, "capability": { "$ref": "#/$defs/capability_name" } },
+      "additionalProperties": false
     },
     "region": {
       "type": "object",

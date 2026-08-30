@@ -123,7 +123,7 @@ public static class MapBuilder
                 }
             }
         }
-        foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables" })
+        foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables", "profile", "profile_spec", "profiles", "teams", "team_registry" })
         {
             if (staged[field] is JsonNode value) reopened[field] = value.DeepClone();
             else reopened.Remove(field);

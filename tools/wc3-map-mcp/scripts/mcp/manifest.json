@@ -24,7 +24,7 @@
     { "id": "core.events", "path": "core/events.j", "dependencies": ["core.state"] },
     { "id": "core.debug", "path": "core/debug.j", "dependencies": ["core.state"] },
     { "id": "systems.phases", "path": "systems/phases.j", "dependencies": ["core.state"] },
-    { "id": "systems.waves", "path": "systems/waves.j", "dependencies": ["systems.phases"] },
+    { "id": "systems.waves", "path": "systems/waves.j", "dependencies": ["systems.phases", "systems.routing"] },
     { "id": "systems.heroes", "path": "systems/heroes.j", "dependencies": ["core.state"] },
     { "id": "systems.lives", "path": "systems/lives.j", "dependencies": ["systems.heroes"] },
     { "id": "systems.elimination", "path": "systems/elimination.j", "dependencies": ["systems.lives"] },
@@ -59,7 +59,11 @@
       ],
       "shared_team_lives": 15,
       "shared_vision": true,
-      "shared_unit_control": false
+      "shared_unit_control": false,
+      "team_definitions": [
+        { "id": "team_1", "name": "Team 1", "member_player_ids": [1, 2], "force_index": 0, "arena_id": "arena_a", "hero_ids": [], "life_state": "active", "routing_state": "unassigned" },
+        { "id": "team_2", "name": "Team 2", "member_player_ids": [3, 4], "force_index": 1, "arena_id": "arena_b", "hero_ids": [], "life_state": "active", "routing_state": "unassigned" }
+      ]
     },
     "full_6team": {
       "active_player_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
@@ -67,7 +71,15 @@
       "arena_ids": ["arena_1", "arena_2", "arena_3", "arena_4", "arena_5", "arena_6"],
       "shared_team_lives": 15,
       "shared_vision": true,
-      "shared_unit_control": false
+      "shared_unit_control": false,
+      "team_definitions": [
+        { "id": "team_1", "name": "Team 1", "member_player_ids": [1, 2], "force_index": 0, "arena_id": "arena_1", "hero_ids": [], "life_state": "active", "routing_state": "unassigned" },
+        { "id": "team_2", "name": "Team 2", "member_player_ids": [3, 4], "force_index": 1, "arena_id": "arena_2", "hero_ids": [], "life_state": "active", "routing_state": "unassigned" },
+        { "id": "team_3", "name": "Team 3", "member_player_ids": [5, 6], "force_index": 2, "arena_id": "arena_3", "hero_ids": [], "life_state": "active", "routing_state": "unassigned" },
+        { "id": "team_4", "name": "Team 4", "member_player_ids": [7, 8], "force_index": 3, "arena_id": "arena_4", "hero_ids": [], "life_state": "active", "routing_state": "unassigned" },
+        { "id": "team_5", "name": "Team 5", "member_player_ids": [9, 10], "force_index": 4, "arena_id": "arena_5", "hero_ids": [], "life_state": "active", "routing_state": "unassigned" },
+        { "id": "team_6", "name": "Team 6", "member_player_ids": [11, 12], "force_index": 5, "arena_id": "arena_6", "hero_ids": [], "life_state": "active", "routing_state": "unassigned" }
+      ]
     }
   },
   "trigger_files": [

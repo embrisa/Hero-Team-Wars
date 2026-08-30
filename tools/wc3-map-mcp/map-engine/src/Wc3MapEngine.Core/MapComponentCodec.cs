@@ -22,10 +22,18 @@ namespace Wc3MapEngine.Core;
 public static class MapComponentCodec
 {
     public const string CodecVersion = "war3net-6.0.3-typed-components-1";
+    public const int ProvenMapInfoFormatVersion = 33;
+    private const int FixedStartFlag = 1;
+    private const int AlliedFlag = 1;
+    private const int ShareVisionFlag = 8;
+    private const int ShareUnitControlFlag = 16;
 
     public static IReadOnlyDictionary<string, string> ObjectMembers => ObjectPlacementSupport.ObjectMembers;
 
     public static bool IsObjectMember(string path) => ObjectPlacementSupport.IsObjectMember(path);
+
+    public static bool IsMapInfoWriteSupported(MapInfo info)
+        => (int)info.FormatVersion == ProvenMapInfoFormatVersion;
 
     public static string ObjectCategory(string path)
         => ObjectPlacementSupport.CategoryForMember(path);
@@ -46,8 +54,18 @@ public static class MapComponentCodec
             ["ally_high_priority_mask"] = player.AllyHighPriorityFlags.ToInt32(),
             ["enemy_low_priority_mask"] = player.EnemyLowPriorityFlags.ToInt32(),
             ["enemy_high_priority_mask"] = player.EnemyHighPriorityFlags.ToInt32(),
+            ["observer"] = null,
+            ["locked"] = (((int)player.Flags) & FixedStartFlag) != 0,
+            ["slot_status"] = player.Controller.ToString() switch
+            {
+                "None" => "closed",
+                "Neutral" => "neutral",
+                "Rescuable" => "rescuable",
+                _ => "active"
+            },
             ["provenance"] = "observed_archive",
-            ["capability"] = "parsed_read_only"
+            ["capability"] = "typed_write_enabled",
+            ["codec_version"] = CodecVersion
         };
 
     public static JsonObject ToForce(ForceData force, int index, int playerCount)
@@ -61,8 +79,12 @@ public static class MapComponentCodec
                 .Where(player => force.Players[player])
                 .Select(player => (JsonNode)JsonValue.Create(player + 1)!)
                 .ToArray()),
+            ["alliance"] = (((int)force.Flags) & AlliedFlag) != 0,
+            ["shared_vision"] = (((int)force.Flags) & ShareVisionFlag) != 0,
+            ["shared_unit_control"] = (((int)force.Flags) & ShareUnitControlFlag) != 0,
             ["provenance"] = "observed_archive",
-            ["capability"] = "parsed_read_only"
+            ["capability"] = "typed_write_enabled",
+            ["codec_version"] = CodecVersion
         };
 
     public static JsonArray ToRegions(MapRegions regions)
@@ -215,6 +237,7 @@ public static class MapComponentCodec
 
     public static MapInfo BuildInfo(MapInfo source, JsonArray players, JsonArray forces)
     {
+        EnsureMapInfoWriteSupported(source);
         source.Players.Clear();
         source.Players.AddRange(players.OfType<JsonObject>().Select(ToPlayer).OrderBy(player => player.Id));
         source.Forces.Clear();
@@ -253,7 +276,11 @@ public static class MapComponentCodec
         return source;
     }
 
-    public static byte[] SerializeInfo(MapInfo info) => Serialize(writer => writer.Write(info));
+    public static byte[] SerializeInfo(MapInfo info)
+    {
+        EnsureMapInfoWriteSupported(info);
+        return Serialize(writer => writer.Write(info));
+    }
     public static byte[] SerializeRegions(MapRegions regions) => Serialize(writer => writer.Write(regions));
     public static byte[] SerializeUnits(MapUnits units) => Serialize(writer => writer.Write(units));
     public static byte[] SerializeDoodads(MapDoodads doodads) => Serialize(writer => writer.Write(doodads));
@@ -294,12 +321,22 @@ public static class MapComponentCodec
     {
         var id = RequiredInt(value, "id", 1, 24) - 1;
         var start = RequiredPosition2(value["start"], "start");
+        var flags = RequiredInt(value, "flags", 0, int.MaxValue);
+        if (value["locked"] is JsonValue locked && locked.TryGetValue<bool>(out var isLocked))
+        {
+            flags = isLocked ? flags | FixedStartFlag : flags & ~FixedStartFlag;
+        }
+        if (value["observer"] is JsonValue observer && observer.TryGetValue<bool>(out var isObserver) && isObserver)
+        {
+            throw new EngineException("BUILD_UNSUPPORTED", "war3map.w3i has no proven observer-slot representation.");
+        }
+
         return new PlayerData(id)
         {
             Name = String(value, "stored_name") ?? String(value, "name") ?? $"Player {id + 1}",
             Controller = EnumValue<PlayerController>(value, "controller", PlayerController.None),
             Race = EnumValue<PlayerRace>(value, "race", PlayerRace.Selectable),
-            Flags = (PlayerFlags)RequiredInt(value, "flags", 0, int.MaxValue),
+            Flags = (PlayerFlags)flags,
             StartPosition = start,
             AllyLowPriorityFlags = new Bitmask32(RequiredInt(value, "ally_low_priority_mask", 0, int.MaxValue)),
             AllyHighPriorityFlags = new Bitmask32(RequiredInt(value, "ally_high_priority_mask", 0, int.MaxValue)),
@@ -312,12 +349,25 @@ public static class MapComponentCodec
     {
         var ids = PlayerIds(value["player_ids"]);
         var mask = value["player_mask"] is null ? ids.Aggregate(0, (current, id) => current | (1 << (id - 1))) : RequiredInt(value, "player_mask", int.MinValue, int.MaxValue);
+        var flags = RequiredInt(value, "flags", 0, int.MaxValue);
+        foreach (var (field, bit) in new[] { ("alliance", AlliedFlag), ("shared_vision", ShareVisionFlag), ("shared_unit_control", ShareUnitControlFlag) })
+        {
+            if (value[field] is JsonValue boolean && boolean.TryGetValue<bool>(out var enabled)) flags = enabled ? flags | bit : flags & ~bit;
+        }
         return new ForceData
         {
             Name = String(value, "stored_name") ?? String(value, "name") ?? "Force",
-            Flags = (ForceFlags)RequiredInt(value, "flags", 0, int.MaxValue),
+            Flags = (ForceFlags)flags,
             Players = new Bitmask32(mask)
         };
+    }
+
+    private static void EnsureMapInfoWriteSupported(MapInfo info)
+    {
+        if (!IsMapInfoWriteSupported(info))
+        {
+            throw new EngineException("BUILD_UNSUPPORTED", $"war3map.w3i format version {(int)info.FormatVersion} is not proven for typed writes; expected {ProvenMapInfoFormatVersion}.");
+        }
     }
 
     private static Region ToRegion(JsonObject value)

@@ -13,9 +13,7 @@ import { WorkerClient } from "../transport/worker-client.js";
 
 const BUILD_SCHEMA_VERSION = "1.0";
 const VALIDATION_CONTEXT = {
-  project_id: "hero-team-wars",
-  protected_region_names: ["Arena_A", "Camp_A_Player1"],
-  explicit_teams: [[1, 2], [3, 4]]
+  project_id: "hero-team-wars"
 };
 
 export type RuntimeStatus = "untested" | "process_started" | "editor_opened" | "game_loaded" | "smoke_passed" | "playtest_passed";
@@ -94,7 +92,7 @@ export class BuildService {
           canonical_path: loaded.paths.canonical,
           output_path: temporaryOutput,
           profile,
-          validation_context: { ...VALIDATION_CONTEXT, project_id: projectId }
+          validation_context: { ...VALIDATION_CONTEXT, project_id: projectId, profile: project.config.profile }
         }, correlationId);
         assertEngineBuildResult(engineResult, temporaryOutput);
 
