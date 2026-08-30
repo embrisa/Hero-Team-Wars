@@ -26,13 +26,13 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
 
         var regions = Regions(source);
         var stagedRegions = Regions(staged);
-        if (!JsonUtilities.Equal(source["regions"], staged["regions"]))
+        if (!RegionsSerializedEqual(regions, stagedRegions))
         {
             foreach (var region in regions.Concat(stagedRegions))
             {
                 foreach (var field in region.Select(x => x.Key))
                 {
-                    if (field is not ("id" or "name" or "min_x" or "min_y" or "max_x" or "max_y" or "creation_number" or "weather" or "ambient_sound" or "color_argb" or "provenance" or "capability"))
+                    if (field is not ("id" or "name" or "stored_name" or "min_x" or "min_y" or "max_x" or "max_y" or "creation_number" or "weather" or "ambient_sound" or "color_argb" or "references" or "codec_version" or "provenance" or "capability"))
                     {
                         throw new EngineException("BUILD_UNSUPPORTED", $"Region field '{field}' has no proven typed serializer.");
                     }
@@ -169,6 +169,9 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
 
     private static List<JsonObject> Regions(JsonObject root)
         => root["regions"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
+
+    private static bool RegionsSerializedEqual(IReadOnlyList<JsonObject> left, IReadOnlyList<JsonObject> right)
+        => left.Count == right.Count && left.Zip(right).All(pair => RegionSupport.SerializedEqual(pair.First, pair.Second));
 
     private static List<JsonObject> Scripts(JsonObject root)
         => root["scripts"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();

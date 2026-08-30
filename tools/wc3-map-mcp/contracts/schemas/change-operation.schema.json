@@ -6,7 +6,7 @@
   "required": ["operation_id", "type", "target", "rationale"],
   "properties": {
     "operation_id": { "type": "string", "format": "uuid" },
-    "type": { "type": "string", "enum": ["set_map_metadata", "create_player_slot", "set_player_slot", "delete_player_slot", "create_force", "set_force", "delete_force", "create_team", "set_team", "delete_team", "set_team_arena", "set_team_members", "update_region", "create_region", "rename_region", "delete_region", "set_region_role", "create_object_definition", "update_object_definition", "delete_object_definition", "set_object_reference", "place_object", "move_object", "update_placed_object", "remove_placed_object", "place_unit", "move_unit", "remove_placed_unit", "set_object_data", "set_script_source", "upsert_script_module", "remove_script_module", "set_trigger_mode", "create_trigger", "update_trigger", "move_trigger", "delete_trigger", "create_variable", "update_variable", "delete_variable"] },
+    "type": { "type": "string", "enum": ["set_map_metadata", "create_player_slot", "set_player_slot", "delete_player_slot", "create_force", "set_force", "delete_force", "create_team", "set_team", "delete_team", "set_team_arena", "set_team_members", "update_region", "create_region", "rename_region", "delete_region", "reorder_regions", "set_region_role", "create_object_definition", "update_object_definition", "delete_object_definition", "set_object_reference", "place_object", "move_object", "update_placed_object", "remove_placed_object", "place_unit", "move_unit", "remove_placed_unit", "set_object_data", "set_script_source", "upsert_script_module", "remove_script_module", "set_trigger_mode", "create_trigger", "update_trigger", "move_trigger", "delete_trigger", "create_variable", "update_variable", "delete_variable"] },
     "target": { "type": "object", "additionalProperties": true },
     "expected_revision": { "type": "integer", "minimum": 0 },
     "expected": {},
@@ -53,6 +53,64 @@
       "type": "object",
       "required": ["id", "name", "type"],
       "properties": { "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }, "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }, "type": { "enum": ["integer", "real", "boolean", "string", "handle", "timer", "trigger", "unit", "group", "region", "rect", "player", "force"] }, "initial": {}, "default_value": {}, "value": {}, "dependencies": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }, "provenance": { "type": "string" }, "capability": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "region_target": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "id": { "type": "string", "pattern": "^region:[0-9]+$" },
+        "region_id": { "type": "string", "pattern": "^region:[0-9]+$" },
+        "name": { "type": "string", "minLength": 1 },
+        "creation_number": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "region_record": {
+      "type": "object",
+      "required": ["id", "name", "min_x", "min_y", "max_x", "max_y", "creation_number", "weather", "ambient_sound", "color_argb", "references", "codec_version", "provenance", "capability"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^region:[0-9]+$" },
+        "name": { "type": "string", "minLength": 1 },
+        "stored_name": { "type": "string", "minLength": 1 },
+        "min_x": { "type": "number" }, "min_y": { "type": "number" }, "max_x": { "type": "number" }, "max_y": { "type": "number" },
+        "creation_number": { "type": "integer", "minimum": 0 }, "weather": { "type": "string" }, "ambient_sound": { "type": "string" }, "color_argb": { "type": "integer" },
+        "references": { "$ref": "#/$defs/region_references" }, "codec_version": { "const": "war3net-6.0.3-mapregions-v5" },
+        "provenance": { "type": "string" }, "capability": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "region_references": {
+      "type": "object",
+      "required": ["mcp_owned", "editor_trigger", "custom_text", "derived_roles"],
+      "properties": { "mcp_owned": { "type": "array" }, "editor_trigger": { "type": "array" }, "custom_text": { "type": "array" }, "derived_roles": { "type": "array" } },
+      "additionalProperties": false
+    },
+    "region_create": {
+      "type": "object",
+      "required": ["name", "min_x", "min_y", "max_x", "max_y"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^region:[0-9]+$" }, "name": { "type": "string", "minLength": 1 },
+        "min_x": { "type": "number" }, "min_y": { "type": "number" }, "max_x": { "type": "number" }, "max_y": { "type": "number" },
+        "creation_number": { "type": "integer", "minimum": 0 }, "weather": { "type": "string" }, "ambient_sound": { "type": "string" }, "color_argb": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "region_update": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": { "min_x": { "type": "number" }, "min_y": { "type": "number" }, "max_x": { "type": "number" }, "max_y": { "type": "number" }, "weather": { "type": "string" }, "ambient_sound": { "type": "string" }, "color_argb": { "type": "integer" } },
+      "additionalProperties": false
+    },
+    "reference_rewrite_plan": {
+      "type": "object",
+      "required": ["mcp_owned", "editor_trigger", "custom_text"],
+      "properties": {
+        "mcp_owned": { "oneOf": [{ "enum": ["rewrite", "unchanged", "not_applicable"] }, { "type": "array" }] },
+        "editor_trigger": { "oneOf": [{ "enum": ["rewrite", "unchanged", "not_applicable"] }, { "type": "array" }] },
+        "custom_text": { "oneOf": [{ "enum": ["rewrite", "unchanged", "not_applicable"] }, { "type": "array" }] },
+        "unresolved": { "type": "array" }
+      },
       "additionalProperties": false
     }
   },
@@ -111,6 +169,30 @@
     {
       "if": { "required": ["type"], "properties": { "type": { "const": "set_trigger_mode" } } },
       "then": { "required": ["expected", "value"], "properties": { "target": { "type": "object", "maxProperties": 0 }, "value": { "type": "object", "required": ["mode"], "properties": { "mode": { "enum": ["mcp_native", "mcp_native_jass", "editor_compatible"] } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "create_region" } } },
+      "then": { "required": ["value"], "properties": { "target": { "type": "object", "maxProperties": 0 }, "value": { "$ref": "#/$defs/region_create" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "enum": ["update_region", "rename_region", "delete_region"] } } },
+      "then": { "required": ["expected"], "properties": { "target": { "$ref": "#/$defs/region_target" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "update_region" } } },
+      "then": { "required": ["value"], "properties": { "value": { "$ref": "#/$defs/region_update" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "rename_region" } } },
+      "then": { "required": ["value"], "properties": { "value": { "type": "object", "required": ["name", "reference_rewrite_plan"], "properties": { "name": { "type": "string", "minLength": 1 }, "reference_rewrite_plan": { "$ref": "#/$defs/reference_rewrite_plan" } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "set_region_role" } } },
+      "then": { "required": ["value"], "properties": { "value": { "type": "object", "required": ["role"], "properties": { "role": { "enum": ["arena", "entrance", "backline", "camp", "spawn", "cleanup", "camera_boundary"] } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "reorder_regions" } } },
+      "then": { "required": ["expected", "value"], "properties": { "target": { "type": "object", "maxProperties": 0 }, "expected": { "type": "array", "items": { "type": "string", "pattern": "^region:[0-9]+$" } }, "value": { "type": "object", "required": ["region_ids"], "properties": { "region_ids": { "type": "array", "items": { "type": "string", "pattern": "^region:[0-9]+$" }, "uniqueItems": true } }, "additionalProperties": false } } }
     }
   ]
 }

@@ -91,7 +91,7 @@ public static class MapComponentCodec
         var result = new JsonArray();
         if (regions.Protected)
         {
-            return result;
+            throw new EngineException("UNSUPPORTED_COMPONENT", "war3map.w3r is protected and cannot be represented safely by the typed region codec.");
         }
 
         foreach (var region in regions.Regions)
@@ -108,8 +108,10 @@ public static class MapComponentCodec
                 ["weather"] = region.WeatherType.ToString(),
                 ["ambient_sound"] = region.AmbientSound,
                 ["color_argb"] = region.Color.ToArgb(),
+                ["references"] = RegionSupport.EmptyReferences(),
                 ["provenance"] = "observed_archive",
-                ["capability"] = "parsed_read_only"
+                ["capability"] = "typed_write_enabled",
+                ["codec_version"] = RegionSupport.CodecVersion
             });
         }
 
@@ -338,7 +340,7 @@ public static class MapComponentCodec
     private static Region ToRegion(JsonObject value)
         => new()
         {
-            Name = RequiredString(value, "name"),
+            Name = String(value, "stored_name") ?? RequiredString(value, "name"),
             Left = RequiredFloat(value, "min_x"),
             Bottom = RequiredFloat(value, "min_y"),
             Right = RequiredFloat(value, "max_x"),

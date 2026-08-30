@@ -18,7 +18,7 @@ public static class OperationApplier
     {
         "set_map_metadata", "create_player_slot", "set_player_slot", "delete_player_slot",
         "create_force", "set_force", "delete_force", "create_team", "set_team", "delete_team",
-        "set_team_arena", "set_team_members", "create_region", "update_region", "rename_region", "delete_region", "set_region_role",
+        "set_team_arena", "set_team_members", "create_region", "update_region", "rename_region", "delete_region", "reorder_regions", "set_region_role",
         "create_object_definition", "update_object_definition", "delete_object_definition", "set_object_reference",
         "place_object", "move_object", "update_placed_object", "remove_placed_object",
         "place_unit", "move_unit", "remove_placed_unit", "set_object_data",
@@ -43,6 +43,7 @@ public static class OperationApplier
         }
 
         var working = root.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Canonical map could not be cloned.");
+        RefreshRegionReferences(working);
         var allChanges = new JsonArray();
         var applied = new JsonArray();
         var operationIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -67,6 +68,7 @@ public static class OperationApplier
 
             var before = working.DeepClone();
             ApplyOne(working, operation);
+            RefreshRegionReferences(working);
             var changes = SemanticDiff.CompareCanonical(before, working, operationId);
             foreach (var change in changes.OfType<JsonObject>())
             {
@@ -83,7 +85,8 @@ public static class OperationApplier
             applied.Add(operationId);
         }
 
-        if (operationTypes.Any(IsGameplayModelOperation))
+        if (operationTypes.Any(IsGameplayModelOperation)
+            && (operationTypes.Any(type => type != "rename_region") || HasGameplayModel(working)))
         {
             FinalizeGameplayModel(working);
         }
@@ -131,6 +134,9 @@ public static class OperationApplier
                 break;
             case "delete_region":
                 DeleteRegion(root, target, expected);
+                break;
+            case "reorder_regions":
+                ReorderRegions(root, target, expected, value);
                 break;
             case "rename_region":
                 RenameRegion(root, target, expected, value);
@@ -259,27 +265,17 @@ public static class OperationApplier
 
     private static void UpdateRegion(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
-        EnsureAllowed(target, "name");
-        var name = RequiredString(target, "name");
+        EnsureAllowed(target, "id", "region_id", "name", "creation_number");
         var regions = RequiredArray(root, "regions");
-        var region = regions.OfType<JsonObject>().FirstOrDefault(x => string.Equals(x["name"]?.GetValue<string>(), name, StringComparison.Ordinal));
-        if (region is null)
-        {
-            throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' was not found.");
-        }
+        var region = FindRegion(root, target);
+        var name = RequiredString(region, "name");
 
         EnsureExpected(region, expected, $"regions.{name}");
         if (value is not JsonObject update)
         {
             throw new EngineException("INVALID_ARGUMENT", "update_region requires an object value.");
         }
-        EnsureAllowed(update, "name", "min_x", "min_y", "max_x", "max_y", "weather", "ambient_sound", "color_argb");
-
-        var newName = update["name"] is null ? name : RequiredString(update, "name");
-        if (!string.Equals(newName, name, StringComparison.Ordinal))
-        {
-            throw new EngineException("REGION_RENAME_FORBIDDEN", "Existing region names are immutable; create a new region instead.");
-        }
+        EnsureAllowed(update, "min_x", "min_y", "max_x", "max_y", "weather", "ambient_sound", "color_argb");
 
         foreach (var field in new[] { "min_x", "min_y", "max_x", "max_y" })
         {
@@ -291,7 +287,7 @@ public static class OperationApplier
         if (update["weather"] is not null) region["weather"] = NormalizeWeather(update["weather"]!);
         if (update["ambient_sound"] is not null) { RequireStringValue(update["ambient_sound"]!, "ambient_sound"); region["ambient_sound"] = update["ambient_sound"]!.DeepClone(); }
         if (update["color_argb"] is not null) region["color_argb"] = RequiredIntValue(update["color_argb"]!, "color_argb", int.MinValue, int.MaxValue);
-        ValidateRegionBounds(region, name);
+        ValidateRegionBounds(root, region, name);
 
         region["provenance"] = "intended_design";
         region["capability"] = "typed_write_enabled";
@@ -328,43 +324,54 @@ public static class OperationApplier
             ["creation_number"] = region["creation_number"] is null ? NextCreationNumber(regions) : RequiredIntValue(region["creation_number"]!, "creation_number", 0, int.MaxValue),
             ["weather"] = region["weather"] is null ? WeatherType.None.ToString() : NormalizeWeather(region["weather"]!),
             ["ambient_sound"] = region["ambient_sound"]?.DeepClone() ?? string.Empty,
-            ["color_argb"] = region["color_argb"]?.DeepClone() ?? 0,
+            ["color_argb"] = region["color_argb"] is null ? 0 : RequiredIntValue(region["color_argb"]!, "color_argb", int.MinValue, int.MaxValue),
+            ["references"] = RegionSupport.EmptyReferences(),
             ["provenance"] = "intended_design",
-            ["capability"] = "typed_write_enabled"
+            ["capability"] = "typed_write_enabled",
+            ["codec_version"] = RegionSupport.CodecVersion
         };
-        created["id"] = region["id"]?.DeepClone() ?? $"region:{created["creation_number"]!.GetValue<int>()}";
+        RegionSupport.ValidateIdentity(created, "create_region");
+        if (region["id"] is not null && !string.Equals(StringValue(region, "id"), StringValue(created, "id"), StringComparison.Ordinal))
+        {
+            throw new EngineException("INVALID_ARGUMENT", "create_region id must match its creation_number.");
+        }
         if (regions.OfType<JsonObject>().Any(item => StringValue(item, "id") == StringValue(created, "id") || IntValue(item["creation_number"]) == IntValue(created["creation_number"])))
         {
             throw new EngineException("INVALID_ARGUMENT", "Region id and creation_number must be unique.");
         }
         if (region["weather"] is not null) RequireStringValue(region["weather"]!, "weather");
         if (region["ambient_sound"] is not null) RequireStringValue(region["ambient_sound"]!, "ambient_sound");
-        ValidateRegionBounds(created, name);
+        ValidateRegionBounds(root, created, name);
 
         regions.Add(created);
     }
 
     private static void DeleteRegion(JsonObject root, JsonObject target, JsonNode? expected)
     {
-        EnsureAllowed(target, "name");
-        var name = RequiredString(target, "name");
+        EnsureAllowed(target, "id", "region_id", "name", "creation_number");
         var regions = RequiredArray(root, "regions");
-        var index = regions.IndexOf(regions.OfType<JsonObject>().FirstOrDefault(x => string.Equals(x["name"]?.GetValue<string>(), name, StringComparison.Ordinal)));
+        var region = FindRegion(root, target);
+        var name = RequiredString(region, "name");
+        if (RegionSupport.IsProtectedName(name))
+        {
+            throw new EngineException("REGION_PROTECTED", $"Protected region '{name}' must be explicitly renamed before it can be deleted.");
+        }
+        var index = regions.IndexOf(region);
         if (index < 0)
         {
             throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' was not found.");
         }
 
         EnsureExpected(regions[index], expected, $"regions.{name}");
-        EnsureNoRegionReferences(root, regions[index] as JsonObject ?? throw new EngineException("INVALID_JSON", "The region entry is not an object."));
+        EnsureNoRegionReferences(root, region);
         regions.RemoveAt(index);
     }
 
     private static void RenameRegion(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
-        EnsureAllowed(target, "id", "name");
+        EnsureAllowed(target, "id", "region_id", "name", "creation_number");
         if (value is not JsonObject update) throw new EngineException("INVALID_ARGUMENT", "rename_region requires an object value.");
-        EnsureAllowed(update, "name");
+        EnsureAllowed(update, "name", "reference_rewrite_plan");
         var region = FindRegion(root, target);
         EnsureExpected(region, expected, "regions.rename");
         var newName = RequiredString(update, "name");
@@ -373,7 +380,9 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", $"Region '{newName}' already exists.");
         }
+        ValidateReferenceRewritePlan(root, region, update["reference_rewrite_plan"]);
         region["name"] = newName;
+        region.Remove("stored_name");
         RewriteKnownRegionReferences(root, oldName, newName, StringValue(region, "id"));
         region["provenance"] = "intended_design";
         region["capability"] = "typed_write_enabled";
@@ -381,7 +390,7 @@ public static class OperationApplier
 
     private static void SetRegionRole(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
-        EnsureAllowed(target, "region_id", "name");
+        EnsureAllowed(target, "id", "region_id", "name", "creation_number");
         if (value is not JsonObject roleValue) throw new EngineException("INVALID_ARGUMENT", "set_region_role requires { role }.");
         EnsureAllowed(roleValue, "role");
         var region = FindRegion(root, target);
@@ -394,8 +403,33 @@ public static class OperationApplier
             role = new JsonObject { ["region_id"] = regionId };
             roles.Add(role);
         }
-        role["role"] = RequiredString(roleValue, "role");
+        role["role"] = RegionSupport.RequiredRole(roleValue);
         role["provenance"] = "intended_design";
+    }
+
+    private static void ReorderRegions(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
+    {
+        EnsureAllowed(target);
+        if (expected is not JsonArray expectedIds) throw new EngineException("PRECONDITION_REQUIRED", "reorder_regions requires the complete expected prior region-id order.");
+        if (value is not JsonObject update) throw new EngineException("INVALID_ARGUMENT", "reorder_regions requires an object value.");
+        EnsureAllowed(update, "region_ids");
+        if (update["region_ids"] is not JsonArray requestedIds) throw new EngineException("INVALID_ARGUMENT", "reorder_regions requires region_ids as an array.");
+
+        var regions = RequiredArray(root, "regions");
+        var currentIds = regions.OfType<JsonObject>().Select(RegionId).ToArray();
+        var priorIds = expectedIds.Select(node => StringValue(node)).ToArray();
+        var newIds = requestedIds.Select(node => StringValue(node)).ToArray();
+        if (priorIds.Any(id => id is null) || newIds.Any(id => id is null) || !currentIds.SequenceEqual(priorIds!, StringComparer.Ordinal))
+        {
+            throw new EngineException("PRECONDITION_FAILED", "The expected region-id order does not match the staged region order.");
+        }
+        if (newIds.Length != currentIds.Length || newIds.Distinct(StringComparer.Ordinal).Count() != newIds.Length || currentIds.Except(newIds, StringComparer.Ordinal).Any())
+        {
+            throw new EngineException("INVALID_ARGUMENT", "reorder_regions must provide every region id exactly once.");
+        }
+        var byId = regions.OfType<JsonObject>().ToDictionary(RegionId, StringComparer.Ordinal);
+        regions.Clear();
+        foreach (var id in newIds) regions.Add(byId[id!]);
     }
 
     private static void SetPlayer(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
@@ -880,7 +914,11 @@ public static class OperationApplier
     }
 
     private static bool IsGameplayModelOperation(string type)
-        => type is "upsert_script_module" or "remove_script_module" or "create_trigger" or "update_trigger" or "move_trigger" or "delete_trigger" or "create_variable" or "update_variable" or "delete_variable";
+        => type is "upsert_script_module" or "remove_script_module" or "create_trigger" or "update_trigger" or "move_trigger" or "delete_trigger" or "create_variable" or "update_variable" or "delete_variable" or "rename_region";
+
+    private static bool HasGameplayModel(JsonObject root)
+        => root["gameplay_source"] is JsonObject
+            || root["gameplay_modules"] is JsonArray modules && modules.Count > 0;
 
     private static void FinalizeGameplayModel(JsonObject root)
     {
@@ -969,8 +1007,19 @@ public static class OperationApplier
         var regions = RequiredArray(root, "regions");
         var id = StringValue(target, "id") ?? StringValue(target, "region_id");
         var name = StringValue(target, "name");
-        return regions.OfType<JsonObject>().FirstOrDefault(item => (id is not null && StringValue(item, "id") == id) || (name is not null && StringValue(item, "name") == name))
-            ?? throw new EngineException("INVALID_ARGUMENT", "The target region was not found.");
+        var creation = target["creation_number"] is JsonValue number && number.TryGetValue<int>(out var value) ? value : int.MinValue;
+        if (id is null && name is null && creation == int.MinValue) throw new EngineException("INVALID_ARGUMENT", "A region target requires id, name, region_id, or creation_number.");
+        if (id is not null && (!id.StartsWith("region:", StringComparison.Ordinal) || !int.TryParse(id[7..], out var parsedId) || parsedId < 0)) throw new EngineException("INVALID_ARGUMENT", "Region target ids must use the stable region:<creation_number> form.");
+        var matches = regions.OfType<JsonObject>().Where(item =>
+            (id is null || StringValue(item, "id") == id) &&
+            (name is null || StringValue(item, "name") == name) &&
+            (creation == int.MinValue || IntValue(item["creation_number"]) == creation)).ToArray();
+        return matches.Length switch
+        {
+            1 => matches[0],
+            0 => throw new EngineException("INVALID_ARGUMENT", "The target region was not found or its identity selectors disagree."),
+            _ => throw new EngineException("INVALID_ARGUMENT", "The region target is ambiguous.")
+        };
     }
 
     private static JsonObject FindTeam(JsonObject root, JsonObject target)
@@ -1159,12 +1208,60 @@ public static class OperationApplier
         if (variable["type"] is not null && StringValue(variable["type"]) is null) throw new EngineException("INVALID_ARGUMENT", "Variable type must be a string.");
     }
 
+    private static void ValidateReferenceRewritePlan(JsonObject root, JsonObject region, JsonNode? value)
+    {
+        if (value is not JsonObject plan) throw new EngineException("INVALID_ARGUMENT", "rename_region requires a complete reference_rewrite_plan.");
+        EnsureAllowed(plan, "mcp_owned", "editor_trigger", "custom_text", "unresolved");
+        foreach (var (field, bucket) in new[]
+        {
+            ("mcp_owned", "mcp_owned"),
+            ("editor_trigger", "editor_trigger"),
+            ("custom_text", "custom_text")
+        })
+        {
+            if (plan[field] is null) throw new EngineException("INVALID_ARGUMENT", $"reference_rewrite_plan is missing '{field}'.");
+            if (plan[field] is JsonValue status && status.TryGetValue<string>(out var text))
+            {
+                if (text is not ("rewrite" or "unchanged" or "not_applicable"))
+                {
+                    throw new EngineException("INVALID_ARGUMENT", $"reference_rewrite_plan.{field} must be rewrite, unchanged, or not_applicable.");
+                }
+
+                var references = (region["references"] as JsonObject)?[bucket] as JsonArray;
+                if (text is "unchanged" or "not_applicable" && references is { Count: > 0 })
+                {
+                    throw new EngineException("REGION_REFERENCES_INCOMPLETE", $"reference_rewrite_plan.{field} declares {text}, but the inspected region has {references.Count} live reference(s) in that bucket.");
+                }
+            }
+            else if (plan[field] is JsonArray references)
+            {
+                var actual = (region["references"] as JsonObject)?[bucket] as JsonArray ?? new JsonArray();
+                if (!JsonUtilities.Equal(references, actual))
+                {
+                    throw new EngineException("REGION_REFERENCES_INCOMPLETE", $"reference_rewrite_plan.{field} must enumerate the complete inspected reference set.");
+                }
+            }
+            else
+            {
+                throw new EngineException("INVALID_ARGUMENT", $"reference_rewrite_plan.{field} must be a status or reference array.");
+            }
+        }
+        if (plan["unresolved"] is JsonArray unresolved && unresolved.Count > 0)
+        {
+            throw new EngineException("REGION_REFERENCES_UNRESOLVED", "rename_region cannot proceed while reference_rewrite_plan.unresolved is non-empty.");
+        }
+        if (StringValue(root, "trigger_mode") == GameplayModelValidator.EditorMode && plan["editor_trigger"] is JsonValue editor && editor.TryGetValue<string>(out var editorStatus) && editorStatus != "rewrite")
+        {
+            throw new EngineException("CAPABILITY_GATED", "Editor-compatible region rename requires an editor trigger serializer; unresolved editor references must be rewritten in World Editor first.");
+        }
+    }
+
     private static void RewriteKnownRegionReferences(JsonObject root, string oldName, string newName, string? regionId)
     {
         foreach (var section in new[] { "triggers", "variables", "gameplay_triggers", "gameplay_variables", "teams", "region_roles" })
         {
-            if (root[section] is not JsonNode value) continue;
-            Rewrite(value, oldName, newName, regionId);
+            if (root[section] is not JsonNode sectionValue) continue;
+            Rewrite(sectionValue, oldName, newName, regionId);
         }
     }
 
@@ -1175,7 +1272,11 @@ public static class OperationApplier
             foreach (var property in objectValue.ToList())
             {
                 if (property.Key is "region_name" or "region" or "region_handle" && StringValue(property.Value) == oldName) objectValue[property.Key] = newName;
-                else if (property.Key == "region_id" && regionId is not null && StringValue(property.Value) == regionId) objectValue[property.Key] = regionId;
+                else if (property.Key == "regions" && property.Value is JsonArray names)
+                {
+                    for (var index = 0; index < names.Count; index++) if (StringValue(names[index]) == oldName) names[index] = newName;
+                    Rewrite(names, oldName, newName, regionId);
+                }
                 else if (property.Value is not null) Rewrite(property.Value, oldName, newName, regionId);
             }
         }
@@ -1189,10 +1290,102 @@ public static class OperationApplier
     {
         var name = StringValue(region, "name");
         var id = StringValue(region, "id");
-        foreach (var section in new[] { "triggers", "variables", "gameplay_triggers", "gameplay_variables", "teams", "region_roles" })
+        foreach (var (section, value) in new[] { "triggers", "variables", "gameplay_triggers", "gameplay_variables", "teams", "region_roles" }
+            .Where(section => root[section] is not null)
+            .Select(section => (section, value: root[section]!)))
         {
-            if (root[section] is not JsonNode value) continue;
-            if (ContainsRegionReference(value, name, id)) throw new EngineException("REFERENCE_IN_USE", $"Region '{name}' still has a live MCP reference in {section}.");
+            if (ContainsRegionReference(value, name, id)) throw new EngineException("REFERENCE_IN_USE", $"Region '{name}' still has a live reference in {section}; remove or rewrite it before deleting the region.");
+        }
+        var handle = id is null ? null : RegionHandle(id);
+        if (handle is not null && root["scripts"] is JsonArray scripts && scripts.OfType<JsonObject>().Any(script => StringValue(script, "source")?.Contains(handle, StringComparison.Ordinal) == true))
+        {
+            throw new EngineException("REFERENCE_IN_USE", $"Region '{name}' is referenced by generated MCP JASS handle '{handle}'.");
+        }
+    }
+
+    private static string RegionHandle(string id)
+        => "HTW_Region_" + new string(id.Select(character => char.IsLetterOrDigit(character) || character == '_' ? character : '_').ToArray());
+
+    private static string RegionId(JsonObject region)
+        => StringValue(region, "id") ?? RegionSupport.StableId(IntValue(region["creation_number"]));
+
+    private static void RefreshRegionReferences(JsonObject root)
+    {
+        if (root["regions"] is not JsonArray regions) return;
+        foreach (var region in regions.OfType<JsonObject>())
+        {
+            // Hand-authored unit tests and legacy canonical snapshots can
+            // contain a name/bounds-only region. Preserve those snapshots for
+            // unrelated operations; inspected/buildable maps still fail the
+            // full identity check in ValidationPipeline.
+            if (region["creation_number"] is not null || region["id"] is not null)
+            {
+                RegionSupport.ValidateIdentity(region, "regions");
+            }
+            region["references"] = CollectRegionReferences(root, region);
+            if (region["creation_number"] is not null) region["codec_version"] ??= RegionSupport.CodecVersion;
+        }
+    }
+
+    private static JsonObject CollectRegionReferences(JsonObject root, JsonObject region)
+    {
+        var name = StringValue(region, "name");
+        var id = StringValue(region, "id") ?? string.Empty;
+        var references = RegionSupport.EmptyReferences();
+        foreach (var (section, bucket) in new[]
+        {
+            ("triggers", "editor_trigger"),
+            ("variables", "editor_trigger"),
+            ("gameplay_triggers", "mcp_owned"),
+            ("gameplay_variables", "mcp_owned"),
+            ("teams", "mcp_owned"),
+            ("region_roles", "derived_roles"),
+            ("custom_text", "custom_text")
+        })
+        {
+            if (root[section] is JsonNode value && references[bucket] is JsonArray entries)
+            {
+                CollectRegionReferences(value, section, "$", name, id, entries);
+            }
+        }
+        return references;
+    }
+
+    private static void CollectRegionReferences(JsonNode node, string section, string path, string? name, string id, JsonArray output)
+    {
+        if (node is JsonObject objectValue)
+        {
+            foreach (var property in objectValue)
+            {
+                var propertyPath = $"{path}.{property.Key}";
+                if (property.Key is "region_name" or "region" or "region_handle" && name is not null && StringValue(property.Value) == name)
+                {
+                    output.Add(new JsonObject { ["section"] = section, ["path"] = propertyPath, ["kind"] = "name" });
+                }
+                else if (property.Key == "region_id" && StringValue(property.Value) == id)
+                {
+                    output.Add(new JsonObject { ["section"] = section, ["path"] = propertyPath, ["kind"] = "id" });
+                }
+                else if (property.Key == "regions" && property.Value is JsonArray regionNames)
+                {
+                    for (var index = 0; index < regionNames.Count; index++)
+                    {
+                        var reference = StringValue(regionNames[index]);
+                        if (reference == name || reference == id)
+                        {
+                            output.Add(new JsonObject { ["section"] = section, ["path"] = $"{propertyPath}[{index}]", ["kind"] = reference == id ? "id" : "name" });
+                        }
+                    }
+                }
+                if (property.Value is not null) CollectRegionReferences(property.Value, section, propertyPath, name, id, output);
+            }
+        }
+        else if (node is JsonArray array)
+        {
+            for (var index = 0; index < array.Count; index++)
+            {
+                if (array[index] is not null) CollectRegionReferences(array[index]!, section, $"{path}[{index}]", name, id, output);
+            }
         }
     }
 
@@ -1204,6 +1397,7 @@ public static class OperationApplier
             {
                 if (property.Key is "region_name" or "region" or "region_handle" && name is not null && StringValue(property.Value) == name) return true;
                 if (property.Key == "region_id" && id is not null && StringValue(property.Value) == id) return true;
+                if (property.Key == "regions" && property.Value is JsonArray names && names.Any(item => StringValue(item) == name)) return true;
                 if (property.Value is not null && ContainsRegionReference(property.Value, name, id)) return true;
             }
         }
@@ -1253,7 +1447,7 @@ public static class OperationApplier
         EnsureExpected(actual, expected, field);
     }
 
-    private static void ValidateRegionBounds(JsonObject region, string name)
+    private static void ValidateRegionBounds(JsonObject root, JsonObject region, string name)
     {
         var minX = FiniteNumber(region["min_x"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires min_x."), $"regions.{name}.min_x").GetValue<double>();
         var minY = FiniteNumber(region["min_y"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires min_y."), $"regions.{name}.min_y").GetValue<double>();
@@ -1263,6 +1457,7 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' must have min coordinates no greater than max coordinates.");
         }
+        RegionSupport.ValidateEnvelope(root, region, name);
     }
 
     private static string NormalizeWeather(JsonNode value)

@@ -29,6 +29,7 @@ public static class MapInspector
             ResolveTriggerStrings(info, archive.Find("war3map.wts"));
         }
         var regions = TryReadRegions(path, out var regionError);
+        ResolveRegionStrings(regions, archive.Find("war3map.wts"));
         var units = TryReadUnits(archive.Find("war3mapUnits.doo"), out var unitsError);
         var doodads = TryReadDoodads(archive.Find("war3map.doo"), out var doodadsError);
         var objectData = TryReadObjectData(archive, out var objectDataErrors);
@@ -105,6 +106,7 @@ public static class MapInspector
         if (units is not null) SetTypedStatus(root, "placed_objects", "war3mapUnits.doo", "roundtrip_verified", "War3Net MapUnits was parsed and has a typed serializer.");
         if (doodads is not null) SetTypedStatus(root, "placed_objects", "war3map.doo", "roundtrip_verified", "War3Net MapDoodads was parsed and has a typed serializer.");
         if (archive.Members.Any(item => ObjectMembers.Contains(item.Path)) && objectDataErrors.Count == 0) SetTypedStatus(root, "object_data", "object-data", "roundtrip_verified", "War3Net object-data records were parsed and have category-specific serializers.");
+        if (regions is not null) SetTypedStatus(root, "regions", "war3map.w3r", "typed_write_enabled", "war3map.w3r was parsed with the versioned MapRegions codec and has a typed serializer.");
 
         return root;
     }
@@ -128,8 +130,8 @@ public static class MapInspector
                         break;
                     case "war3map.w3r":
                         _ = ReadRegions(member.Bytes);
-                        status = "parsed_read_only";
-                        parser = "War3Net.Build.Core: MapRegions";
+                        status = "typed_write_enabled";
+                        parser = $"War3Net.Build.Core: MapRegions ({RegionSupport.CodecVersion})";
                         break;
                     case "war3mapunits.doo":
                         _ = ReadUnits(member.Bytes);
@@ -384,7 +386,7 @@ public static class MapInspector
                 : ComponentStatus("parsed_read_only", "observed_archive", "Forces were parsed read-only from war3map.w3i."),
             ["regions"] = regions is null
                 ? ComponentStatus("unsupported_blocking", "unknown", regionError ?? "war3map.w3r was not available for read-only parsing.")
-                : ComponentStatus("parsed_read_only", "observed_archive", "Regions were parsed read-only from war3map.w3r."),
+                : ComponentStatus("typed_write_enabled", "observed_archive", $"Regions were parsed with the versioned {RegionSupport.CodecVersion} codec and can be serialized without changing unrelated fields."),
             ["archive_members"] = ComponentStatus("mixed", "observed_archive", "Archive membership and per-member hashes are observed; parser/preservation capability is reported per member."),
             ["capabilities"] = ComponentStatus("parsed_read_only", "derived", "Per-member parser results were derived from a read-only archive probe."),
             ["triggers"] = OpaqueStatus("triggers", triggers),
@@ -643,6 +645,19 @@ public static class MapInspector
 
     private static Dictionary<string, string> ParseTriggerStrings(byte[] bytes)
         => new(ScriptOwnership.ParseTriggerStrings(bytes), StringComparer.OrdinalIgnoreCase);
+
+    private static void ResolveRegionStrings(JsonArray? regions, ArchiveMemberData? triggerStringsMember)
+    {
+        if (regions is null || triggerStringsMember is null) return;
+        var strings = ParseTriggerStrings(triggerStringsMember.Bytes);
+        foreach (var region in regions.OfType<JsonObject>())
+        {
+            if (region["name"] is not JsonValue stored || !stored.TryGetValue<string>(out var token)) continue;
+            if (!strings.TryGetValue(token, out var resolved)) continue;
+            region["stored_name"] = token;
+            region["name"] = resolved;
+        }
+    }
 
     private static int? TryParseSuggestedPlayers(string? recommendedPlayers)
     {

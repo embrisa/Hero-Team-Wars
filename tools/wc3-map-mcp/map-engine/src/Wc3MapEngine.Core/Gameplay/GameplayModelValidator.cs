@@ -97,6 +97,7 @@ public static class GameplayModelValidator
         }
 
         ValidateReferences(root, modules, variables, triggers);
+        ValidateRegionRoles(root);
         ValidateTypedArguments(variables, triggers);
     }
 
@@ -287,6 +288,25 @@ public static class GameplayModelValidator
             }
 
             ValidateTriggerNestedReferences(root, trigger, variableIds, variableNames, regionIds, regionNames, functions);
+        }
+    }
+
+    private static void ValidateRegionRoles(JsonObject root)
+    {
+        if (root["region_roles"] is not JsonArray roles) return;
+        var regions = (root["regions"] as JsonArray ?? new JsonArray()).OfType<JsonObject>().ToArray();
+        var ids = regions.Select(region => StringValue(region, "id")).Where(id => id is not null).Cast<string>().ToHashSet(StringComparer.Ordinal);
+        var names = regions.Select(region => StringValue(region, "name")).Where(name => name is not null).Cast<string>().ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in roles)
+        {
+            if (node is not JsonObject role) throw new EngineException("INVALID_ARGUMENT", "Every region role must be an object.");
+            EnsureAllowed(role, "region_id", "region_name", "role", "provenance", "capability");
+            var reference = StringValue(role, "region_id") ?? StringValue(role, "region_name");
+            if (reference is null || (ids.Count > 0 && !ids.Contains(reference) && !names.Contains(reference))) throw new EngineException("INVALID_ARGUMENT", $"Region role references unknown region '{reference}'.");
+            var roleName = StringValue(role, "role");
+            if (roleName is null || !RegionSupport.Roles.Contains(roleName)) throw new EngineException("INVALID_ARGUMENT", "Region role is not supported.");
+            if (!seen.Add($"{reference}:{roleName}")) throw new EngineException("INVALID_ARGUMENT", $"Duplicate region role '{roleName}' for '{reference}'.");
         }
     }
 

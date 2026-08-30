@@ -108,7 +108,11 @@ public sealed class Phase5BuildRoundTripTests
         });
         var created = OperationApplier.Apply(model, new JsonArray(create))["canonical_map"]!;
         var region = created["regions"]!.AsArray().OfType<JsonObject>().Single(item => item["name"]!.GetValue<string>() == "MCP_Test_Region");
-        var rename = Operation("rename_region", new JsonObject { ["id"] = region["id"]!.DeepClone() }, region.DeepClone(), new JsonObject { ["name"] = "MCP_Test_Region_Renamed" });
+        var rename = Operation("rename_region", new JsonObject { ["id"] = region["id"]!.DeepClone() }, region.DeepClone(), new JsonObject
+        {
+            ["name"] = "MCP_Test_Region_Renamed",
+            ["reference_rewrite_plan"] = new JsonObject { ["mcp_owned"] = "not_applicable", ["editor_trigger"] = "not_applicable", ["custom_text"] = "not_applicable" }
+        });
         var staged = OperationApplier.Apply(created, new JsonArray(rename))["canonical_map"]!;
         var directory = TempDirectory();
         try
@@ -118,6 +122,8 @@ public sealed class Phase5BuildRoundTripTests
             JsonUtilities.WriteAtomic(canonical, staged);
             var result = MapBuilder.Build(source, canonical, output, "debug");
             Assert.True(result["reopened"]!.GetValue<bool>());
+            Assert.Equal(new[] { "war3map.w3r" }, result["archive_comparison"]!["content_changes"]!.AsArray().Select(item => item!["path"]!.GetValue<string>()));
+            Assert.Empty(result["archive_comparison"]!["unexpected_content_changes"]!.AsArray());
             Assert.Contains(MapInspector.Inspect(output)["regions"]!.AsArray().OfType<JsonObject>(), item => item["name"]!.GetValue<string>() == "MCP_Test_Region_Renamed");
         }
         finally { DeleteTemp(directory); }

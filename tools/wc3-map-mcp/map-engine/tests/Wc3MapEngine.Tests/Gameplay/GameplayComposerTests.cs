@@ -23,6 +23,20 @@ public sealed class GameplayComposerTests
     }
 
     [Fact]
+    public void ComposerBindsStableRegionIdsToGeneratedRectHandles()
+    {
+        var composed = GameplaySourceComposer.Compose(FindManifest());
+        var source = composed["source"]!.GetValue<string>();
+
+        Assert.Contains("region HTW_Region_region_0", source);
+        Assert.Contains("set HTW_Region_region_0 = CreateRegion()", source);
+        Assert.Contains("RegionAddRect(HTW_Region_region_0, Rect(1152., -3072., 2496., -448.))", source);
+        Assert.DoesNotContain("gg_rct_Arena_A", source);
+        Assert.Equal("HTW_Region_region_0", composed["region_handles"]!["region:0"]!.GetValue<string>());
+        Assert.Equal(10, composed["regions"]!.AsArray().Count);
+    }
+
+    [Fact]
     public void ScenarioHarnessUsesLockedSixTeamOffset()
     {
         var report = ScenarioRunner.Run(new JsonObject

@@ -45,6 +45,24 @@ const referenceSchema = z.object({
   objects: z.array(z.string().min(1)).optional(), object_ids: z.array(z.string().min(1)).optional(), rawcodes: z.array(rawcode).optional(),
   players: z.array(z.string().min(1)).optional(), forces: z.array(z.string().min(1)).optional(), functions: z.array(identifier).optional()
 }).strict();
+const regionId = z.string().regex(/^region:[0-9]+$/);
+const regionTargetSchema = z.object({ id: regionId.optional(), region_id: regionId.optional(), name: z.string().min(1).optional(), creation_number: z.number().int().min(0).optional() }).strict().refine(value => Object.keys(value).length > 0, "Region target requires id, region_id, name, or creation_number");
+const regionCreateSchema = z.object({
+  id: regionId.optional(), name: z.string().min(1), min_x: z.number().finite(), min_y: z.number().finite(), max_x: z.number().finite(), max_y: z.number().finite(),
+  creation_number: z.number().int().min(0).optional(), weather: z.string().optional(), ambient_sound: z.string().optional(), color_argb: z.number().int().optional()
+}).strict().superRefine((value, context) => {
+  if (value.min_x > value.max_x || value.min_y > value.max_y) context.addIssue({ code: "custom", path: ["min_x"], message: "Region minimum bounds cannot exceed maximum bounds." });
+  if (value.id !== undefined && value.creation_number !== undefined && value.id !== `region:${value.creation_number}`) context.addIssue({ code: "custom", path: ["id"], message: "Region id must be region:<creation_number>." });
+});
+const regionUpdateSchema = z.object({ min_x: z.number().finite().optional(), min_y: z.number().finite().optional(), max_x: z.number().finite().optional(), max_y: z.number().finite().optional(), weather: z.string().optional(), ambient_sound: z.string().optional(), color_argb: z.number().int().optional() }).strict().refine(value => Object.keys(value).length > 0, "Region update requires at least one field");
+const regionReferenceRewritePlanSchema = z.object({
+  mcp_owned: z.union([z.enum(["rewrite", "unchanged", "not_applicable"]), z.array(z.unknown())]),
+  editor_trigger: z.union([z.enum(["rewrite", "unchanged", "not_applicable"]), z.array(z.unknown())]),
+  custom_text: z.union([z.enum(["rewrite", "unchanged", "not_applicable"]), z.array(z.unknown())]),
+  unresolved: z.array(z.unknown()).optional()
+}).strict();
+const regionRenameSchema = z.object({ name: z.string().min(1), reference_rewrite_plan: regionReferenceRewritePlanSchema }).strict();
+const regionRoleSchema = z.object({ role: z.enum(["arena", "entrance", "backline", "camp", "spawn", "cleanup", "camera_boundary"]) }).strict();
 const sourceLocationSchema = z.object({ path: z.string().min(1), line: z.number().int().positive().optional(), column: z.number().int().positive().optional() }).strict();
 const editorEncodingSchema = z.object({ status: z.enum(["unsupported", "available", "not_applicable"]), version: z.string().optional(), reason: z.string().optional() }).strict();
 
@@ -71,7 +89,7 @@ export const operationSchema = z.object({
   operation_id: uuidSchema,
   type: z.enum([
     "set_map_metadata", "create_player_slot", "set_player_slot", "delete_player_slot", "create_force", "set_force", "delete_force", "create_team", "set_team", "delete_team",
-    "set_team_arena", "set_team_members", "create_region", "update_region", "rename_region", "delete_region", "set_region_role", "create_object_definition", "update_object_definition",
+    "set_team_arena", "set_team_members", "create_region", "update_region", "rename_region", "delete_region", "reorder_regions", "set_region_role", "create_object_definition", "update_object_definition",
     "delete_object_definition", "set_object_reference", "place_object", "move_object", "update_placed_object", "remove_placed_object", "place_unit", "move_unit", "remove_placed_unit",
     "set_object_data", "set_script_source", "upsert_script_module", "remove_script_module", "set_trigger_mode", "create_trigger", "update_trigger", "move_trigger", "delete_trigger",
     "create_variable", "update_variable", "delete_variable"
@@ -107,6 +125,23 @@ export const operationSchema = z.object({
     } else {
       requireExpected();
       if (operation.type === "update_variable" && !gameplayVariableUpdateSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "update_variable has an invalid typed variable value." });
+    }
+  }
+  if (["create_region", "update_region", "rename_region", "delete_region", "reorder_regions", "set_region_role"].includes(operation.type)) {
+    if (operation.type === "create_region") {
+      if (Object.keys(operation.target).length !== 0) context.addIssue({ code: "custom", path: ["target"], message: "create_region requires an empty target." });
+      if (operation.expected !== undefined) context.addIssue({ code: "custom", path: ["expected"], message: "create_region requires an absent expected value." });
+      if (!regionCreateSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "create_region has an invalid typed region value." });
+    } else if (operation.type === "reorder_regions") {
+      if (Object.keys(operation.target).length !== 0) context.addIssue({ code: "custom", path: ["target"], message: "reorder_regions requires an empty target." });
+      if (!z.array(regionId).safeParse(operation.expected).success) context.addIssue({ code: "custom", path: ["expected"], message: "reorder_regions requires the complete prior region-id order." });
+      if (!z.object({ region_ids: z.array(regionId).min(1) }).strict().safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "reorder_regions requires region_ids." });
+    } else {
+      if (!regionTargetSchema.safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Region operations require an id, name, region_id, or creation_number target." });
+      if (operation.type !== "set_region_role" && operation.expected === undefined) context.addIssue({ code: "custom", path: ["expected"], message: "This region operation requires the complete expected prior region record." });
+      if (operation.type === "update_region" && !regionUpdateSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "update_region has an invalid typed region update." });
+      if (operation.type === "rename_region" && !regionRenameSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "rename_region requires a name and complete reference_rewrite_plan." });
+      if (operation.type === "set_region_role" && !regionRoleSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_region_role requires a supported role." });
     }
   }
   if (operation.type === "set_trigger_mode") {

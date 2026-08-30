@@ -32,6 +32,7 @@
     "players": { "type": "array", "items": { "$ref": "#/$defs/player" } },
     "forces": { "type": "array", "items": { "$ref": "#/$defs/force" } },
     "regions": { "type": "array", "items": { "$ref": "#/$defs/region" } },
+    "region_roles": { "type": "array", "items": { "$ref": "#/$defs/region_role" } },
     "cameras": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
     "archive_members": { "type": "array", "items": { "$ref": "#/$defs/archive_member" } },
     "capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" } },
@@ -124,16 +125,43 @@
     },
     "region": {
       "type": "object",
-      "required": ["name", "min_x", "min_y", "max_x", "max_y", "provenance", "capability"],
+      "required": ["id", "name", "min_x", "min_y", "max_x", "max_y", "creation_number", "weather", "ambient_sound", "color_argb", "references", "codec_version", "provenance", "capability"],
       "properties": {
+        "id": { "type": "string", "pattern": "^region:[0-9]+$" },
         "name": { "type": "string" },
+        "stored_name": { "type": "string" },
         "min_x": { "type": "number" },
         "min_y": { "type": "number" },
         "max_x": { "type": "number" },
         "max_y": { "type": "number" },
-        "creation_number": { "type": "integer" },
+        "creation_number": { "type": "integer", "minimum": 0 },
         "weather": { "type": "string" },
         "ambient_sound": { "type": "string" },
+        "color_argb": { "type": "integer" },
+        "references": { "$ref": "#/$defs/region_references" },
+        "codec_version": { "const": "war3net-6.0.3-mapregions-v5" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability_name" }
+      },
+      "additionalProperties": true
+    },
+    "region_references": {
+      "type": "object",
+      "required": ["mcp_owned", "editor_trigger", "custom_text", "derived_roles"],
+      "properties": {
+        "mcp_owned": { "type": "array" },
+        "editor_trigger": { "type": "array" },
+        "custom_text": { "type": "array" },
+        "derived_roles": { "type": "array" }
+      },
+      "additionalProperties": false
+    },
+    "region_role": {
+      "type": "object",
+      "required": ["region_id", "role"],
+      "properties": {
+        "region_id": { "type": "string", "pattern": "^region:[0-9]+$" },
+        "role": { "enum": ["arena", "entrance", "backline", "camp", "spawn", "cleanup", "camera_boundary"] },
         "provenance": { "$ref": "#/$defs/provenance" },
         "capability": { "$ref": "#/$defs/capability_name" }
       },

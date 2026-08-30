@@ -135,7 +135,7 @@ public sealed class MapInspectionTests
 
         Assert.Equal("unsupported_blocking", infoResult["status"]!.GetValue<string>());
         Assert.NotNull(infoResult["error"]);
-        Assert.Equal("parsed_read_only", regionResult["status"]!.GetValue<string>());
+        Assert.Equal("typed_write_enabled", regionResult["status"]!.GetValue<string>());
     }
 
     [Fact]

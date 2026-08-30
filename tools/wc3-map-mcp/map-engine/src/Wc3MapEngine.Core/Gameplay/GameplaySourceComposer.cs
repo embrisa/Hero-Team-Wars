@@ -38,7 +38,10 @@ public static class GameplaySourceComposer
             ["profile"] = requestedProfile ?? canonical["profile"]?.GetValue<string>() ?? "mvp_2arena",
             ["modules"] = (canonical["gameplay_modules"] as JsonArray)?.DeepClone() ?? new JsonArray(),
             ["triggers"] = (canonical["gameplay_triggers"] as JsonArray)?.DeepClone() ?? new JsonArray(),
-            ["variables"] = (canonical["gameplay_variables"] as JsonArray)?.DeepClone() ?? new JsonArray()
+            ["variables"] = (canonical["gameplay_variables"] as JsonArray)?.DeepClone() ?? new JsonArray(),
+            ["regions"] = (canonical["regions"] as JsonArray)?.DeepClone() ?? new JsonArray(),
+            ["region_roles"] = (canonical["region_roles"] as JsonArray)?.DeepClone() ?? new JsonArray(),
+            ["profiles"] = (canonical["profiles"] as JsonObject)?.DeepClone()
         };
         var bytes = Encoding.UTF8.GetBytes(manifest.ToJsonString(EngineProtocol.JsonOptions));
         return ComposeManifest(manifest, "<canonical-gameplay-model>", bytes, requestedProfile);
@@ -55,11 +58,15 @@ public static class GameplaySourceComposer
         var modules = ReadModules(manifest, manifestPath);
         var variables = ReadVariables(manifest, manifestPath);
         var triggers = ReadTriggers(manifest, manifestPath);
+        var regions = ReadRegions(manifest["regions"]);
+        var regionRoles = ReadRegionRoles(manifest, profile, regions);
         var model = new JsonObject
         {
             ["gameplay_modules"] = new JsonArray(modules.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
             ["gameplay_variables"] = new JsonArray(variables.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
-            ["gameplay_triggers"] = new JsonArray(triggers.Select(x => (JsonNode?)x.DeepClone()).ToArray())
+            ["gameplay_triggers"] = new JsonArray(triggers.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+            ["regions"] = new JsonArray(regions.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+            ["region_roles"] = new JsonArray(regionRoles.Select(x => (JsonNode?)x.DeepClone()).ToArray())
         };
         // Source composition has no map archive context. It validates typed
         // syntax and function references; map-bound refs are checked again
@@ -91,7 +98,8 @@ public static class GameplaySourceComposer
             handlers[id] = handler;
         }
 
-        var source = ComposeSource(profile, modules, variables, triggers, handlers);
+        var regionBindings = BuildRegionBindings(regions);
+        var source = ComposeSource(profile, modules, variables, triggers, handlers, regions, regionBindings);
         try { ScriptOwnership.ValidateMcpOwnedJass("war3map.j", source); }
         catch (InvalidDataException exception) { throw new EngineException("PARSE_FAILED", exception.Message, false, exception); }
 
@@ -123,6 +131,8 @@ public static class GameplaySourceComposer
             ["modules"] = moduleResults.DeepClone(),
             ["triggers"] = triggerManifest.DeepClone(),
             ["variables"] = variableManifest.DeepClone(),
+            ["regions"] = new JsonArray(regions.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+            ["region_roles"] = new JsonArray(regionRoles.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
             ["module_order"] = new JsonArray(modules.Select(x => (JsonNode?)JsonValue.Create(GameplayModelValidator.RequiredString(x, "id"))).ToArray()),
             ["symbols"] = new JsonArray(symbols.Select(x => (JsonNode?)x.DeepClone()).ToArray())
         };
@@ -140,6 +150,9 @@ public static class GameplaySourceComposer
             ["modules"] = moduleResults,
             ["triggers"] = triggerManifest,
             ["variables"] = variableManifest,
+            ["regions"] = new JsonArray(regions.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+            ["region_roles"] = new JsonArray(regionRoles.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+            ["region_handles"] = new JsonObject(regionBindings.Keys.OrderBy(x => x, StringComparer.Ordinal).ToDictionary(id => id, id => (JsonNode?)RegionHandle(id))),
             ["symbols"] = new JsonArray(symbols.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
             ["trigger_manifest_sha256"] = GameplayModelValidator.Hash(triggerManifest),
             ["variable_manifest_sha256"] = GameplayModelValidator.Hash(variableManifest),
@@ -153,7 +166,9 @@ public static class GameplaySourceComposer
             {
                 ["gameplay_modules"] = new JsonArray(modules.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
                 ["gameplay_triggers"] = new JsonArray(triggers.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
-                ["gameplay_variables"] = new JsonArray(variables.Select(x => (JsonNode?)x.DeepClone()).ToArray())
+                ["gameplay_variables"] = new JsonArray(variables.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+                ["regions"] = new JsonArray(regions.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+                ["region_roles"] = new JsonArray(regionRoles.Select(x => (JsonNode?)x.DeepClone()).ToArray())
             },
             ["source"] = source
         };
@@ -231,6 +246,77 @@ public static class GameplaySourceComposer
         return values.OrderBy(x => GameplayModelValidator.RequiredString(x, "id"), StringComparer.Ordinal).ToList();
     }
 
+    private static List<JsonObject> ReadRegions(JsonNode? node)
+    {
+        if (node is null) return new List<JsonObject>();
+        if (node is not JsonArray values) throw new EngineException("INVALID_ARGUMENT", "Gameplay manifest field 'regions' must be an array.");
+        var result = new List<JsonObject>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var creationNumbers = new HashSet<int>();
+        foreach (var value in values)
+        {
+            if (value is not JsonObject region) throw new EngineException("INVALID_ARGUMENT", "Every gameplay region binding must be an object.");
+            var clone = region.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Gameplay region binding could not be cloned.");
+            var name = GameplayModelValidator.RequiredString(clone, "name");
+            var id = StringValue(clone, "id") ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires a stable id.");
+            var creation = clone["creation_number"] is JsonValue number && number.TryGetValue<int>(out var valueNumber) ? valueNumber : -1;
+            if (!ids.Add(id) || !names.Add(name) || creation < 0 || !creationNumbers.Add(creation) || !string.Equals(id, RegionSupport.StableId(creation), StringComparison.Ordinal))
+            {
+                throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' has duplicate or non-native stable identity.");
+            }
+            var minX = Number(clone["min_x"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires min_x."), "min_x");
+            var minY = Number(clone["min_y"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires min_y."), "min_y");
+            var maxX = Number(clone["max_x"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires max_x."), "max_x");
+            var maxY = Number(clone["max_y"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires max_y."), "max_y");
+            if (minX > maxX || minY > maxY) throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' has inverted bounds.");
+            clone["weather"] ??= "None";
+            clone["ambient_sound"] ??= string.Empty;
+            clone["color_argb"] ??= 0;
+            clone["references"] ??= RegionSupport.EmptyReferences();
+            clone["codec_version"] ??= RegionSupport.CodecVersion;
+            clone["provenance"] ??= "intended_design";
+            clone["capability"] ??= "typed_write_enabled";
+            result.Add(clone);
+        }
+        return result;
+    }
+
+    private static Dictionary<string, JsonObject> BuildRegionBindings(IReadOnlyList<JsonObject> regions)
+        => regions.ToDictionary(
+            region => GameplayModelValidator.RequiredString(region, "id"),
+            region => region,
+            StringComparer.Ordinal);
+
+    private static List<JsonObject> ReadRegionRoles(JsonObject manifest, string profile, IReadOnlyList<JsonObject> regions)
+    {
+        var byId = regions.ToDictionary(region => GameplayModelValidator.RequiredString(region, "id"), StringComparer.Ordinal);
+        var byName = regions.ToDictionary(region => GameplayModelValidator.RequiredString(region, "name"), StringComparer.Ordinal);
+        var configured = manifest["region_roles"] as JsonArray;
+        if ((configured is null || configured.Count == 0) && manifest["profiles"] is JsonObject profiles && profiles[profile] is JsonObject profileObject) configured = profileObject["region_roles"] as JsonArray;
+        if (configured is null) return new List<JsonObject>();
+
+        var result = new List<JsonObject>();
+        var roles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in configured)
+        {
+            if (node is not JsonObject role) throw new EngineException("INVALID_ARGUMENT", "Every region role binding must be an object.");
+            var roleName = RegionSupport.RequiredRole(role);
+            var reference = StringValue(role, "region_id") ?? StringValue(role, "region_name") ?? throw new EngineException("INVALID_ARGUMENT", "Region role bindings require region_id or region_name.");
+            var region = byId.TryGetValue(reference, out var byIdValue) ? byIdValue : byName.TryGetValue(reference, out var byNameValue) ? byNameValue : null;
+            if (region is null) throw new EngineException("INVALID_ARGUMENT", $"Region role binding references unknown region '{reference}'.");
+            var regionId = GameplayModelValidator.RequiredString(region, "id");
+            if (!roles.Add($"{regionId}:{roleName}")) throw new EngineException("INVALID_ARGUMENT", $"Duplicate region role '{roleName}' for '{regionId}'.");
+            result.Add(new JsonObject
+            {
+                ["region_id"] = regionId,
+                ["role"] = roleName,
+                ["provenance"] = "intended_design"
+            });
+        }
+        return result;
+    }
+
     private static List<JsonObject> ReadInlineObjects(JsonNode? node, string field)
     {
         if (node is null) return new List<JsonObject>();
@@ -274,20 +360,20 @@ public static class GameplaySourceComposer
         return output;
     }
 
-    private static string ComposeSource(string profile, IReadOnlyList<JsonObject> modules, IReadOnlyList<JsonObject> variables, IReadOnlyList<JsonObject> triggers, IReadOnlyDictionary<string, string> handlers)
+    private static string ComposeSource(string profile, IReadOnlyList<JsonObject> modules, IReadOnlyList<JsonObject> variables, IReadOnlyList<JsonObject> triggers, IReadOnlyDictionary<string, string> handlers, IReadOnlyList<JsonObject> regions, IReadOnlyDictionary<string, JsonObject> regionBindings)
     {
         var builder = new StringBuilder();
         builder.AppendLine("// Generated by wc3-map-mcp; do not edit in World Editor.");
         builder.AppendLine($"// profile: {profile}");
         builder.AppendLine($"// composer: {ComposerVersion}");
-        var regionHandles = triggers.SelectMany(x => (x["events"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()).Where(x => StringValue(x, "type") == "region_entry").Select(x => StringValue(x, "region_name") ?? StringValue(x, "region_id")).Where(x => x is not null).Cast<string>().Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+        var regionHandles = triggers.SelectMany(x => (x["events"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()).Where(x => StringValue(x, "type") == "region_entry").Select(x => ResolveRegionReference(x, regionBindings)).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         var customEvents = triggers.SelectMany(x => (x["events"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()).Where(x => StringValue(x, "type") == "custom_event").Select(x => StringValue(x, "name")).Where(x => x is not null).Cast<string>().Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-        if (variables.Count > 0 || regionHandles.Length > 0 || customEvents.Length > 0)
+        if (variables.Count > 0 || regions.Count > 0 || customEvents.Length > 0)
         {
             builder.AppendLine("globals");
             foreach (var variable in variables) builder.AppendLine($"    {GameplayModelValidator.RequiredString(variable, "type").ToLowerInvariant()} {GameplayModelValidator.RequiredString(variable, "name")}");
-            foreach (var region in regionHandles) builder.AppendLine($"    region {RegionHandle(region)}");
-            foreach (var eventName in customEvents) builder.AppendLine($"    real {RegionHandle("event_" + eventName)}");
+            foreach (var region in regions) builder.AppendLine($"    region {RegionHandle(GameplayModelValidator.RequiredString(region, "id"))}");
+            foreach (var eventName in customEvents) builder.AppendLine($"    real {EventHandle(eventName)}");
             builder.AppendLine("endglobals");
             builder.AppendLine();
         }
@@ -303,7 +389,12 @@ public static class GameplaySourceComposer
             var type = GameplayModelValidator.RequiredString(variable, "type").ToLowerInvariant();
             if (type is not ("handle" or "timer" or "trigger" or "unit" or "group" or "region" or "rect" or "player" or "force")) builder.AppendLine($"    set {GameplayModelValidator.RequiredString(variable, "name")} = {Literal(variable["initial"]!, type)}");
         }
-        foreach (var region in regionHandles) builder.AppendLine($"    set {RegionHandle(region)} = CreateRegion()");
+        foreach (var regionId in regions.Select(region => GameplayModelValidator.RequiredString(region, "id")))
+        {
+            var region = regionBindings[regionId];
+            builder.AppendLine($"    set {RegionHandle(regionId)} = CreateRegion()");
+            builder.AppendLine($"    call RegionAddRect({RegionHandle(regionId)}, Rect({JassReal(Number(region["min_x"]!, "min_x"))}, {JassReal(Number(region["min_y"]!, "min_y"))}, {JassReal(Number(region["max_x"]!, "max_x"))}, {JassReal(Number(region["max_y"]!, "max_y"))}))");
+        }
         builder.AppendLine("endfunction");
         builder.AppendLine();
         foreach (var trigger in triggers.Where(x => x["handler_name"] is null && (x["enabled"] is null || x["enabled"]!.GetValue<bool>())))
@@ -332,7 +423,7 @@ public static class GameplaySourceComposer
             {
                 builder.AppendLine("    set htw_trigger = CreateTrigger()");
                 builder.AppendLine($"    call TriggerAddAction(htw_trigger, function {handler})");
-                foreach (var eventNode in registrations) RenderEventRegistration(builder, eventNode);
+            foreach (var eventNode in registrations) RenderEventRegistration(builder, eventNode, regionBindings);
             }
         }
         builder.AppendLine("endfunction");
@@ -404,7 +495,7 @@ public static class GameplaySourceComposer
         return $"{variable} {Operator(condition["operator"]!.GetValue<string>())} {Expression(condition["value"]!, variables)}";
     }
 
-    private static void RenderEventRegistration(StringBuilder builder, JsonObject eventNode)
+    private static void RenderEventRegistration(StringBuilder builder, JsonObject eventNode, IReadOnlyDictionary<string, JsonObject> regionBindings)
     {
         var type = GameplayModelValidator.RequiredString(eventNode, "type");
         switch (type)
@@ -415,9 +506,9 @@ public static class GameplaySourceComposer
                 if (eventNode["player_id"] is null) builder.AppendLine("    call TriggerRegisterAnyUnitEventBJ(htw_trigger, EVENT_PLAYER_UNIT_DEATH)");
                 else builder.AppendLine($"    call TriggerRegisterPlayerUnitEvent(htw_trigger, Player({eventNode["player_id"]!.GetValue<int>() - 1}), EVENT_PLAYER_UNIT_DEATH, null)");
                 break;
-            case "region_entry": builder.AppendLine($"    call TriggerRegisterEnterRegion(htw_trigger, {RegionHandle(StringValue(eventNode, "region_name") ?? StringValue(eventNode, "region_id") ?? throw new EngineException("INVALID_ARGUMENT", "region_entry requires region reference."))}, null)"); break;
+            case "region_entry": builder.AppendLine($"    call TriggerRegisterEnterRegion(htw_trigger, {RegionHandle(ResolveRegionReference(eventNode, regionBindings))}, null)"); break;
             case "player_state_change": builder.AppendLine($"    call TriggerRegisterPlayerStateEvent(htw_trigger, Player({eventNode["player_id"]!.GetValue<int>() - 1}), {GameplayModelValidator.RequiredIdentifier(eventNode, "state")}, {OperatorConstant(eventNode["operator"]!.GetValue<string>())}, {JassReal(Number(eventNode["value"]!, "value"))})"); break;
-            case "custom_event": builder.AppendLine($"    call TriggerRegisterVariableEvent(htw_trigger, {Quote(RegionHandle("event_" + GameplayModelValidator.RequiredIdentifier(eventNode, "name")))}, EQUAL, 1.0)"); break;
+            case "custom_event": builder.AppendLine($"    call TriggerRegisterVariableEvent(htw_trigger, {Quote(EventHandle(GameplayModelValidator.RequiredIdentifier(eventNode, "name")))}, EQUAL, 1.0)"); break;
         }
     }
 
@@ -446,7 +537,18 @@ public static class GameplaySourceComposer
 
     private static string Operator(string value) => value switch { "equal" => "==", "not_equal" => "!=", "less" => "<", "less_equal" => "<=", "greater" => ">", "greater_equal" => ">=", _ => throw new EngineException("INVALID_ARGUMENT", $"Unsupported comparison operator '{value}'.") };
     private static string OperatorConstant(string value) => value switch { "equal" => "EQUAL", "not_equal" => "NOT_EQUAL", "less" => "LESS_THAN", "less_equal" => "LESS_THAN_OR_EQUAL", "greater" => "GREATER_THAN", "greater_equal" => "GREATER_THAN_OR_EQUAL", _ => throw new EngineException("INVALID_ARGUMENT", $"Unsupported comparison operator '{value}'.") };
-    private static string RegionHandle(string value) => $"gg_rct_{Regex.Replace(value, "[^A-Za-z0-9_]", "_")}";
+    private static string ResolveRegionReference(JsonObject eventNode, IReadOnlyDictionary<string, JsonObject> regionBindings)
+    {
+        var reference = StringValue(eventNode, "region_id") ?? StringValue(eventNode, "region_name") ?? throw new EngineException("INVALID_ARGUMENT", "region_entry requires region_id or region_name.");
+        if (regionBindings.ContainsKey(reference)) return reference;
+        var byName = regionBindings.Values.FirstOrDefault(region => string.Equals(StringValue(region, "name"), reference, StringComparison.Ordinal));
+        return byName is null
+            ? throw new EngineException("INVALID_ARGUMENT", $"region_entry references unknown region '{reference}'.")
+            : GameplayModelValidator.RequiredString(byName, "id");
+    }
+
+    private static string RegionHandle(string logicalId) => $"HTW_Region_{Regex.Replace(logicalId, "[^A-Za-z0-9_]", "_")}";
+    private static string EventHandle(string logicalId) => $"HTW_Event_{Regex.Replace(logicalId, "[^A-Za-z0-9_]", "_")}";
     private static string Quote(string value) => $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal).Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}\"";
     private static string Indent(int count) => new(' ', count * 4);
     private static string JassReal(double value) => value.ToString("0.########", CultureInfo.InvariantCulture) + ".";

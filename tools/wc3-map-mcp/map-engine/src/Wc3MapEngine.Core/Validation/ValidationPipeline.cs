@@ -197,13 +197,12 @@ public static class ValidationPipeline
             }
         }
 
-        var sourceRegions = Regions(source);
         var stagedRegions = Regions(staged);
         foreach (var after in stagedRegions)
         {
             foreach (var field in after.Select(x => x.Key))
             {
-                if (field is not ("id" or "name" or "min_x" or "min_y" or "max_x" or "max_y" or "creation_number" or "weather" or "ambient_sound" or "color_argb" or "provenance" or "capability"))
+                if (field is not ("id" or "name" or "stored_name" or "min_x" or "min_y" or "max_x" or "max_y" or "creation_number" or "weather" or "ambient_sound" or "color_argb" or "references" or "codec_version" or "provenance" or "capability"))
                 {
                     Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "regions", RegionName(after), $"Region field '{field}' has no proven typed serializer.", "Use only fields supported by the typed region codec.");
                 }
@@ -515,6 +514,8 @@ public static class ValidationPipeline
         }
 
         var names = new HashSet<string>(StringComparer.Ordinal);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var creationNumbers = new HashSet<int>();
         foreach (var node in regions)
         {
             if (node is not JsonObject region)
@@ -530,6 +531,14 @@ public static class ValidationPipeline
                 continue;
             }
 
+            var creation = IntegerValue(region["creation_number"]);
+            var id = StringValue(region["id"]);
+            var expectedId = creation is null ? null : RegionSupport.StableId(creation.Value);
+            if (creation is null || creation < 0 || !creationNumbers.Add(creation.Value) || id is null || !ids.Add(id) || !string.Equals(id, expectedId, StringComparison.Ordinal))
+            {
+                Add(findings, "error", "REGION_ID_INVALID", "regions", name, "Region creation numbers and stable ids must be present, unique, and use the region:<creation_number> identity form.", "Preserve the native creation number and derived MCP region id.");
+            }
+
             var values = new[] { "min_x", "min_y", "max_x", "max_y" }.Select(key => NumericValue(region[key])).ToArray();
             if (values.Any(x => x is null || !IsFinite(x.Value)) || values[0] > values[2] || values[1] > values[3])
             {
@@ -538,6 +547,21 @@ public static class ValidationPipeline
             else if (bounds is not null && !bounds.Value.Contains(values[0]!.Value, values[1]!.Value, values[2]!.Value, values[3]!.Value))
             {
                 Add(findings, "error", "COORDINATE_OUT_OF_BOUNDS", "regions", name, "Region coordinates fall outside the map camera bounds.", "Keep the region rectangle inside the map bounds.");
+            }
+        }
+
+        foreach (var region in regions.OfType<JsonObject>())
+        {
+            if (region["references"] is not JsonObject references)
+            {
+                Add(findings, "error", "REGION_REFERENCES_MISSING", "regions", RegionName(region), "Every canonical region must carry its complete reference inventory.", "Reinspect the map with the versioned region codec.");
+            }
+            else
+            {
+                foreach (var bucket in new[] { "mcp_owned", "editor_trigger", "custom_text", "derived_roles" })
+                {
+                    if (references[bucket] is not JsonArray) Add(findings, "error", "REGION_REFERENCES_INVALID", "regions", RegionName(region), $"Region references.{bucket} must be an array.", "Regenerate the canonical reference inventory.");
+                }
             }
         }
 

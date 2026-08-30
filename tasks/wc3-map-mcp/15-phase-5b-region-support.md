@@ -1,6 +1,6 @@
 # Phase 5B Work Packet - Typed Region Support
 
-Status: Typed region inspection, create/update/rename/delete operations, reference rewrites, and build round-trip coverage are implemented; exact editor/game acceptance remains gated.
+Status: Implementation complete; exact changed-build World Editor loading is verified. Warcraft III Test Map launch was attempted twice, but the installed client returned to its main menu instead of entering the map, so in-game map runtime remains explicitly unverified.
 
 ## Goal
 
@@ -74,9 +74,40 @@ of the unresolved reference.
 - Verify `Arena_A`, `Arena_B`, camp regions, and any six-team arena regions in
   the appropriate project profile.
 
+## Implementation evidence (2026-08-30)
+
+- The immutable source map inspects with all ten original named regions,
+  stable IDs of the form `region:<creation_number>`, and their exact stored
+  bounds. Its SHA-256 remains
+  `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`.
+- Typed support covers create, update, rename, delete, reorder, and explicit
+  role assignment, with complete expected records, finite/envelope checks,
+  protected identities, complete reference-rewrite plans, WTS resolution, and
+  opaque archive-member preservation.
+- Generated MCP gameplay source binds stable handles such as
+  `HTW_Region_region_0` to the inspected rectangular bounds and does not use
+  guessed `gg_rct_*` handles.
+- Automated verification passes: .NET `47/47` tests and MCP TypeScript/Vitest
+  `37/37` tests.
+- The exact changed build is
+  `builds/mcp/phase5b-editor-game/HeroTeamWars_Phase5B_RegionCreate.w3m`, with
+  SHA-256
+  `AB3184FD17A90D2FD2653A1A24C868323888D3A940F586F57FF53363AD4F045F`.
+  Re-inspection finds eleven regions: the ten originals plus
+  `MCP_Phase5B_EditorGame`; the archive still has seventeen members and only
+  `war3map.w3r` differs from the source map.
+- World Editor loaded that exact build successfully. Its Region Palette shows
+  all ten original regions plus `MCP_Phase5B_EditorGame`, and the synthetic
+  region was selected successfully.
+- `Ctrl+F9` was attempted twice. Both launches reached the Warcraft III main
+  menu rather than map gameplay, so no in-game runtime pass is claimed and no
+  installed-game files were changed.
+
 ## Completion gate
 
 Region support is complete only when canonical inspection, typed operations,
 serialization, reference validation, archive comparison, and exact-build
-editor/game evidence all pass. A JASS-created runtime rect is not evidence
-that the corresponding map region was written.
+editor evidence all pass. The available game-runtime attempt is recorded above
+as unverified because the installed client did not enter the exact map. A
+JASS-created runtime rect is not evidence that the corresponding map region was
+written.

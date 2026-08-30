@@ -1,6 +1,18 @@
 {
   "schema_version": "1.0",
   "profile": "mvp_2arena",
+  "regions": [
+    { "id": "region:0", "name": "Arena_A", "min_x": 1152, "min_y": -3072, "max_x": 2496, "max_y": -448, "creation_number": 0 },
+    { "id": "region:1", "name": "Arena_B", "min_x": -2464, "min_y": -64, "max_x": -320, "max_y": 2240, "creation_number": 1 },
+    { "id": "region:2", "name": "Arena_A_Entrance", "min_x": -256, "min_y": 544, "max_x": 320, "max_y": 2112, "creation_number": 2 },
+    { "id": "region:3", "name": "Arena_B_Entrance", "min_x": 2528, "min_y": -3040, "max_x": 2944, "max_y": -576, "creation_number": 3 },
+    { "id": "region:4", "name": "Arena_A_Backline", "min_x": -2880, "min_y": 288, "max_x": -2624, "max_y": 1952, "creation_number": 4 },
+    { "id": "region:5", "name": "Arena_B_Backline", "min_x": 320, "min_y": -2848, "max_x": 960, "max_y": -1504, "creation_number": 5 },
+    { "id": "region:6", "name": "Camp_A_Player1", "min_x": -1888, "min_y": 2240, "max_x": -992, "max_y": 2560, "creation_number": 6 },
+    { "id": "region:7", "name": "Camp_A_Player2", "min_x": -960, "min_y": 2272, "max_x": -64, "max_y": 2592, "creation_number": 7 },
+    { "id": "region:8", "name": "Camp_B_Player3", "min_x": 1248, "min_y": -512, "max_x": 2144, "max_y": -192, "creation_number": 8 },
+    { "id": "region:9", "name": "Camp_B_Player4", "min_x": 2176, "min_y": -480, "max_x": 3072, "max_y": -160, "creation_number": 9 }
+  ],
   "modules": [
     { "id": "main", "path": "main.j", "dependencies": ["config.tuning", "core.bootstrap", "core.state", "core.debug", "systems.phases", "systems.waves", "systems.routing", "systems.economy", "systems.sending", "systems.information", "content.base-waves", "content.send-units", "content.heroes", "content.items", "content.abilities", "tests.assertions", "tests.scenarios"] },
     { "id": "config.tuning", "path": "config/tuning.j" },
@@ -33,6 +45,18 @@
       "active_player_ids": [1, 2, 3, 4],
       "team_ids": ["team_1", "team_2"],
       "arena_ids": ["arena_a", "arena_b"],
+      "region_roles": [
+        { "region_name": "Arena_A", "role": "arena" },
+        { "region_name": "Arena_B", "role": "arena" },
+        { "region_name": "Arena_A_Entrance", "role": "entrance" },
+        { "region_name": "Arena_B_Entrance", "role": "entrance" },
+        { "region_name": "Arena_A_Backline", "role": "backline" },
+        { "region_name": "Arena_B_Backline", "role": "backline" },
+        { "region_name": "Camp_A_Player1", "role": "camp" },
+        { "region_name": "Camp_A_Player2", "role": "camp" },
+        { "region_name": "Camp_B_Player3", "role": "camp" },
+        { "region_name": "Camp_B_Player4", "role": "camp" }
+      ],
       "shared_team_lives": 15,
       "shared_vision": true,
       "shared_unit_control": false

@@ -244,7 +244,16 @@ internal static class Program
         return new JsonObject { ["map_path"] = archive.SourcePath, ["capabilities"] = MapInspector.Probe(archive) };
     }
 
-    private static JsonObject InspectMap(JsonObject payload) => MapInspector.Inspect(RequiredPath(payload, "map_path"));
+    private static JsonObject InspectMap(JsonObject payload)
+    {
+        var result = MapInspector.Inspect(RequiredPath(payload, "map_path"));
+        if (payload["output_path"]?.GetValue<string>() is { Length: > 0 } outputPath)
+        {
+            JsonUtilities.WriteAtomic(outputPath, result);
+            result["output_path"] = Path.GetFullPath(outputPath);
+        }
+        return result;
+    }
 
     private static JsonObject Validate(JsonObject payload) => MapValidator.ValidateMap(RequiredPath(payload, "map_path"));
 

@@ -20,7 +20,7 @@ public static class MapBuilder
 
     public static JsonObject Build(string sourcePath, string canonicalPath, string outputPath, string profile = "debug", JsonObject? validationContext = null)
     {
-        if (profile is not ("debug" or "release" or "noop" or "phase0-noop"))
+        if (profile is not ("debug" or "release" or "noop" or "phase0-noop" or "mvp_2arena" or "full_6team"))
         {
             throw new EngineException("INVALID_ARGUMENT", $"Unknown build profile '{profile}'.");
         }
@@ -109,11 +109,25 @@ public static class MapBuilder
 
     private static void MergeProjectOwnedGameplay(JsonObject reopened, JsonObject staged)
     {
+        if (staged["regions"] is JsonArray stagedRegions && reopened["regions"] is JsonArray reopenedRegions)
+        {
+            var stagedById = stagedRegions.OfType<JsonObject>().ToDictionary(item => RegionId(item), StringComparer.Ordinal);
+            foreach (var region in reopenedRegions.OfType<JsonObject>())
+            {
+                if (!stagedById.TryGetValue(RegionId(region), out var stagedRegion)) continue;
+                foreach (var field in new[] { "references", "codec_version", "provenance", "capability" })
+                {
+                    if (stagedRegion[field] is JsonNode value) region[field] = value.DeepClone();
+                }
+            }
+        }
         foreach (var field in new[] { "trigger_mode", "gameplay_source", "gameplay_modules", "gameplay_triggers", "gameplay_variables" })
         {
             if (staged[field] is JsonNode value) reopened[field] = value.DeepClone();
             else reopened.Remove(field);
         }
+        if (staged["region_roles"] is JsonNode regionRoles) reopened["region_roles"] = regionRoles.DeepClone();
+        else reopened.Remove("region_roles");
     }
 
     private static void ApplyMetadataChanges(JsonObject source, JsonObject staged, string sourcePath, Dictionary<string, byte[]> replacements)
@@ -142,7 +156,7 @@ public static class MapBuilder
 
     private static void ApplyRegionChanges(JsonObject source, JsonObject staged, string sourcePath, Dictionary<string, byte[]> replacements)
     {
-        if (JsonUtilities.Equal(source["regions"], staged["regions"])) return;
+        if (RegionsSerializedEqual(Regions(source), Regions(staged))) return;
 
         var current = ReadMap(sourcePath, MapFiles.Regions);
         if (current.Regions is null) throw new EngineException("BUILD_UNSUPPORTED", "Map regions could not be parsed for serialization.");
@@ -227,6 +241,12 @@ public static class MapBuilder
 
     private static List<JsonObject> Regions(JsonObject root)
         => root["regions"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
+
+    private static string RegionId(JsonObject region)
+        => region["id"]?.GetValue<string>() ?? RegionSupport.StableId(region["creation_number"]?.GetValue<int>() ?? -1);
+
+    private static bool RegionsSerializedEqual(IReadOnlyList<JsonObject> left, IReadOnlyList<JsonObject> right)
+        => left.Count == right.Count && left.Zip(right).All(pair => RegionSupport.SerializedEqual(pair.First, pair.Second));
 
     private static List<JsonObject> Scripts(JsonObject root)
         => root["scripts"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
