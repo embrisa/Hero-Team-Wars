@@ -49,6 +49,85 @@ public sealed class MapInspectionTests
         }
     }
 
+    [Fact]
+    public void NonMpqFileIsRejectedWithoutCrash()
+    {
+        var temporaryDirectory = Path.Combine(Path.GetTempPath(), "wc3-map-mcp-tests", Guid.NewGuid().ToString("N"));
+        var temporaryPath = Path.Combine(temporaryDirectory, "not-an-mpq.w3m");
+        try
+        {
+            Directory.CreateDirectory(temporaryDirectory);
+            File.WriteAllText(temporaryPath, "not an MPQ archive");
+            var exception = Assert.Throws<EngineException>(() => MapArchive.Read(temporaryPath));
+            Assert.Equal("PARSE_FAILED", exception.Code);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(temporaryDirectory)) Directory.Delete(temporaryDirectory, recursive: true);
+            }
+            catch (IOException)
+            {
+                // War3Net can retain a handle while rejecting a non-MPQ file on Windows.
+                // The unique temp directory is outside the workspace and is safe to reclaim later.
+            }
+        }
+    }
+
+    [Fact]
+    public void OneMemberParseFailureDoesNotEraseOtherMemberResults()
+    {
+        var source = FindSourceMap();
+        var sourceArchive = MapArchive.Read(source);
+        var region = sourceArchive.Find("war3map.w3r")!;
+        var invalidInfo = new byte[] { 0x01, 0x02, 0x03 };
+        var fixture = new MapArchiveSnapshot("synthetic-map.w3m", new[]
+        {
+            new ArchiveMemberData("war3map.w3i", 0, invalidInfo.Length, Hashing.Sha256(invalidInfo), true, invalidInfo, default),
+            new ArchiveMemberData(region.Path, region.CompressedSize, region.Size, region.Sha256, true, region.Bytes, default)
+        });
+
+        var results = MapInspector.Probe(fixture);
+        var infoResult = results.OfType<System.Text.Json.Nodes.JsonObject>().Single(x => x["path"]!.GetValue<string>() == "war3map.w3i");
+        var regionResult = results.OfType<System.Text.Json.Nodes.JsonObject>().Single(x => x["path"]!.GetValue<string>() == "war3map.w3r");
+
+        Assert.Equal("unsupported_blocking", infoResult["status"]!.GetValue<string>());
+        Assert.NotNull(infoResult["error"]);
+        Assert.Equal("parsed_read_only", regionResult["status"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void OpaqueMemberBytesMatchTheirReportedHash()
+    {
+        var archive = MapArchive.Read(FindSourceMap());
+        var terrain = archive.Find("war3map.w3e");
+
+        Assert.NotNull(terrain);
+        Assert.Equal(terrain!.Sha256, Hashing.Sha256(terrain.Bytes));
+    }
+
+    [Fact]
+    public void NoOpRebuildPreservesMemberContentHashes()
+    {
+        var source = FindSourceMap();
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "wc3-map-mcp-tests", Guid.NewGuid().ToString("N"));
+        var output = Path.Combine(outputDirectory, "noop.w3m");
+        try
+        {
+            Directory.CreateDirectory(outputDirectory);
+            MapArchive.Rebuild(source, output, new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase));
+            var sourceMembers = MapArchive.Read(source).Members.Select(x => (x.Path, x.Sha256)).ToArray();
+            var outputMembers = MapArchive.Read(output).Members.Select(x => (x.Path, x.Sha256)).ToArray();
+
+            Assert.Equal(sourceMembers, outputMembers);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
+        }
+    }
+
     private static string FindSourceMap()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

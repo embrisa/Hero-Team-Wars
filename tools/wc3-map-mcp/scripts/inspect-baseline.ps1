@@ -75,19 +75,61 @@ function Invoke-Engine([hashtable] $Request) {
     return $response.result
 }
 
+function Get-ToolEvidence([string] $Command, [string[]] $Arguments) {
+    $commandInfo = Get-Command $Command -ErrorAction Stop
+    $version = (& $commandInfo.Source @Arguments).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "Could not read $Command version." }
+    return [ordered]@{
+        path = $commandInfo.Source
+        version = $version
+    }
+}
+
+$exampleConfigPath = Join-Path $mcpRoot "config/wc3-map-mcp.example.json"
+$exampleConfig = Get-Content -LiteralPath $exampleConfigPath -Raw | ConvertFrom-Json -Depth 20
+$heroTeamWarsConfig = $exampleConfig.projects.'hero-team-wars'
+$worldEditorPath = [string]$heroTeamWarsConfig.world_editor
+$warcraftPath = [string]$heroTeamWarsConfig.warcraft
+$testMapRoot = [string]$heroTeamWarsConfig.test_map_root
+$configuredFiles = [ordered]@{
+    source_map = $sourcePath
+    world_editor = $worldEditorPath
+    warcraft = $warcraftPath
+    test_map_root = $testMapRoot
+}
+
 $before = Get-FileEvidence $sourcePath
 $requestId = [guid]::NewGuid().ToString()
-$environment = Invoke-Engine @{ protocol_version = "1.0"; request_id = $requestId; operation = "environment_status"; payload = @{} }
+$environment = Invoke-Engine @{ protocol_version = "1.0"; request_id = $requestId; operation = "environment_status"; payload = @{ configured_files = $configuredFiles } }
+$tooling = [ordered]@{
+    node = Get-ToolEvidence "node" @("--version")
+    npm = Get-ToolEvidence "npm" @("--version")
+    dotnet = Get-ToolEvidence "dotnet" @("--version")
+    dotnet_info = (& dotnet --info | Out-String).Trim()
+}
+$editorGameEvidence = [ordered]@{
+    world_editor = $environment.configured_files.world_editor
+    warcraft = $environment.configured_files.warcraft
+    test_map_root = $environment.configured_files.test_map_root
+}
 $inspection = Invoke-Engine @{ protocol_version = "1.0"; request_id = ([guid]::NewGuid().ToString()); operation = "inspect_map"; payload = @{ map_path = $sourcePath } }
 $archive = Invoke-Engine @{ protocol_version = "1.0"; request_id = ([guid]::NewGuid().ToString()); operation = "list_archive_members"; payload = @{ map_path = $sourcePath } }
 $probe = Invoke-Engine @{ protocol_version = "1.0"; request_id = ([guid]::NewGuid().ToString()); operation = "probe_map"; payload = @{ map_path = $sourcePath } }
+$blockingCapabilities = @($probe.capabilities | Where-Object { $_.status -eq "unsupported_blocking" })
 
 $canonicalPath = Join-Path $tempRoot "canonical-map.json"
 Write-JsonAtomic $canonicalPath $inspection
-$timestamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
-$noopPath = Join-Path $buildRoot "HeroTeamWars_M0_2Arena_MCP_P0_noop_$timestamp.w3m"
-$build = Invoke-Engine @{ protocol_version = "1.0"; request_id = ([guid]::NewGuid().ToString()); operation = "build_map"; payload = @{ source_map_path = $sourcePath; canonical_path = $canonicalPath; output_path = $noopPath; profile = "phase0-noop" } }
-$rebuiltInspection = Invoke-Engine @{ protocol_version = "1.0"; request_id = ([guid]::NewGuid().ToString()); operation = "inspect_map"; payload = @{ map_path = $noopPath } }
+$noopAttempted = $blockingCapabilities.Count -eq 0
+$noopPath = $null
+$build = $null
+$rebuiltInspection = $null
+$memberDifferences = @()
+if ($noopAttempted) {
+    $timestamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssfffZ")
+    $noopPath = Join-Path $buildRoot "HeroTeamWars_M0_2Arena_MCP_P0_noop_$timestamp.w3m"
+    $build = Invoke-Engine @{ protocol_version = "1.0"; request_id = ([guid]::NewGuid().ToString()); operation = "build_map"; payload = @{ source_map_path = $sourcePath; canonical_path = $canonicalPath; output_path = $noopPath; profile = "phase0-noop" } }
+    $rebuiltInspection = Invoke-Engine @{ protocol_version = "1.0"; request_id = ([guid]::NewGuid().ToString()); operation = "inspect_map"; payload = @{ map_path = $noopPath } }
+}
 
 $after = Get-FileEvidence $sourcePath
 if ($before.sha256 -ne $after.sha256 -or $before.size_bytes -ne $after.size_bytes) {
@@ -95,20 +137,86 @@ if ($before.sha256 -ne $after.sha256 -or $before.size_bytes -ne $after.size_byte
 }
 
 $sourceMembers = @($inspection.archive_members)
-$rebuiltMembers = @($rebuiltInspection.archive_members)
-$sourceMemberMap = @{}
-foreach ($member in $sourceMembers) { $sourceMemberMap[$member.path] = $member.sha256 }
-$rebuiltMemberMap = @{}
-foreach ($member in $rebuiltMembers) { $rebuiltMemberMap[$member.path] = $member.sha256 }
-$memberDifferences = @(
-    foreach ($path in @($sourceMemberMap.Keys | Sort-Object)) {
-        if (-not $rebuiltMemberMap.ContainsKey($path)) { [ordered]@{ path = $path; difference = "missing_from_rebuild" } }
-        elseif ($sourceMemberMap[$path] -ne $rebuiltMemberMap[$path]) { [ordered]@{ path = $path; difference = "content_hash_changed"; source_sha256 = $sourceMemberMap[$path]; rebuilt_sha256 = $rebuiltMemberMap[$path] } }
+$archiveComparison = [ordered]@{
+    attempted = $noopAttempted
+    source_member_order = @($sourceMembers | ForEach-Object { $_.path })
+    rebuilt_member_order = @()
+    member_order_changed = $null
+    compression_metadata_changes = @()
+    special_member_checks = @()
+}
+if ($noopAttempted) {
+    $rebuiltMembers = @($rebuiltInspection.archive_members)
+    $sourceMemberMap = @{}
+    $sourceMemberByPath = @{}
+    foreach ($member in $sourceMembers) {
+        $sourceMemberMap[$member.path] = $member.sha256
+        $sourceMemberByPath[$member.path] = $member
     }
-    foreach ($path in @($rebuiltMemberMap.Keys | Where-Object { -not $sourceMemberMap.ContainsKey($_) } | Sort-Object)) {
-        [ordered]@{ path = $path; difference = "added_to_rebuild" }
+    $rebuiltMemberMap = @{}
+    $rebuiltMemberByPath = @{}
+    foreach ($member in $rebuiltMembers) {
+        $rebuiltMemberMap[$member.path] = $member.sha256
+        $rebuiltMemberByPath[$member.path] = $member
     }
-)
+    $rebuiltOrder = @($rebuiltMembers | ForEach-Object { $_.path })
+    $archiveComparison.rebuilt_member_order = $rebuiltOrder
+    if ($archiveComparison.source_member_order.Count -ne $rebuiltOrder.Count) {
+        $archiveComparison.member_order_changed = $true
+    }
+    else {
+        $orderChanged = $false
+        for ($index = 0; $index -lt $archiveComparison.source_member_order.Count; $index++) {
+            if ($archiveComparison.source_member_order[$index] -ne $rebuiltOrder[$index]) {
+                $orderChanged = $true
+                break
+            }
+        }
+        $archiveComparison.member_order_changed = $orderChanged
+    }
+
+    $archiveComparison.compression_metadata_changes = @(
+        foreach ($path in @($sourceMemberByPath.Keys + $rebuiltMemberByPath.Keys | Sort-Object -Unique)) {
+            if ($sourceMemberByPath.ContainsKey($path) -and $rebuiltMemberByPath.ContainsKey($path)) {
+                $sourceMember = $sourceMemberByPath[$path]
+                $rebuiltMember = $rebuiltMemberByPath[$path]
+                if ($sourceMember.compressed_size_bytes -ne $rebuiltMember.compressed_size_bytes -or $sourceMember.flags -ne $rebuiltMember.flags) {
+                    [ordered]@{
+                        path = $path
+                        source_compressed_size_bytes = $sourceMember.compressed_size_bytes
+                        rebuilt_compressed_size_bytes = $rebuiltMember.compressed_size_bytes
+                        source_flags = $sourceMember.flags
+                        rebuilt_flags = $rebuiltMember.flags
+                    }
+                }
+            }
+        }
+    )
+
+    $archiveComparison.special_member_checks = @(
+        foreach ($path in @("(listfile)", "(attributes)")) {
+            $sourceMember = $sourceMemberByPath[$path]
+            $rebuiltMember = $rebuiltMemberByPath[$path]
+            [ordered]@{
+                path = $path
+                present_in_source = $null -ne $sourceMember
+                present_in_rebuild = $null -ne $rebuiltMember
+                source_sha256 = if ($null -ne $sourceMember) { $sourceMember.sha256 } else { $null }
+                rebuilt_sha256 = if ($null -ne $rebuiltMember) { $rebuiltMember.sha256 } else { $null }
+                content_hash_equal = $null -ne $sourceMember -and $null -ne $rebuiltMember -and $sourceMember.sha256 -eq $rebuiltMember.sha256
+            }
+        }
+    )
+    $memberDifferences = @(
+        foreach ($path in @($sourceMemberMap.Keys | Sort-Object)) {
+            if (-not $rebuiltMemberMap.ContainsKey($path)) { [ordered]@{ path = $path; difference = "missing_from_rebuild" } }
+            elseif ($sourceMemberMap[$path] -ne $rebuiltMemberMap[$path]) { [ordered]@{ path = $path; difference = "content_hash_changed"; source_sha256 = $sourceMemberMap[$path]; rebuilt_sha256 = $rebuiltMemberMap[$path] } }
+        }
+        foreach ($path in @($rebuiltMemberMap.Keys | Where-Object { -not $sourceMemberMap.ContainsKey($_) } | Sort-Object)) {
+            [ordered]@{ path = $path; difference = "added_to_rebuild" }
+        }
+    )
+}
 
 $report = [ordered]@{
     schema_version = "1.0"
@@ -116,6 +224,8 @@ $report = [ordered]@{
     source = $before
     source_after_probe = $after
     environment = $environment
+    tooling = $tooling
+    editor_game = $editorGameEvidence
     archive_members = $archive.members
     parser_probe = $probe.capabilities
     canonical_summary = [ordered]@{
@@ -134,17 +244,19 @@ $report = [ordered]@{
         parse_warnings = $inspection.parse_warnings
     }
     no_op_rebuild = [ordered]@{
-        attempted = $true
-        output = Get-FileEvidence $noopPath
+        attempted = $noopAttempted
+        output = if ($noopAttempted) { Get-FileEvidence $noopPath } else { $null }
         engine_result = $build
         rebuilt_source_semantics = $rebuiltInspection
         member_differences = $memberDifferences
+        archive_comparison = $archiveComparison
         editor_observed = $false
         game_observed = $false
-        evidence_level = "built_reopened_by_engine_only"
-        note = "World Editor and Warcraft III were not launched by this unattended probe; process/build compatibility is not runtime evidence."
+        evidence_level = if ($noopAttempted) { "built_reopened_by_engine_only" } else { "blocked_by_unsupported_member" }
+        note = if ($noopAttempted) { "World Editor and Warcraft III were not launched by this unattended probe; process/build compatibility is not runtime evidence." } else { "No-op rebuild was not attempted because at least one member was classified unsupported_blocking." }
     }
-    phase_0_recommendation = if ($memberDifferences.Count -eq 0) { "GO_READONLY_AND_NOOP_BUILD_WITH_MANUAL_RUNTIME_GATE" } else { "GO_READONLY_ONLY_UNTIL_MEMBER_PRESERVATION_IS_RESOLVED" }
+    blocking_capabilities = $blockingCapabilities
+    phase_0_recommendation = if ($memberDifferences.Count -eq 0 -and $blockingCapabilities.Count -eq 0) { "GO_READONLY_AND_NOOP_BUILD_WITH_MANUAL_RUNTIME_GATE" } else { "GO_READONLY_ONLY_UNTIL_MEMBER_PRESERVATION_IS_RESOLVED" }
 }
 
 $reportJsonPath = Join-Path $compatibilityRoot "hero-team-wars-baseline.json"
@@ -182,15 +294,24 @@ $markdown = @(
     ""
     "## Environment"
     ""
-    "````json"
+    '```json'
     ($environment | ConvertTo-Json -Depth 20)
-    "````"
+    '```'
+    ""
+    "## Tooling and configured paths"
+    ""
+    '```json'
+    ([ordered]@{ tooling = $tooling; editor_game = $editorGameEvidence } | ConvertTo-Json -Depth 20)
+    '```'
     ""
     "## Archive and parser coverage"
     ""
     "- Archive members observed: $($sourceMembers.Count)"
     "- Parser probe entries: $(@($probe.capabilities).Count)"
     "- Rebuilt member content-hash comparison: **$memberStatus**"
+    "- Archive member order changed: ``$($report.no_op_rebuild.archive_comparison.member_order_changed)``"
+    "- Compression/flag metadata changes: $(@($report.no_op_rebuild.archive_comparison.compression_metadata_changes).Count)"
+    "- Listfile/attributes content hashes equal: $(@($report.no_op_rebuild.archive_comparison.special_member_checks | Where-Object { $_.content_hash_equal }).Count)/$(@($report.no_op_rebuild.archive_comparison.special_member_checks).Count)"
     ""
     "The JSON report contains the complete stable member inventory, parser capability matrix, canonical metadata, players, forces, regions, and unknown/opaque classifications."
     ""
@@ -225,6 +346,8 @@ $candidateMarkdown = @(
     "- Parsed members: ``war3map.w3i``, ``war3map.w3r``, and ``war3map.wts``"
     "- Opaque members preserved through no-op rebuild: $(@($inspection.opaque_members).Count)"
     "- No-op member content-hash differences: $($memberDifferences.Count)"
+    "- Archive member order changed: ``$($report.no_op_rebuild.archive_comparison.member_order_changed)``"
+    "- Compression/flag metadata changes: $(@($report.no_op_rebuild.archive_comparison.compression_metadata_changes).Count)"
     ""
     "## Editor verification needs"
     ""

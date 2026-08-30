@@ -78,7 +78,7 @@ internal static class Program
         {
             var result = request.Operation switch
             {
-                "environment_status" => EnvironmentStatus(),
+                "environment_status" => EnvironmentStatus(request.Payload),
                 "hash_file" => HashFile(request.Payload),
                 "list_archive_members" => ListArchiveMembers(request.Payload),
                 "probe_map" => ProbeMap(request.Payload),
@@ -103,16 +103,57 @@ internal static class Program
         }
     }
 
-    private static JsonObject EnvironmentStatus() => new()
+    private static JsonObject EnvironmentStatus(JsonObject payload)
     {
-        ["engine_version"] = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.1.0",
-        ["engine_commit"] = "local",
-        ["runtime"] = Environment.Version.ToString(),
-        ["os"] = Environment.OSVersion.VersionString,
-        ["architecture"] = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
-        ["war3net_io_mpq"] = typeof(War3Net.IO.Mpq.MpqArchive).Assembly.GetName().Version?.ToString(),
-        ["war3net_build_core"] = typeof(War3Net.Build.Map).Assembly.GetName().Version?.ToString()
-    };
+        var result = new JsonObject
+        {
+            ["engine_version"] = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.1.0",
+            ["engine_commit"] = "local",
+            ["runtime"] = Environment.Version.ToString(),
+            ["framework_description"] = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+            ["os"] = Environment.OSVersion.VersionString,
+            ["architecture"] = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+            ["os_architecture"] = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString(),
+            ["war3net_io_mpq"] = typeof(War3Net.IO.Mpq.MpqArchive).Assembly.GetName().Version?.ToString(),
+            ["war3net_build_core"] = typeof(War3Net.Build.Map).Assembly.GetName().Version?.ToString()
+        };
+
+        if (payload["configured_files"] is JsonObject configuredFiles)
+        {
+            var observations = new JsonObject();
+            foreach (var property in configuredFiles)
+            {
+                if (property.Value is not JsonValue value || !value.TryGetValue<string>(out var configuredPath) || string.IsNullOrWhiteSpace(configuredPath))
+                {
+                    throw new EngineException("INVALID_ARGUMENT", $"configured_files.{property.Key} must be a non-empty path string.");
+                }
+
+                var fullPath = Path.GetFullPath(configuredPath);
+                var isFile = File.Exists(fullPath);
+                var isDirectory = Directory.Exists(fullPath);
+                var observation = new JsonObject
+                {
+                    ["path"] = fullPath,
+                    ["exists"] = isFile || isDirectory,
+                    ["kind"] = isFile ? "file" : isDirectory ? "directory" : "missing"
+                };
+
+                if (isFile)
+                {
+                    var version = FileVersionInfo.GetVersionInfo(fullPath);
+                    observation["file_version"] = version.FileVersion;
+                    observation["product_version"] = version.ProductVersion;
+                    observation["product_name"] = version.ProductName;
+                }
+
+                observations[property.Key] = observation;
+            }
+
+            result["configured_files"] = observations;
+        }
+
+        return result;
+    }
 
     private static JsonObject HashFile(JsonObject payload)
     {
