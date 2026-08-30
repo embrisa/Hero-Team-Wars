@@ -1,37 +1,82 @@
-# Phase 4 - Editor and Game Test Runner
+# Phase 4 Work Packet - World Editor and Warcraft III Test Runner
 
-## Objective
+Status: blocked until Phase 3 creates exact hash-addressable builds.
 
-Collect observable compatibility and runtime evidence for a built test map.
+This automates launch and evidence recording. It does not automatically judge gameplay quality and must not kill unrelated editor/game processes.
 
-## Implement
+## Required reading and inputs
 
-- `wc3_launch_editor`
-- `wc3_launch_test_map`
-- `wc3_record_test_result`
-- process discovery and configured executable paths;
-- safe copy into a dedicated Warcraft III test directory;
-- launch timestamps, command arguments, exit state, and log discovery;
-- optional screenshot attachment/manual checklist handoff;
-- test-session manifest linked to the build transaction.
+Read the mandatory context, Phase 3 handoff, `11-safety-recovery-and-audit.md`, `12-testing-and-definition-of-done.md`, and launch behavior recorded in Phase 0.
 
-## Evidence levels
+## Goal
 
-1. `built`: archive was created.
-2. `editor_opened`: World Editor opened the selected build.
-3. `game_loaded`: Warcraft III loaded the selected build.
-4. `smoke_passed`: defined initialization behavior was observed.
-5. `playtest_passed`: the chunk-specific gameplay acceptance test passed.
+An agent can launch one exact build in World Editor or Warcraft III and obtain a test session linked to the build hash. Process start, editor open, game load, smoke success, and playtest success remain distinct.
 
-Never upgrade evidence levels automatically without the corresponding observation.
+## Files to create or complete
 
-## Automation boundary
+```text
+mcp-server/src/services/launch-service.ts
+mcp-server/src/tools/launches.ts
+mcp-server/src/platform/windows/{process-runner,warcraft-paths}.ts
+contracts/schemas/test-session.schema.json
+mcp-server/test/{unit,integration}/launch-*.test.ts
+docs/compatibility/launch-behavior.md
+```
 
-Launching processes and collecting logs can be automated. Judging terrain appearance or gameplay feel requires a user observation or a separately designed visual/runtime harness. Screen automation may assist but is not the source of truth by itself.
+## Test-session record
 
-## Acceptance criteria
+Record session UUID, project/transaction/revision/build/hash, target, executable/version, exact argument array, test-copy path/hash, PID/start UTC, milestones and recorder, exit state, artifacts/notes, and final evidence level.
 
-- The runner launches only the explicitly selected build.
-- Existing editor/game processes are not killed without explicit permission.
-- Every reported test result includes map hash and transaction ID.
-- Failed launch, failed load, and failed gameplay test remain distinct outcomes.
+## Tools
+
+### `wc3_launch_editor`
+
+Verify editor path/version and build manifest/hash; create session; launch `World Editor.exe` using the Phase 0-proven argument array such as `-loadfile <map>`; avoid shell command strings; record PID/start; return only `process_started`. A later observation upgrades to `editor_opened`.
+
+### `wc3_launch_test_map`
+
+Verify build and test root, copy to unique test name when required, verify copy hash, launch game with tested argument array, and return `process_started`. Initial existing-process policy is `fail_if_running`; do not terminate anything.
+
+### `wc3_record_test_result`
+
+Input session, expected build hash, milestone, result, notes, and optional artifacts. Milestones: `editor_opened`, `game_loaded`, `smoke_test`, `playtest`. Recorder is `user_observation`, `agent_log_observation`, or a future verified harness. Do not silently skip evidence order.
+
+### `wc3_get_test_session`
+
+Return session and verify referenced artifacts still exist/match.
+
+## Process safety
+
+- Native process API, executable plus argument array.
+- No broad termination.
+- Existing process returns a clear conflict.
+- Only editor/game windows are visible.
+- Bound waits and return while apps remain open.
+- Running process is not proof of map load.
+
+## Chunk checklists
+
+Support manual checklists. Example for `HTW-01`: preparation begins once; timer counts down; combat begins once; resolution occurs once; next preparation begins; `[HTW]` includes correct wave ID; no soft lock/duplicate transition.
+
+## Tests
+
+- fake runner verifies executable/arguments;
+- labels cannot inject arguments;
+- hash mismatch blocks launch;
+- outside-root test destination rejected;
+- existing-process policy does not terminate;
+- session survives server exit;
+- milestones cannot reference another build;
+- evidence levels remain distinct;
+- failures never become passed;
+- source hash unchanged.
+
+## Manual acceptance
+
+Launch Phase 3 no-op in editor, record observed open, launch in game, record observed load, then repeat for minimal changed build. Keep failures separate.
+
+## Completion gate and handoff
+
+Complete when exact builds launch safely, sessions persist, observations are accurate, and no tool can kill unrelated processes or forge evidence from process start.
+
+Handoff contracts, verified arguments, conflict behavior, session schema, session IDs/evidence, log locations, and checklist format.

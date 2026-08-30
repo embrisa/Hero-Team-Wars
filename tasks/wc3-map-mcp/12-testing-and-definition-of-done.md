@@ -55,3 +55,54 @@
 - An agent generated source that is not connected to the map script.
 - A GUI action was attempted without observable saved state.
 - A map difference cannot be explained by the transaction manifest.
+
+## Required test matrix by phase
+
+| Phase | Automated evidence | Application/manual evidence |
+|---|---|---|
+| 0 | engine builds, schemas validate, archive inventory/probe tests | no-op editor open/game load if rebuild permitted |
+| 1 | STDIO integration, input/path policy, stable canonical output | MCP Inspector calls and Codex read-only visibility |
+| 2 | transaction atomicity, revisions, locks, rollback/discard safety | review sample semantic diff |
+| 3 | invalid fixture rejection, no-op/minimal rebuild/reinspect | editor opens and game loads exact build hashes |
+| 4 | fake runner, argument safety, persisted sessions/evidence rules | real editor/game launches and recorded observations |
+| 5 | script/static tests where possible, transaction/build validations | chunk-specific gameplay acceptance tests |
+
+## Fixtures
+
+Maintain at least:
+
+- tiny valid synthetic `.w3m` created for testing if licensing/format permits;
+- copied local Hero Team Wars baseline excluded from public distribution;
+- truncated archive;
+- archive with unknown opaque member;
+- duplicate rawcode case;
+- invalid player/force reference;
+- out-of-bounds region/placement;
+- disconnected script/import case;
+- known canonical JSON expectations.
+
+Each fixture README states origin, licensing/distribution rule, expected capabilities, and hash.
+
+## Source preservation assertion
+
+Create a shared test/setup helper that captures the original Hero Team Wars hash before applicable integration/application tests and asserts the same hash afterward. A mismatch is a test-suite failure even if all other checks pass.
+
+## Evidence naming
+
+Use correlation/transaction/build/test IDs in filenames. Examples:
+
+```text
+compatibility/hero-team-wars-baseline.json
+transactions/<T>/reports/diff-0001.json
+artifacts/builds/<B>/build-manifest.json
+artifacts/tests/<S>/test-session.json
+logs/<correlation>.jsonl
+```
+
+## Coverage quality
+
+Coverage percentage alone is not the gate. Critical policy/state/build paths require branch tests: path escapes, hash drift, stale revisions, partial batch failure, engine crash, malformed response, build reopen mismatch, existing game process, and false evidence upgrade.
+
+## Completion report review
+
+Before accepting a phase, verify commands were actually run, outputs exist, hashes match, source remained unchanged, disabled/untested items are explicit, and the next agent can reproduce the result without chat history.

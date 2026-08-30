@@ -31,3 +31,32 @@ The MCP protocol and agent contracts evolve independently from Warcraft III bina
 - Do not download or update dependencies during an MCP tool call.
 - Resolve and install dependencies during explicit setup only.
 - Add a compatibility fixture before upgrading any map-format dependency.
+
+## Locked interface decisions
+
+- Public tools use project IDs plus project-relative map/build labels. They do not accept arbitrary absolute paths.
+- Public map changes are typed semantic operations. There is no generic shell, `write_file`, `replace_member`, or “run arbitrary compiler command” tool.
+- Large results are written as versioned JSON/Markdown artifacts and summarized through MCP.
+- Source hash and transaction revision are optimistic-concurrency preconditions on every mutation/build.
+- Internal TypeScript-to-.NET communication is NDJSON with one request/response per line and independent protocol versioning.
+- Runtime configuration is validated at server startup and is not mutable through MCP tools in the first release.
+
+## Decisions deliberately deferred to Phase 0/3
+
+- Exact Node, MCP SDK, .NET SDK, NuGet, and War3Net versions.
+- Whether the initial map engine is one-shot or persistent.
+- Exact MPQ writer and compression/listfile behavior.
+- Editor-owned versus build-owned JASS/Lua strategy.
+- Which individual `war3map.*` members can be written.
+- Whether `.w3x` support ships with the first `.w3m` release.
+
+Deferred means “gather evidence and record an ADR,” not “let each agent choose differently.”
+
+## Rejected approaches
+
+- **World Editor DLL injection:** patch-sensitive, unsafe, unnecessary for the first goal.
+- **Pure screen automation:** too brittle for repeatable trigger/object creation and weak evidence.
+- **Direct edits to the accepted `.w3m`:** no safe rollback and binary corruption risk.
+- **One giant MCP tool such as `edit_map`:** ambiguous authorization, poor schemas, and unauditable changes.
+- **An agent-generated absolute output path:** path-escape and overwrite risk.
+- **Treating map script import as execution:** imported source is inert unless connected through the selected script/build path.

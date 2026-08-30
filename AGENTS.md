@@ -1,5 +1,39 @@
 # Agent instructions
 
+## Multi-agent workflow
+
+For non-trivial engineering tasks, act primarily as the orchestrator.
+
+Delegate independent work to subagents whenever doing so can reduce context
+pollution or parallelize the task.
+
+Prefer subagents for:
+- codebase exploration
+- locating relevant files and execution paths
+- independent implementation tasks
+- writing or running tests
+- debugging
+- reviewing changes
+- documentation/API research
+
+Use multiple subagents concurrently when their work is independent.
+
+Do not override the configured default subagent model unless explicitly asked
+to do so. The main agent should retain responsibility for:
+- understanding the user's intent
+- decomposing the task
+- assigning bounded tasks
+- coordinating agents
+- resolving conflicting findings
+- reviewing important changes
+- integrating the final result
+- giving the final answer
+
+Wait for relevant subagents before concluding the task.
+
+Avoid having multiple agents modify the same files concurrently unless there
+is a clear reason to do so.
+
 ## Finish every task with Git
 
 - Treat the repository as a shared working tree. Preserve unrelated user changes and inspect `git status` before editing.

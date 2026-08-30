@@ -87,3 +87,47 @@ Disagreement produces a warning with all conflicting values and their origins.
 - Validation failure: build cannot be promoted.
 - Editor/game launch failure: build remains available but is marked untested.
 - Runtime test failure: source input remains unchanged; discard or revise the transaction.
+
+## End-to-end example
+
+Suppose a later agent wants to change the map title in a component proven writable:
+
+1. `wc3_project_status` returns source hash `H1` and supported metadata capability.
+2. `wc3_inspect_map` reports current title with `observed_archive` provenance.
+3. `wc3_begin_transaction(expected_source_hash=H1)` creates transaction `T1`, revision 0.
+4. `wc3_apply_operations(T1, revision=0, set_map_metadata expected old title -> new title)` creates revision 1.
+5. `wc3_transaction_diff(T1)` reports only the title change.
+6. `wc3_validate_transaction(T1, revision=1)` produces report `V1` with no errors.
+7. `wc3_build_map(T1, revision=1)` produces build `B1`, hash `H2`, status untested.
+8. `wc3_launch_editor(B1, expected_hash=H2)` creates session `S1`, initially process-started.
+9. User confirms the exact build opened; `wc3_record_test_result(S1, editor_opened=pass)` records evidence.
+10. Warcraft loads the same `H2`; session records `game_loaded=pass`.
+11. `wc3_promote_build(B1, expected_hash=H2, configured destination)` copies it and verifies the destination hash.
+
+At no point is the source map overwritten. Every identifier and hash links the audit trail.
+
+## Internal request flow
+
+```text
+MCP tool input
+  -> Zod schema validation
+  -> configured project resolution
+  -> path and operation policy
+  -> application service
+  -> worker request schema validation
+  -> .NET engine operation
+  -> worker response schema validation
+  -> application error/result mapping
+  -> concise MCP text + structuredContent + artifact references
+```
+
+Tool handlers should not perform path arithmetic, spawn processes, parse map members, or write manifests directly. Those duties belong to dedicated services.
+
+## Persistence model
+
+- Configuration: checked-in example plus ignored machine-local file.
+- Transactions: filesystem directories with atomic manifest/revision files.
+- Builds: immutable artifacts addressed by build ID and SHA-256.
+- Test sessions: append/update records tied to a build hash.
+- Logs: structured per-correlation files.
+- No database is required initially. If filesystem persistence becomes inadequate, adopt a database through an ADR without changing public tool contracts.
