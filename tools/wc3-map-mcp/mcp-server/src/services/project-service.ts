@@ -20,6 +20,21 @@ export class ProjectService {
     return resolveProject(this.config, projectId);
   }
 
+  public assertToolAvailable(projectId: string, toolName: string): void {
+    const project = this.project(projectId);
+    if (project.config.enabled_tools.length > 0 && !project.config.enabled_tools.includes(toolName)) {
+      throw new AppError("INVALID_ARGUMENT", `Tool '${toolName}' is not enabled for project '${projectId}'.`);
+    }
+  }
+
+  public assertMutationAllowed(projectId: string, toolName: string): void {
+    const project = this.project(projectId);
+    if (project.config.write_policy === "read_only") {
+      throw new AppError("INVALID_ARGUMENT", `Project '${projectId}' is read-only; '${toolName}' is disabled.`);
+    }
+    this.assertToolAvailable(projectId, toolName);
+  }
+
   public source(projectId: string, map: string): string {
     return this.assertReadableMap(this.project(projectId), sourcePath(this.project(projectId), map), map);
   }
@@ -49,6 +64,11 @@ export class ProjectService {
     const expectedHash = project.config.baseline_sha256?.toUpperCase();
     const actualHash = sourceHash?.sha256.toUpperCase();
     const readOnlyTools = ["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_validate_map", "wc3_compare_maps"];
+    const transactionTools = ["wc3_begin_transaction", "wc3_apply_operations", "wc3_transaction_diff", "wc3_validate_transaction", "wc3_discard_transaction"];
+    const laterTools = ["wc3_build_map", "wc3_build_report", "wc3_launch_editor", "wc3_launch_test_map", "wc3_record_test_result", "wc3_get_test_session", "wc3_promote_build"];
+    const enabledTools = project.config.enabled_tools.length > 0
+      ? project.config.enabled_tools
+      : project.config.write_policy === "read_only" ? readOnlyTools : [...readOnlyTools, ...transactionTools, ...laterTools];
     return {
       schema_version: "1.0",
       project_id: project.id,
@@ -59,11 +79,9 @@ export class ProjectService {
       server: { name: "wc3-map-mcp", version: "0.1.0", runtime: `Node.js ${process.version}` },
       engine,
       configured: (engine.configured_files as Record<string, unknown> | undefined) ?? {},
-      capability_summary: { inspection: "enabled", comparison: "enabled", validation: "read_only", mutation: "disabled", build: "disabled", launch: "disabled", deletion: "disabled" },
-      enabled_tools: project.config.write_policy === "read_only"
-        ? readOnlyTools.filter(tool => project.config.enabled_tools.length === 0 || project.config.enabled_tools.includes(tool))
-        : project.config.enabled_tools,
-      disabled_tools: ["wc3_begin_transaction", "wc3_apply_operations", "wc3_transaction_diff", "wc3_validate_transaction", "wc3_build_map", "wc3_build_report", "wc3_launch_editor", "wc3_launch_test_map", "wc3_record_test_result", "wc3_get_test_session", "wc3_promote_build", "wc3_discard_transaction"],
+      capability_summary: { inspection: "enabled", comparison: "enabled", validation: project.config.write_policy === "read_only" ? "read_only" : "transactional", mutation: project.config.write_policy === "read_only" ? "disabled" : "typed_write_enabled", build: project.config.write_policy === "read_only" ? "disabled" : "available_after_validation", launch: project.config.write_policy === "read_only" ? "disabled" : "approval_gated", deletion: project.config.write_policy === "read_only" ? "disabled" : "confirmed_transaction_only" },
+      enabled_tools: enabledTools.filter(tool => (project.config.write_policy !== "read_only" || readOnlyTools.includes(tool))),
+      disabled_tools: [...transactionTools, ...laterTools].filter(tool => !enabledTools.includes(tool)),
       disabled_until_evidence: ["script_source_mutation", "generic_archive_patch", "autonomous_promotion"],
       roots: { staging: relativeProjectPath(project, project.stagingRoot), artifacts: relativeProjectPath(project, project.artifactRoot), builds: relativeProjectPath(project, project.buildRoot) }
     };

@@ -56,4 +56,134 @@ public sealed class OperationTests
         var exception = Assert.Throws<EngineException>(() => OperationApplier.Apply(canonical, operations));
         Assert.Equal("PRECONDITION_FAILED", exception.Code);
     }
+
+    [Fact]
+    public void FailedBatchDoesNotMutateTheInputCanonicalValue()
+    {
+        var canonical = Canonical();
+        var operations = new JsonArray(
+            MetadataOperation("c0a80101-0000-4000-8000-000000000003", "Before", "After"),
+            new JsonObject
+            {
+                ["operation_id"] = "c0a80101-0000-4000-8000-000000000004",
+                ["type"] = "update_region",
+                ["target"] = new JsonObject { ["name"] = "Missing" },
+                ["expected"] = new JsonObject { ["name"] = "Missing" },
+                ["value"] = new JsonObject { ["min_x"] = 1 },
+                ["rationale"] = "Force the batch to fail."
+            });
+
+        var exception = Assert.Throws<EngineException>(() => OperationApplier.Apply(canonical, operations));
+
+        Assert.Equal("INVALID_ARGUMENT", exception.Code);
+        Assert.Equal("Before", canonical["metadata"]![0]!["value"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void PlayerForceAndRegionOperationsApplyWithExplicitPreconditions()
+    {
+        var canonical = Canonical();
+        var playerBefore = new JsonObject
+        {
+            ["capability"] = "parsed_read_only",
+            ["provenance"] = "observed_archive",
+            ["id"] = 1,
+            ["name"] = "Player 1",
+            ["controller"] = "User",
+            ["race"] = "NightElf",
+            ["flags"] = 1,
+            ["start"] = new JsonObject { ["x"] = 0, ["y"] = 0 }
+        };
+        canonical["players"] = new JsonArray(playerBefore);
+        var forceBefore = new JsonObject
+        {
+            ["index"] = 0,
+            ["name"] = "Force 1",
+            ["flags"] = 9,
+            ["player_mask"] = 3,
+            ["player_ids"] = new JsonArray(1)
+        };
+        canonical["forces"] = new JsonArray(forceBefore);
+
+        var operations = new JsonArray(
+            new JsonObject
+            {
+                ["operation_id"] = "c0a80101-0000-4000-8000-000000000005",
+                ["type"] = "set_player_slot",
+                ["target"] = new JsonObject { ["id"] = 1 },
+                ["expected"] = new JsonObject
+                {
+                    ["id"] = 1,
+                    ["name"] = "Player 1",
+                    ["controller"] = "User",
+                    ["race"] = "NightElf",
+                    ["flags"] = 1,
+                    ["start"] = new JsonObject { ["y"] = 0, ["x"] = 0 },
+                    ["provenance"] = "observed_archive",
+                    ["capability"] = "parsed_read_only"
+                },
+                ["value"] = new JsonObject { ["controller"] = "Computer", ["start"] = new JsonObject { ["x"] = 10, ["y"] = 20 } },
+                ["rationale"] = "Test player slot."
+            },
+            new JsonObject
+            {
+                ["operation_id"] = "c0a80101-0000-4000-8000-000000000006",
+                ["type"] = "set_force",
+                ["target"] = new JsonObject { ["index"] = 0 },
+                ["expected"] = forceBefore.DeepClone(),
+                ["value"] = new JsonObject { ["player_ids"] = new JsonArray(1), ["flags"] = 9 },
+                ["rationale"] = "Test force membership."
+            },
+            new JsonObject
+            {
+                ["operation_id"] = "c0a80101-0000-4000-8000-000000000007",
+                ["type"] = "create_region",
+                ["target"] = new JsonObject(),
+                ["value"] = new JsonObject { ["name"] = "Arena_B", ["min_x"] = 0, ["min_y"] = 0, ["max_x"] = 128, ["max_y"] = 128 },
+                ["rationale"] = "Test region creation."
+            });
+
+        var result = OperationApplier.Apply(canonical, operations);
+
+        Assert.Equal("Computer", result["canonical_map"]!["players"]![0]!["controller"]!.GetValue<string>());
+        Assert.Contains(result["canonical_map"]!["regions"]!.AsArray().OfType<JsonObject>(), node => node["name"]!.GetValue<string>() == "Arena_B");
+        Assert.Equal(3, result["applied_operation_ids"]!.AsArray().Count);
+        Assert.All(result["diff"]!["changes"]!.AsArray().OfType<JsonObject>(), change => Assert.Equal("intended_design", change["provenance"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public void OpaqueOperationsRemainDisabled()
+    {
+        var operation = new JsonArray(new JsonObject
+        {
+            ["operation_id"] = "c0a80101-0000-4000-8000-000000000008",
+            ["type"] = "set_script_source",
+            ["target"] = new JsonObject { ["archive_path"] = "war3map.j" },
+            ["value"] = "function main takes nothing returns nothing endfunction",
+            ["rationale"] = "This must remain disabled until script ownership is proven."
+        });
+
+        var exception = Assert.Throws<EngineException>(() => OperationApplier.Apply(Canonical(), operation));
+
+        Assert.Equal("UNSUPPORTED_OPERATION", exception.Code);
+    }
+
+    private static JsonObject Canonical() => new()
+    {
+        ["schema_version"] = "1.0",
+        ["metadata"] = new JsonArray(new JsonObject { ["field"] = "title", ["value"] = "Before", ["provenance"] = "observed_archive", ["capability"] = "parsed_read_only" }),
+        ["regions"] = new JsonArray(new JsonObject { ["name"] = "Arena_A", ["min_x"] = 0, ["min_y"] = 0, ["max_x"] = 64, ["max_y"] = 64 }),
+        ["players"] = new JsonArray(),
+        ["forces"] = new JsonArray()
+    };
+
+    private static JsonObject MetadataOperation(string id, string expected, string value) => new()
+    {
+        ["operation_id"] = id,
+        ["type"] = "set_map_metadata",
+        ["target"] = new JsonObject { ["field"] = "title" },
+        ["expected"] = expected,
+        ["value"] = value,
+        ["rationale"] = "Test metadata."
+    };
 }

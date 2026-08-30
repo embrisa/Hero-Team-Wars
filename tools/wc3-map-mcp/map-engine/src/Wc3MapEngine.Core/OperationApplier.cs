@@ -1,10 +1,29 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace Wc3MapEngine.Core;
 
+/// <summary>
+/// Applies the Phase 2 typed operation vocabulary to a cloned canonical map.
+/// The caller receives a new canonical value only after the entire batch has
+/// succeeded; no operation in this class writes a caller-owned file.
+/// </summary>
 public static class OperationApplier
 {
+    private static readonly HashSet<string> SupportedTypes = new(StringComparer.Ordinal)
+    {
+        "set_map_metadata", "set_player_slot", "set_force",
+        "create_region", "update_region", "delete_region"
+    };
+
+    private static readonly HashSet<string> MetadataFields = new(StringComparer.Ordinal)
+    {
+        // These are the metadata fields with a proven Phase 0/3 binary
+        // representation. Other parsed fields remain read-only until their
+        // serializer is proven.
+        "title", "suggested_players"
+    };
+
     public static JsonObject Apply(JsonNode canonical, JsonArray operations)
     {
         if (canonical is not JsonObject root)
@@ -15,6 +34,8 @@ public static class OperationApplier
         var working = root.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Canonical map could not be cloned.");
         var allChanges = new JsonArray();
         var applied = new JsonArray();
+        var operationIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var operationNode in operations)
         {
             if (operationNode is not JsonObject operation)
@@ -22,13 +43,25 @@ public static class OperationApplier
                 throw new EngineException("INVALID_ARGUMENT", "Each operation must be a JSON object.");
             }
 
-            var operationId = RequiredString(operation, "operation_id");
+            var operationId = RequiredOperationId(operation);
+            if (!operationIds.Add(operationId))
+            {
+                throw new EngineException("INVALID_ARGUMENT", $"Operation ID '{operationId}' occurs more than once in the batch.");
+            }
+
             var before = working.DeepClone();
             ApplyOne(working, operation);
-            var changes = SemanticDiff.Compare(before, working, operationId);
-            foreach (var change in changes)
+            var changes = SemanticDiff.CompareCanonical(before, working, operationId);
+            foreach (var change in changes.OfType<JsonObject>())
             {
-                allChanges.Add(change!.DeepClone());
+                change["target"] = (operation["target"] as JsonObject)?.DeepClone();
+                change["provenance"] = "intended_design";
+                if (operation["design_reference"] is not null)
+                {
+                    change["design_reference"] = operation["design_reference"]!.DeepClone();
+                }
+
+                allChanges.Add(change.DeepClone());
             }
 
             applied.Add(operationId);
@@ -53,6 +86,11 @@ public static class OperationApplier
         var expected = operation["expected"];
         var value = operation["value"];
 
+        if (!SupportedTypes.Contains(type))
+        {
+            throw new EngineException("UNSUPPORTED_OPERATION", $"Operation type '{type}' is not enabled for this map. The component needs a proven typed serializer first.");
+        }
+
         switch (type)
         {
             case "set_map_metadata":
@@ -62,7 +100,7 @@ public static class OperationApplier
                 UpdateRegion(root, target, expected, value);
                 break;
             case "create_region":
-                CreateRegion(root, expected, value);
+                CreateRegion(root, target, expected, value);
                 break;
             case "delete_region":
                 DeleteRegion(root, target, expected);
@@ -73,15 +111,19 @@ public static class OperationApplier
             case "set_force":
                 SetForce(root, target, expected, value);
                 break;
-            default:
-                throw new EngineException("UNSUPPORTED_OPERATION", $"Operation type '{type}' is not supported by this engine release.");
         }
     }
 
     private static void SetMetadata(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
+        EnsureAllowed(target, "field");
         var field = RequiredString(target, "field");
-        var metadata = root["metadata"] as JsonArray ?? throw new EngineException("INVALID_JSON", "Canonical map has no metadata array.");
+        if (!MetadataFields.Contains(field))
+        {
+            throw new EngineException("UNSUPPORTED_OPERATION", $"Metadata field '{field}' has no proven typed writer in this release.");
+        }
+
+        var metadata = RequiredArray(root, "metadata");
         var entry = metadata.OfType<JsonObject>().FirstOrDefault(x => string.Equals(x["field"]?.GetValue<string>(), field, StringComparison.Ordinal));
         if (entry is null)
         {
@@ -94,15 +136,25 @@ public static class OperationApplier
             throw new EngineException("INVALID_ARGUMENT", $"Metadata field '{field}' cannot be set to null.");
         }
 
+        if (field == "title" && (value is not JsonValue text || !text.TryGetValue<string>(out var title) || string.IsNullOrWhiteSpace(title)))
+        {
+            throw new EngineException("INVALID_ARGUMENT", "Map title must be a non-empty string.");
+        }
+        if (field == "suggested_players")
+        {
+            ValidateSuggestedPlayers(value);
+        }
+
         entry["value"] = value.DeepClone();
         entry["provenance"] = "intended_design";
-        entry["capability"] = "staged_typed_write";
+        entry["capability"] = "typed_write_enabled";
     }
 
     private static void UpdateRegion(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
+        EnsureAllowed(target, "name");
         var name = RequiredString(target, "name");
-        var regions = root["regions"] as JsonArray ?? throw new EngineException("INVALID_JSON", "Canonical map has no regions array.");
+        var regions = RequiredArray(root, "regions");
         var region = regions.OfType<JsonObject>().FirstOrDefault(x => string.Equals(x["name"]?.GetValue<string>(), name, StringComparison.Ordinal));
         if (region is null)
         {
@@ -114,8 +166,9 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", "update_region requires an object value.");
         }
+        EnsureAllowed(update, "name", "min_x", "min_y", "max_x", "max_y");
 
-        var newName = update["name"]?.GetValue<string>() ?? name;
+        var newName = update["name"] is null ? name : RequiredString(update, "name");
         if (!string.Equals(newName, name, StringComparison.Ordinal))
         {
             throw new EngineException("REGION_RENAME_FORBIDDEN", "Existing region names are immutable; create a new region instead.");
@@ -125,49 +178,61 @@ public static class OperationApplier
         {
             if (update[field] is not null)
             {
-                region[field] = update[field]!.DeepClone();
+                region[field] = FiniteNumber(update[field]!, $"regions.{name}.{field}");
             }
         }
+        ValidateRegionBounds(region, name);
 
         region["provenance"] = "intended_design";
-        region["capability"] = "staged_typed_write";
+        region["capability"] = "typed_write_enabled";
     }
 
-    private static void CreateRegion(JsonObject root, JsonNode? expected, JsonNode? value)
+    private static void CreateRegion(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
-        var regions = root["regions"] as JsonArray ?? throw new EngineException("INVALID_JSON", "Canonical map has no regions array.");
+        EnsureAllowed(target);
+        if (expected is not null)
+        {
+            throw new EngineException("INVALID_ARGUMENT", "create_region does not accept an expected prior value; use update_region for an existing region.");
+        }
+
+        var regions = RequiredArray(root, "regions");
         if (value is not JsonObject region || string.IsNullOrWhiteSpace(region["name"]?.GetValue<string>()))
         {
             throw new EngineException("INVALID_ARGUMENT", "create_region requires a named region object.");
         }
+        EnsureAllowed(region, "name", "min_x", "min_y", "max_x", "max_y", "creation_number", "weather", "ambient_sound");
 
-        var name = region["name"]!.GetValue<string>();
+        var name = RequiredString(region, "name");
         if (regions.OfType<JsonObject>().Any(x => string.Equals(x["name"]?.GetValue<string>(), name, StringComparison.Ordinal)))
         {
             throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' already exists.");
         }
 
-        regions.Add(new JsonObject
+        var created = new JsonObject
         {
             ["name"] = name,
-            ["min_x"] = RequiredNumber(region, "min_x"),
-            ["min_y"] = RequiredNumber(region, "min_y"),
-            ["max_x"] = RequiredNumber(region, "max_x"),
-            ["max_y"] = RequiredNumber(region, "max_y"),
-            ["creation_number"] = region["creation_number"]?.DeepClone() ?? 0,
+            ["min_x"] = FiniteNumber(region["min_x"] ?? throw new EngineException("INVALID_ARGUMENT", "create_region requires min_x."), "regions.min_x"),
+            ["min_y"] = FiniteNumber(region["min_y"] ?? throw new EngineException("INVALID_ARGUMENT", "create_region requires min_y."), "regions.min_y"),
+            ["max_x"] = FiniteNumber(region["max_x"] ?? throw new EngineException("INVALID_ARGUMENT", "create_region requires max_x."), "regions.max_x"),
+            ["max_y"] = FiniteNumber(region["max_y"] ?? throw new EngineException("INVALID_ARGUMENT", "create_region requires max_y."), "regions.max_y"),
+            ["creation_number"] = region["creation_number"] is null ? 0 : RequiredIntValue(region["creation_number"]!, "creation_number", 0, int.MaxValue),
             ["weather"] = region["weather"]?.DeepClone() ?? "none",
             ["ambient_sound"] = region["ambient_sound"]?.DeepClone() ?? string.Empty,
             ["provenance"] = "intended_design",
-            ["capability"] = "staged_typed_write"
-        });
+            ["capability"] = "typed_write_enabled"
+        };
+        if (region["weather"] is not null) RequireStringValue(region["weather"]!, "weather");
+        if (region["ambient_sound"] is not null) RequireStringValue(region["ambient_sound"]!, "ambient_sound");
+        ValidateRegionBounds(created, name);
 
-        _ = expected;
+        regions.Add(created);
     }
 
     private static void DeleteRegion(JsonObject root, JsonObject target, JsonNode? expected)
     {
+        EnsureAllowed(target, "name");
         var name = RequiredString(target, "name");
-        var regions = root["regions"] as JsonArray ?? throw new EngineException("INVALID_JSON", "Canonical map has no regions array.");
+        var regions = RequiredArray(root, "regions");
         var index = regions.IndexOf(regions.OfType<JsonObject>().FirstOrDefault(x => string.Equals(x["name"]?.GetValue<string>(), name, StringComparison.Ordinal)));
         if (index < 0)
         {
@@ -180,9 +245,10 @@ public static class OperationApplier
 
     private static void SetPlayer(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
-        var id = target["id"]?.GetValue<int>() ?? throw new EngineException("INVALID_ARGUMENT", "set_player_slot requires a numeric player id.");
-        var players = root["players"] as JsonArray ?? throw new EngineException("INVALID_JSON", "Canonical map has no players array.");
-        var player = players.OfType<JsonObject>().FirstOrDefault(x => x["id"]?.GetValue<int>() == id);
+        EnsureAllowed(target, "id");
+        var id = RequiredInt(target, "id", 1, 24);
+        var players = RequiredArray(root, "players");
+        var player = players.OfType<JsonObject>().FirstOrDefault(x => IntValue(x["id"]) == id);
         if (player is null)
         {
             throw new EngineException("INVALID_ARGUMENT", $"Player {id} was not found.");
@@ -193,24 +259,27 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", "set_player_slot requires an object value.");
         }
+        EnsureAllowed(update, "controller", "race", "flags", "start");
+        if (update["controller"] is not null) RequireStringValue(update["controller"]!, "controller");
+        if (update["race"] is not null) RequireStringValue(update["race"]!, "race");
+        if (update["flags"] is not null) _ = RequiredIntValue(update["flags"]!, "flags", 0, int.MaxValue);
+        if (update["start"] is not null) ValidateStart(update["start"]!);
 
         foreach (var field in new[] { "controller", "race", "flags", "start" })
         {
-            if (update[field] is not null)
-            {
-                player[field] = update[field]!.DeepClone();
-            }
+            if (update[field] is not null) player[field] = update[field]!.DeepClone();
         }
 
         player["provenance"] = "intended_design";
-        player["capability"] = "staged_typed_write";
+        player["capability"] = "typed_write_enabled";
     }
 
     private static void SetForce(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
-        var index = target["index"]?.GetValue<int>() ?? throw new EngineException("INVALID_ARGUMENT", "set_force requires a numeric force index.");
-        var forces = root["forces"] as JsonArray ?? throw new EngineException("INVALID_JSON", "Canonical map has no forces array.");
-        var force = forces.OfType<JsonObject>().FirstOrDefault(x => x["index"]?.GetValue<int>() == index);
+        EnsureAllowed(target, "index");
+        var index = RequiredInt(target, "index", 0, 23);
+        var forces = RequiredArray(root, "forces");
+        var force = forces.OfType<JsonObject>().FirstOrDefault(x => IntValue(x["index"]) == index);
         if (force is null)
         {
             throw new EngineException("INVALID_ARGUMENT", $"Force {index} was not found.");
@@ -221,17 +290,19 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", "set_force requires an object value.");
         }
+        EnsureAllowed(update, "name", "flags", "player_ids", "player_mask");
+        if (update["name"] is not null) RequireStringValue(update["name"]!, "name");
+        if (update["flags"] is not null) _ = RequiredIntValue(update["flags"]!, "flags", 0, int.MaxValue);
+        if (update["player_mask"] is not null) _ = RequiredIntValue(update["player_mask"]!, "player_mask", int.MinValue, int.MaxValue);
+        if (update["player_ids"] is not null) ValidatePlayerIds(update["player_ids"]!);
 
-        foreach (var field in new[] { "name", "flags", "player_mask", "player_ids" })
+        foreach (var field in new[] { "name", "flags", "player_ids", "player_mask" })
         {
-            if (update[field] is not null)
-            {
-                force[field] = update[field]!.DeepClone();
-            }
+            if (update[field] is not null) force[field] = update[field]!.DeepClone();
         }
 
         force["provenance"] = "intended_design";
-        force["capability"] = "staged_typed_write";
+        force["capability"] = "typed_write_enabled";
     }
 
     private static void EnsureExpected(JsonNode? actual, JsonNode? expected, string field)
@@ -247,11 +318,87 @@ public static class OperationApplier
         }
     }
 
-    private static string RequiredString(JsonObject objectNode, string name) => objectNode[name]?.GetValue<string>() is { Length: > 0 } value
-        ? value
-        : throw new EngineException("INVALID_ARGUMENT", $"Missing required string property '{name}'.");
+    private static void ValidateRegionBounds(JsonObject region, string name)
+    {
+        var minX = FiniteNumber(region["min_x"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires min_x."), $"regions.{name}.min_x").GetValue<double>();
+        var minY = FiniteNumber(region["min_y"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires min_y."), $"regions.{name}.min_y").GetValue<double>();
+        var maxX = FiniteNumber(region["max_x"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires max_x."), $"regions.{name}.max_x").GetValue<double>();
+        var maxY = FiniteNumber(region["max_y"] ?? throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' requires max_y."), $"regions.{name}.max_y").GetValue<double>();
+        if (minX > maxX || minY > maxY)
+        {
+            throw new EngineException("INVALID_ARGUMENT", $"Region '{name}' must have min coordinates no greater than max coordinates.");
+        }
+    }
 
-    private static JsonNode RequiredNumber(JsonObject objectNode, string name) => objectNode[name] is JsonValue value && value.TryGetValue<double>(out var number)
-        ? JsonValue.Create(number)!
-        : throw new EngineException("INVALID_ARGUMENT", $"Missing numeric property '{name}'.");
+    private static JsonArray RequiredArray(JsonObject root, string name) => root[name] as JsonArray
+        ?? throw new EngineException("INVALID_JSON", $"Canonical map has no {name} array.");
+
+    private static string RequiredOperationId(JsonObject operation)
+    {
+        var value = RequiredString(operation, "operation_id");
+        if (!Guid.TryParse(value, out _)) throw new EngineException("INVALID_ARGUMENT", "operation_id must be a UUID.");
+        return value;
+    }
+
+    private static string RequiredString(JsonObject objectNode, string name) => objectNode[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)
+        ? text
+        : throw new EngineException("INVALID_ARGUMENT", $"Missing required non-empty string property '{name}'.");
+
+    private static int RequiredInt(JsonObject objectNode, string name, int minimum, int maximum) => objectNode[name] is not null
+        ? RequiredIntValue(objectNode[name]!, name, minimum, maximum)
+        : throw new EngineException("INVALID_ARGUMENT", $"Missing required integer property '{name}'.");
+
+    private static int RequiredIntValue(JsonNode value, string name, int minimum, int maximum)
+    {
+        if (value is JsonValue json && json.TryGetValue<int>(out var integer) && integer >= minimum && integer <= maximum) return integer;
+        throw new EngineException("INVALID_ARGUMENT", $"Property '{name}' must be an integer between {minimum} and {maximum}.");
+    }
+
+    private static int IntValue(JsonNode? value) => value is JsonValue json && json.TryGetValue<int>(out var integer) ? integer : int.MinValue;
+
+    private static JsonNode FiniteNumber(JsonNode value, string field)
+    {
+        if (value is JsonValue json)
+        {
+            if (json.TryGetValue<double>(out var number) && double.IsFinite(number)) return JsonValue.Create(number)!;
+            if (json.TryGetValue<float>(out var single) && float.IsFinite(single)) return JsonValue.Create((double)single)!;
+            if (json.TryGetValue<int>(out var integer)) return JsonValue.Create((double)integer)!;
+            if (json.TryGetValue<long>(out var longValue)) return JsonValue.Create((double)longValue)!;
+        }
+        throw new EngineException("INVALID_ARGUMENT", $"Property '{field}' must be a finite number.");
+    }
+
+    private static void RequireStringValue(JsonNode value, string field)
+    {
+        if (value is not JsonValue json || !json.TryGetValue<string>(out _)) throw new EngineException("INVALID_ARGUMENT", $"Property '{field}' must be a string.");
+    }
+
+    private static void ValidateSuggestedPlayers(JsonNode value)
+    {
+        if (value is JsonValue json && json.TryGetValue<int>(out var integer) && integer is >= 1 and <= 24) return;
+        if (value is JsonValue text && text.TryGetValue<string>(out var players) && !string.IsNullOrWhiteSpace(players)) return;
+        throw new EngineException("INVALID_ARGUMENT", "suggested_players must be a non-empty string or an integer from 1 through 24.");
+    }
+
+    private static void ValidateStart(JsonNode value)
+    {
+        if (value is not JsonObject start) throw new EngineException("INVALID_ARGUMENT", "Player start must be an object.");
+        EnsureAllowed(start, "x", "y");
+        _ = FiniteNumber(start["x"] ?? throw new EngineException("INVALID_ARGUMENT", "Player start requires x."), "start.x");
+        _ = FiniteNumber(start["y"] ?? throw new EngineException("INVALID_ARGUMENT", "Player start requires y."), "start.y");
+    }
+
+    private static void ValidatePlayerIds(JsonNode value)
+    {
+        if (value is not JsonArray ids) throw new EngineException("INVALID_ARGUMENT", "player_ids must be an array.");
+        var parsed = ids.Select((node, index) => RequiredIntValue(node ?? throw new EngineException("INVALID_ARGUMENT", $"player_ids[{index}] is null."), $"player_ids[{index}]", 1, 24)).ToArray();
+        if (parsed.Length != parsed.Distinct().Count()) throw new EngineException("INVALID_ARGUMENT", "player_ids must contain unique player IDs.");
+    }
+
+    private static void EnsureAllowed(JsonObject objectNode, params string[] allowed)
+    {
+        var permitted = new HashSet<string>(allowed, StringComparer.Ordinal);
+        var unknown = objectNode.Select(property => property.Key).Where(key => !permitted.Contains(key)).ToArray();
+        if (unknown.Length > 0) throw new EngineException("INVALID_ARGUMENT", $"Unsupported typed-operation field(s): {string.Join(", ", unknown)}.");
+    }
 }

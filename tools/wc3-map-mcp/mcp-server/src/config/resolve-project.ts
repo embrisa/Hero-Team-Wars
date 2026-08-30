@@ -1,5 +1,5 @@
 import { existsSync, realpathSync } from "node:fs";
-import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import type { ProjectConfig, Wc3Config } from "./schema.js";
 import { AppError } from "../errors/app-error.js";
 
@@ -88,8 +88,15 @@ export function resolveExistingPath(candidate: string, allowMissing: boolean): s
     throw new AppError("FILE_NOT_FOUND", `Path does not exist: ${candidate}`);
   }
 
-  const parent = resolveExistingPath(join(candidate, ".."), false);
-  return join(parent, candidate.slice(parent.length + 1));
+  let current = resolve(candidate);
+  const missing: string[] = [];
+  while (!existsSync(current)) {
+    const parent = resolve(current, "..");
+    if (parent === current) throw new AppError("FILE_NOT_FOUND", `Path does not exist: ${candidate}`);
+    missing.unshift(basename(current));
+    current = parent;
+  }
+  return join(realpathSync(current), ...missing);
 }
 
 export function sourcePath(project: ResolvedProject, map: string): string {

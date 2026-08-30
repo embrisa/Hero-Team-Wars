@@ -134,16 +134,21 @@ public static class SemanticDiff
             return;
         }
 
-        var component = path.Split('.', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "unknown";
+        var componentPath = path.StartsWith("$.", StringComparison.Ordinal) ? path[2..] : path.TrimStart('$', '.');
+        var separator = componentPath.IndexOfAny(['.', '[']);
+        var component = (separator >= 0 ? componentPath[..separator] : componentPath) is { Length: > 0 } firstComponent
+            ? firstComponent
+            : "unknown";
         changes.Add(new JsonObject
         {
             ["component"] = component,
             ["path"] = path,
             ["before"] = before?.DeepClone(),
             ["after"] = after?.DeepClone(),
-            ["change_type"] = before is null ? "added" : after is null ? "removed" : "updated",
+            ["change_type"] = before is null ? "added" : after is null ? "removed" : "changed",
             ["operation_id"] = operationId,
-            ["provenance"] = "derived"
+            ["provenance"] = "derived",
+            ["target"] = null
         });
     }
 }

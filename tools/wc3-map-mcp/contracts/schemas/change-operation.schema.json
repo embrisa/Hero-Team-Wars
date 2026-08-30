@@ -8,6 +8,7 @@
     "operation_id": { "type": "string", "format": "uuid" },
     "type": { "type": "string", "enum": ["set_map_metadata", "update_region", "create_region", "delete_region", "set_player_slot", "set_force", "place_unit", "move_unit", "remove_placed_unit", "set_object_data", "set_script_source"] },
     "target": { "type": "object", "additionalProperties": true },
+    "expected_revision": { "type": "integer", "minimum": 0 },
     "expected": {},
     "value": {},
     "rationale": { "type": "string", "minLength": 1 },

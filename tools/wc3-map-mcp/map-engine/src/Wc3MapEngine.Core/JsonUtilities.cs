@@ -43,8 +43,46 @@ public static class JsonUtilities
         }
     }
 
-    public static bool Equal(JsonNode? left, JsonNode? right) =>
-        string.Equals(left?.ToJsonString(EngineProtocol.JsonOptions), right?.ToJsonString(EngineProtocol.JsonOptions), StringComparison.Ordinal);
+    public static bool Equal(JsonNode? left, JsonNode? right)
+    {
+        if (ReferenceEquals(left, right)) return true;
+        if (left is null || right is null) return false;
+        if (left is JsonObject leftObject && right is JsonObject rightObject)
+        {
+            if (leftObject.Count != rightObject.Count) return false;
+            foreach (var property in leftObject)
+            {
+                if (!rightObject.TryGetPropertyValue(property.Key, out var rightNode) || !Equal(property.Value, rightNode)) return false;
+            }
+
+            return true;
+        }
+
+        if (left is JsonArray leftArray && right is JsonArray rightArray)
+        {
+            return leftArray.Count == rightArray.Count && leftArray.Zip(rightArray).All(pair => Equal(pair.First, pair.Second));
+        }
+
+        if (left is JsonValue leftValue && right is JsonValue rightValue)
+        {
+            if (leftValue.TryGetValue<double>(out var leftNumber) && rightValue.TryGetValue<double>(out var rightNumber))
+            {
+                return leftNumber.Equals(rightNumber);
+            }
+
+            if (leftValue.TryGetValue<bool>(out var leftBoolean) && rightValue.TryGetValue<bool>(out var rightBoolean))
+            {
+                return leftBoolean == rightBoolean;
+            }
+
+            if (leftValue.TryGetValue<string>(out var leftString) && rightValue.TryGetValue<string>(out var rightString))
+            {
+                return string.Equals(leftString, rightString, StringComparison.Ordinal);
+            }
+        }
+
+        return string.Equals(left.ToJsonString(EngineProtocol.JsonOptions), right.ToJsonString(EngineProtocol.JsonOptions), StringComparison.Ordinal);
+    }
 
     public static JsonNode? Clone(JsonNode? value) => value?.DeepClone();
 }

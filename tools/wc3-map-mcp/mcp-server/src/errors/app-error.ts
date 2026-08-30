@@ -18,6 +18,7 @@ export type ErrorCode =
   | "LAUNCH_FAILED"
   | "PROMOTION_FAILED"
   | "DISCARD_FAILED"
+  | "OUTPUT_EXISTS"
   | "INTERNAL_ERROR";
 
 export class AppError extends Error {

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
@@ -109,6 +109,28 @@ describe("MCP transaction and build workflow", () => {
     }
   });
 
+  it("rejects a source hash mismatch before creating a staging directory", async () => {
+    const before = sourceHash();
+    const transactionRoot = join(projectRoot, "tools/wc3-map-mcp/snapshots/transactions");
+    const existingTransactions = new Set(existsSync(transactionRoot)
+      ? readdirSync(transactionRoot, { withFileTypes: true }).filter(entry => entry.isDirectory() && /^[0-9a-f-]{36}$/i.test(entry.name)).map(entry => entry.name)
+      : []);
+    client = new McpClient();
+    await client.initialize();
+
+    const result = await client.call("wc3_begin_transaction", {
+      project_id: "hero-team-wars",
+      map: "map/HeroTeamWars_M0_2Arena.w3m",
+      expected_source_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+    });
+
+    expect(result.structuredContent.ok).toBe(false);
+    expect(result.structuredContent.error.code).toBe("SOURCE_CHANGED");
+    expect(sourceHash()).toBe(before);
+    const afterTransactions = new Set(readdirSync(transactionRoot, { withFileTypes: true }).filter(entry => entry.isDirectory() && /^[0-9a-f-]{36}$/i.test(entry.name)).map(entry => entry.name));
+    expect(afterTransactions).toEqual(existingTransactions);
+  }, 120_000);
+
   it("stages, diffs, validates, builds, and rehashes a changed copy", async () => {
     const before = sourceHash();
     client = new McpClient();
@@ -138,6 +160,13 @@ describe("MCP transaction and build workflow", () => {
     expect(apply.structuredContent.ok).toBe(true);
     expect(apply.structuredContent.data.revision).toBe(1);
     expect(apply.structuredContent.data.diff.changes.length).toBeGreaterThan(0);
+    expect(apply.structuredContent.data.diff.changes[0]).toEqual(expect.objectContaining({
+      component: "metadata",
+      operation_id: expect.any(String),
+      provenance: "intended_design",
+      target: { field: "title" },
+      change_type: "changed"
+    }));
 
     const diff = await client.call("wc3_transaction_diff", { project_id: "hero-team-wars", transaction_id: transactionId });
     expect(diff.structuredContent.ok).toBe(true);
@@ -156,6 +185,69 @@ describe("MCP transaction and build workflow", () => {
     const report = await client.call("wc3_build_report", { project_id: "hero-team-wars", build_id: buildId });
     expect(report.structuredContent.ok).toBe(true);
     expect(report.structuredContent.data.verified).toBe(true);
+    expect(sourceHash()).toBe(before);
+  }, 120_000);
+
+  it("keeps failed batches and dry runs at the previous revision", async () => {
+    const before = sourceHash();
+    client = new McpClient();
+    await client.initialize();
+    const begin = await client.call("wc3_begin_transaction", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", expected_source_hash: before, label: "atomicity" });
+    expect(begin.structuredContent.ok).toBe(true);
+    transactionId = begin.structuredContent.data.transaction_id as string;
+    const transactionRoot = join(projectRoot, "tools/wc3-map-mcp/snapshots/transactions", transactionId);
+    const canonicalPath = join(transactionRoot, "working/canonical-map.json");
+    const initialCanonical = readFileSync(canonicalPath, "utf8");
+
+    const dryRun = await client.call("wc3_apply_operations", {
+      project_id: "hero-team-wars",
+      transaction_id: transactionId,
+      expected_revision: 0,
+      dry_run: true,
+      operations: [operation("set_map_metadata", { field: "title" }, "Hero Team Wars - Two Arena MVP", "Dry run title")]
+    });
+    expect(dryRun.structuredContent.ok).toBe(true);
+    expect(dryRun.structuredContent.data.revision).toBe(0);
+    expect(readFileSync(canonicalPath, "utf8")).toBe(initialCanonical);
+    expect(existsSync(join(transactionRoot, "revisions/0001-after-operations.json"))).toBe(false);
+
+    const failed = await client.call("wc3_apply_operations", {
+      project_id: "hero-team-wars",
+      transaction_id: transactionId,
+      expected_revision: 0,
+      operations: [
+        operation("set_map_metadata", { field: "title" }, "Hero Team Wars - Two Arena MVP", "Must roll back"),
+        operation("update_region", { name: "not-present" }, { name: "not-present" }, { min_x: 1 })
+      ]
+    });
+    expect(failed.structuredContent.ok).toBe(false);
+    expect(failed.structuredContent.error.code).toBe("INVALID_ARGUMENT");
+    expect(readFileSync(canonicalPath, "utf8")).toBe(initialCanonical);
+    expect(existsSync(join(transactionRoot, "revisions/0001-after-operations.json"))).toBe(false);
+
+    const stale = await client.call("wc3_apply_operations", {
+      project_id: "hero-team-wars",
+      transaction_id: transactionId,
+      expected_revision: 1,
+      operations: [operation("set_map_metadata", { field: "title" }, "Hero Team Wars - Two Arena MVP", "Stale request")]
+    });
+    expect(stale.structuredContent.ok).toBe(false);
+    expect(stale.structuredContent.error.code).toBe("PRECONDITION_FAILED");
+    expect(sourceHash()).toBe(before);
+  }, 120_000);
+
+  it("discards only a confirmed transaction and leaves the source unchanged", async () => {
+    const before = sourceHash();
+    client = new McpClient();
+    await client.initialize();
+    const begin = await client.call("wc3_begin_transaction", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", expected_source_hash: before });
+    transactionId = begin.structuredContent.data.transaction_id as string;
+    const discarded = await client.call("wc3_discard_transaction", { project_id: "hero-team-wars", transaction_id: transactionId, expected_source_hash: before, confirmation: true });
+
+    expect(discarded.structuredContent.ok).toBe(true);
+    expect(discarded.structuredContent.data.discarded).toBe(true);
+    expect(existsSync(join(projectRoot, "tools/wc3-map-mcp/snapshots/transactions", transactionId))).toBe(false);
+    expect(JSON.parse(readFileSync(join(projectRoot, "tools/wc3-map-mcp/artifacts/audit", `discard-${transactionId}.json`), "utf8")).status).toBe("discarded");
     expect(sourceHash()).toBe(before);
   }, 120_000);
 });
