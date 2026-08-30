@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Wc3MapEngine.Core.Scripts;
@@ -147,7 +148,7 @@ public static class ValidationPipeline
         }
         catch (Exception exception)
         {
-            Add(findings, "warning", "OPAQUE_VALIDATION_LIMIT", "archive", null, $"Script/WTS checks could not be completed: {exception.Message}", "Keep script and trigger members editor-owned until a copied-map round trip proves them.");
+            Add(findings, "warning", "OPAQUE_VALIDATION_LIMIT", "archive", null, $"Script/WTS checks could not be completed: {exception.Message}", "Keep MCP-owned source unchanged until the script and trigger members can be inspected safely.");
         }
 
         if (context?["project_id"]?.GetValue<string>() == "hero-team-wars")
@@ -165,6 +166,7 @@ public static class ValidationPipeline
         ValidateRegions(root["regions"] as JsonArray, findings, bounds, context);
         ValidateRawcodes(root, findings);
         ValidateImports(root, findings);
+        ValidateScriptEntries(root["scripts"] as JsonArray, findings);
 
         if (root["opaque_members"] is not JsonArray && root["archive_members"] is not JsonArray)
         {
@@ -212,6 +214,8 @@ public static class ValidationPipeline
             }
         }
 
+        ValidateBuildableScripts(source, staged, findings);
+
         var sourceClone = source.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Could not clone source canonical map.");
         var stagedClone = staged.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Could not clone staged canonical map.");
         sourceClone.Remove("source");
@@ -220,6 +224,8 @@ public static class ValidationPipeline
         stagedClone.Remove("metadata");
         sourceClone.Remove("regions");
         stagedClone.Remove("regions");
+        sourceClone.Remove("scripts");
+        stagedClone.Remove("scripts");
         sourceClone.Remove("archive_members");
         stagedClone.Remove("archive_members");
         sourceClone.Remove("capabilities");
@@ -533,28 +539,28 @@ public static class ValidationPipeline
         var scripts = archive.Members.Where(x => x.Path.Equals("war3map.j", StringComparison.OrdinalIgnoreCase) || x.Path.Equals("war3map.lua", StringComparison.OrdinalIgnoreCase)).ToList();
         if (scripts.Count > 1)
         {
-            Add(findings, "error", "SCRIPT_ENTRY_AMBIGUOUS", "scripts", null, "The archive contains both JASS and Lua entry-point members.", "Keep exactly one script language and let World Editor own generated script output.");
+            Add(findings, "error", "SCRIPT_ENTRY_AMBIGUOUS", "scripts", null, "The archive contains both JASS and Lua entry-point members.", "Keep exactly one map script language and use the existing war3map.j JASS entry point.");
         }
         else if (scripts.Count == 0 && archive.Find("war3map.wtg") is not null)
         {
-            Add(findings, "warning", "SCRIPT_ENTRY_MISSING", "scripts", "war3map.j", "GUI trigger data exists but no generated script entry was found.", "Open/save a copied map in World Editor before treating the build as runnable.");
+            Add(findings, "warning", "SCRIPT_ENTRY_MISSING", "scripts", "war3map.j", "GUI trigger data exists but no generated script entry was found.", "Provide a generated war3map.j entry point before enabling MCP-owned gameplay source.");
         }
 
         foreach (var script in scripts)
         {
             if (!ScriptOwnership.HasEntryPoint(script.Path, script.Bytes))
             {
-                Add(findings, "warning", "SCRIPT_ENTRY_MISSING", "scripts", script.Path, "The opaque script member does not expose a recognizable main entry point.", "Keep script mutation disabled and verify the copied build in World Editor.");
+                Add(findings, "warning", "SCRIPT_ENTRY_MISSING", "scripts", script.Path, "The script member does not expose a recognizable main entry point.", "Add a valid main entry point before enabling MCP-owned gameplay source.");
             }
         }
 
         if (archive.Find("war3map.wtg") is not null && archive.Find("war3map.wct") is not null && scripts.Count > 0)
         {
-            Add(findings, "info", "SCRIPT_CONNECTION_OPAQUE", "scripts", scripts[0].Path, "GUI/custom-text-to-generated-script connection is preserved but not semantically proven.", "Record editor-open and game-load evidence for the exact build.");
+            Add(findings, "info", "SCRIPT_CONNECTION_OPAQUE", "scripts", scripts[0].Path, "GUI/custom-text members are preserved but are not synchronized with MCP-owned JASS source.", "Treat war3map.j as authoritative and avoid saving the generated trigger source over MCP-owned gameplay code.");
         }
         else if ((archive.Find("war3map.wtg") is not null || archive.Find("war3map.wct") is not null) && scripts.Count == 0)
         {
-            Add(findings, "warning", "SCRIPT_SOURCE_DISCONNECTED", "scripts", null, "Trigger source members exist without a generated script entry.", "Open/save a copied map in World Editor to reconnect generated script output.");
+            Add(findings, "warning", "SCRIPT_SOURCE_DISCONNECTED", "scripts", null, "Trigger source members exist without a generated script entry.", "Provide war3map.j or keep MCP-owned script mutation disabled.");
         }
 
         var wts = archive.Find("war3map.wts");
@@ -582,6 +588,110 @@ public static class ValidationPipeline
                 Add(findings, "error", "WTS_REFERENCE_MISSING", "strings", token, "A decoded metadata field references a missing trigger string.", "Restore the referenced WTS entry or write a literal value through a typed serializer.");
             }
         }
+    }
+
+    private static void ValidateScriptEntries(JsonArray? scripts, JsonArray findings)
+    {
+        if (scripts is null)
+        {
+            Add(findings, "error", "SCRIPTS_MISSING", "scripts", null, "Canonical map scripts are unavailable.", "Regenerate the canonical map from the source archive.");
+            return;
+        }
+
+        foreach (var node in scripts)
+        {
+            if (node is not JsonObject script)
+            {
+                Add(findings, "error", "SCRIPT_INVALID", "scripts", null, "Every script entry must be an object.", "Regenerate the canonical map from the source archive.");
+                continue;
+            }
+
+            var archivePath = StringValue(script["archive_path"]);
+            var sourceText = StringValue(script["source"]);
+            if (sourceText is null)
+            {
+                continue;
+            }
+
+            if (!string.Equals(archivePath, "war3map.j", StringComparison.OrdinalIgnoreCase))
+            {
+                Add(findings, "error", "SCRIPT_MEMBER_UNSUPPORTED", "scripts", archivePath, "Only the existing war3map.j member can be MCP-owned gameplay source.", "Use a JASS war3map.j entry point.");
+                continue;
+            }
+
+            try
+            {
+                ScriptOwnership.ValidateMcpOwnedJass(archivePath ?? string.Empty, sourceText);
+            }
+            catch (InvalidDataException exception)
+            {
+                Add(findings, "error", "SCRIPT_PARSE_FAILED", "scripts", archivePath, exception.Message, "Fix the JASS source and rerun transaction validation.");
+                continue;
+            }
+
+            var hash = Hashing.Sha256(Encoding.UTF8.GetBytes(sourceText));
+            if (!string.Equals(StringValue(script["source_sha256"]), hash, StringComparison.OrdinalIgnoreCase))
+            {
+                Add(findings, "error", "SCRIPT_HASH_MISMATCH", "scripts", archivePath, "The staged source hash does not match its source text.", "Use the exact UTF-8 source hash produced by the MCP operation.");
+            }
+        }
+    }
+
+    private static void ValidateBuildableScripts(JsonObject source, JsonObject staged, JsonArray findings)
+    {
+        var sourceScripts = Scripts(source);
+        var stagedScripts = Scripts(staged);
+        if (sourceScripts.Count != stagedScripts.Count)
+        {
+            Add(findings, "error", "BUILD_SCRIPT_IDENTITY_CHANGED", "scripts", null, "Adding or removing script entry points is not supported.", "Replace the existing war3map.j member only.");
+            return;
+        }
+
+        for (var index = 0; index < sourceScripts.Count; index++)
+        {
+            var before = sourceScripts[index];
+            var after = stagedScripts[index];
+            var archivePath = StringValue(before["archive_path"]) ?? string.Empty;
+            if (!string.Equals(archivePath, StringValue(after["archive_path"]), StringComparison.OrdinalIgnoreCase))
+            {
+                Add(findings, "error", "BUILD_SCRIPT_IDENTITY_CHANGED", "scripts", archivePath, "Script entry-point identity is immutable.", "Keep the existing war3map.j archive path.");
+                continue;
+            }
+
+            if (!ScriptIdentityEqual(before, after))
+            {
+                Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "scripts", archivePath, "Script metadata changed without a supported source replacement.", "Change gameplay through set_script_source with an exact expected hash.");
+            }
+
+            var stagedSource = StringValue(after["source"]);
+            if (stagedSource is null)
+            {
+                if (!string.Equals(StringValue(before["source_sha256"]), StringValue(after["source_sha256"]), StringComparison.OrdinalIgnoreCase))
+                {
+                    Add(findings, "error", "BUILD_SCRIPT_SOURCE_MISSING", "scripts", archivePath, "The staged script hash changed without carrying the staged source text.", "Use set_script_source to provide the complete JASS source.");
+                }
+
+                continue;
+            }
+
+            if (!archivePath.Equals("war3map.j", StringComparison.OrdinalIgnoreCase))
+            {
+                Add(findings, "error", "BUILD_SCRIPT_MEMBER_UNSUPPORTED", "scripts", archivePath, "Only war3map.j is enabled for MCP-owned gameplay source.", "Use the map's JASS entry point.");
+            }
+        }
+    }
+
+    private static bool ScriptIdentityEqual(JsonObject before, JsonObject after)
+    {
+        var left = before.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Script entry could not be cloned.");
+        var right = after.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Script entry could not be cloned.");
+        foreach (var property in new[] { "source", "source_sha256", "sha256", "size_bytes", "capability", "provenance" })
+        {
+            left.Remove(property);
+            right.Remove(property);
+        }
+
+        return JsonUtilities.Equal(left, right);
     }
 
     private static void ValidateHtwInvariants(JsonObject inspection, JsonArray findings, JsonObject context)
@@ -618,6 +728,9 @@ public static class ValidationPipeline
 
     private static List<JsonObject> Regions(JsonObject root)
         => root["regions"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
+
+    private static List<JsonObject> Scripts(JsonObject root)
+        => root["scripts"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
 
     private static string RegionName(JsonObject region) => StringValue(region["name"]) ?? string.Empty;
 

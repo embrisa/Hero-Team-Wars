@@ -24,10 +24,12 @@
         "wc3_inspect_map",
         "wc3_list_archive_files",
         "wc3_get_component",
+        "wc3_get_script_source",
         "wc3_validate_map",
         "wc3_compare_maps"
       ],
       "write_policy": "read_only",
+      "script_policy": "disabled",
       "max_map_bytes": 536870912,
       "max_operation_count": 100
     }

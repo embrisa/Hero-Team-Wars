@@ -25,7 +25,7 @@ writeFileSync(configPath, JSON.stringify({
       build_root: "builds/mcp",
       log_root: "tools/wc3-map-mcp/logs",
       test_output_root: "tools/wc3-map-mcp/artifacts/tests",
-      enabled_tools: [], write_policy: "writes", max_map_bytes: 536870912, max_operation_count: 100
+      enabled_tools: [], write_policy: "writes", script_policy: "mcp_owned_jass", max_map_bytes: 536870912, max_operation_count: 100
     }
   }
 }, null, 2), "utf8");
@@ -185,6 +185,50 @@ describe("MCP transaction and build workflow", () => {
     const report = await client.call("wc3_build_report", { project_id: "hero-team-wars", build_id: buildId });
     expect(report.structuredContent.ok).toBe(true);
     expect(report.structuredContent.data.verified).toBe(true);
+    expect(sourceHash()).toBe(before);
+  }, 120_000);
+
+  it("reads, stages, validates, and builds MCP-owned JASS source", async () => {
+    const before = sourceHash();
+    client = new McpClient();
+    await client.initialize();
+
+    const source = await client.call("wc3_get_script_source", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", archive_path: "war3map.j" });
+    expect(source.structuredContent.ok).toBe(true);
+    expect(source.structuredContent.data.language).toBe("jass");
+    expect(source.structuredContent.data.sha256).toMatch(/^[0-9A-F]{64}$/);
+    const updatedSource = `${source.structuredContent.data.source}\n// MCP-owned JASS integration test.\n`;
+
+    const begin = await client.call("wc3_begin_transaction", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", expected_source_hash: before, label: "jass-source" });
+    expect(begin.structuredContent.ok).toBe(true);
+    transactionId = begin.structuredContent.data.transaction_id as string;
+
+    const apply = await client.call("wc3_apply_operations", {
+      project_id: "hero-team-wars",
+      transaction_id: transactionId,
+      expected_revision: 0,
+      operations: [{
+        operation_id: randomUUID(),
+        type: "set_script_source",
+        target: { archive_path: "war3map.j" },
+        expected: source.structuredContent.data.sha256,
+        value: { language: "jass", source: updatedSource },
+        rationale: "Verify MCP-owned gameplay source replacement."
+      }]
+    });
+    expect(apply.structuredContent.ok).toBe(true);
+    expect(apply.structuredContent.data.diff.changes).toEqual(expect.arrayContaining([expect.objectContaining({ component: "scripts" })]));
+
+    const validation = await client.call("wc3_validate_transaction", { project_id: "hero-team-wars", transaction_id: transactionId, revision: 1 });
+    expect(validation.structuredContent.ok).toBe(true);
+    expect(validation.structuredContent.data.report.buildable).toBe(true);
+
+    const build = await client.call("wc3_build_map", { project_id: "hero-team-wars", transaction_id: transactionId, revision: 1, expected_source_hash: before, profile: "debug", label: "jass-source" });
+    expect(build.structuredContent.ok).toBe(true);
+    buildId = build.structuredContent.data.build.build_id as string;
+    const rebuilt = await client.call("wc3_get_script_source", { project_id: "hero-team-wars", map: build.structuredContent.data.build.output_path, archive_path: "war3map.j" });
+    expect(rebuilt.structuredContent.ok).toBe(true);
+    expect(rebuilt.structuredContent.data.source).toBe(updatedSource);
     expect(sourceHash()).toBe(before);
   }, 120_000);
 

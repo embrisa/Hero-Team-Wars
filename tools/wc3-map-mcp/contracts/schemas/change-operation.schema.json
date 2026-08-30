@@ -14,5 +14,33 @@
     "rationale": { "type": "string", "minLength": 1 },
     "design_reference": { "type": "string", "pattern": "^HTW-[0-9]{2}$" }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "set_script_source" } } },
+      "then": {
+        "required": ["expected", "value"],
+        "properties": {
+          "target": {
+            "type": "object",
+            "required": ["archive_path"],
+            "properties": { "archive_path": { "const": "war3map.j" } },
+            "additionalProperties": false
+          },
+          "expected": {
+            "oneOf": [
+              { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+              { "type": "object", "required": ["sha256"], "properties": { "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" } }, "additionalProperties": false }
+            ]
+          },
+          "value": {
+            "type": "object",
+            "required": ["language", "source"],
+            "properties": { "language": { "type": "string", "pattern": "^[jJ][aA][sS][sS]$" }, "source": { "type": "string", "minLength": 1, "maxLength": 16777216 } },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ]
 }

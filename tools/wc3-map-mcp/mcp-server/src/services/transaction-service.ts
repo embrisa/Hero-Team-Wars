@@ -77,6 +77,9 @@ export class TransactionService {
     this.projects.assertMutationAllowed(projectId, "wc3_apply_operations");
     const project = this.projects.project(projectId);
     const parsedOperations = parseOperations(operations, project.config.max_operation_count, expectedRevision);
+    if (parsedOperations.some(operation => operation.type === "set_script_source")) {
+      this.projects.assertScriptMutationAllowed(projectId);
+    }
     return withProjectLock(project, "apply_operations", async () => {
       const loaded = this.store.read(project, transactionId);
       this.assertActive(loaded.manifest);

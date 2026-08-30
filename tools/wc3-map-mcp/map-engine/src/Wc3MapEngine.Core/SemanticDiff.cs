@@ -20,7 +20,6 @@ public static class SemanticDiff
         // metadata. Until a parser exposes their actual values, a changed
         // member hash is an archive observation rather than a semantic claim.
         "triggers",
-        "scripts",
         "variables",
         "object_data",
         "placed_objects",
@@ -46,7 +45,10 @@ public static class SemanticDiff
         "warnings",
         "error",
         "reason",
-        "detail"
+        "detail",
+        // The full staged script source is carried in a transaction revision
+        // for the builder, while source_sha256 remains in the semantic diff.
+        "source"
     };
 
     public static JsonArray Compare(JsonNode? before, JsonNode? after, string operationId = "")

@@ -17,7 +17,7 @@ export function registerTransactionTools(server: McpServer, transactions: Transa
   });
 
   if (enabled("wc3_apply_operations")) registerTool("wc3_apply_operations", {
-    description: "Apply one bounded batch of typed semantic operations atomically to a transaction revision. A stale expected revision or any failed operation leaves the previous state intact; use dry_run for review.",
+    description: "Apply one bounded batch of typed semantic operations atomically to a transaction revision. A stale expected revision or any failed operation leaves the previous state intact; set_script_source requires project script_policy=mcp_owned_jass, a current war3map.j hash, and statically valid JASS. Use dry_run for review.",
     inputSchema: schemas.applyOperationsSchema as never,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
   }, async (input: any) => {

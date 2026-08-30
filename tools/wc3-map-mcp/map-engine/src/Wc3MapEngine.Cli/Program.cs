@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Wc3MapEngine.Contracts;
 using Wc3MapEngine.Core;
+using Wc3MapEngine.Core.Scripts;
 
 namespace Wc3MapEngine.Cli;
 
@@ -81,6 +82,7 @@ internal static class Program
                 "environment_status" => EnvironmentStatus(request.Payload),
                 "hash_file" => HashFile(request.Payload),
                 "list_archive_members" => ListArchiveMembers(request.Payload),
+                "read_script_source" => ReadScriptSource(request.Payload),
                 "probe_map" => ProbeMap(request.Payload),
                 "inspect_map" => InspectMap(request.Payload),
                 "validate_map" => Validate(request.Payload),
@@ -191,6 +193,44 @@ internal static class Program
                 ["warnings"] = capabilities[member.Path]["warnings"]?.DeepClone() ?? new JsonArray(),
                 ["error"] = capabilities[member.Path]["error"]?.DeepClone()
             }).ToArray())
+        };
+    }
+
+    private static JsonObject ReadScriptSource(JsonObject payload)
+    {
+        var mapPath = RequiredPath(payload, "map_path");
+        var archivePath = payload["archive_path"]?.GetValue<string>() ?? "war3map.j";
+        if (!archivePath.Equals("war3map.j", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new EngineException("UNSUPPORTED_OPERATION", "Only the map's JASS entry point war3map.j can be read as MCP-owned gameplay source.");
+        }
+
+        var archive = MapArchive.Read(mapPath);
+        var member = archive.Find(archivePath) ?? throw new EngineException("FILE_NOT_FOUND", $"The script member '{archivePath}' was not found in the map archive.");
+        if (member.Bytes.Length > ScriptOwnership.MaxSourceBytes)
+        {
+            throw new EngineException("INVALID_ARGUMENT", $"The script member exceeds the {ScriptOwnership.MaxSourceBytes} byte safety limit.");
+        }
+
+        string source;
+        try
+        {
+            source = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(member.Bytes);
+        }
+        catch (Exception exception)
+        {
+            throw new EngineException("PARSE_FAILED", $"The script member '{archivePath}' is not valid UTF-8.", false, exception);
+        }
+
+        return new JsonObject
+        {
+            ["map_path"] = mapPath,
+            ["map_sha256"] = Hashing.Sha256(File.ReadAllBytes(mapPath)),
+            ["archive_path"] = member.Path,
+            ["language"] = "jass",
+            ["size_bytes"] = member.Bytes.Length,
+            ["sha256"] = member.Sha256,
+            ["source"] = source
         };
     }
 

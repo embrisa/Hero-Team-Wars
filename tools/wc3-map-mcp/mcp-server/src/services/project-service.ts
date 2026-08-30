@@ -35,6 +35,17 @@ export class ProjectService {
     this.assertToolAvailable(projectId, toolName);
   }
 
+  public assertScriptMutationAllowed(projectId: string): void {
+    const project = this.project(projectId);
+    this.assertMutationAllowed(projectId, "wc3_apply_operations");
+    if (project.config.script_policy !== "mcp_owned_jass") {
+      throw new AppError("SCRIPT_MUTATION_DISABLED", "MCP-owned JASS mutation is disabled for this project. Set script_policy to 'mcp_owned_jass' in the writes-enabled local configuration after reviewing ADR 0002.", false, {
+        project_id: projectId,
+        script_policy: project.config.script_policy
+      });
+    }
+  }
+
   public source(projectId: string, map: string): string {
     return this.assertReadableMap(this.project(projectId), sourcePath(this.project(projectId), map), map);
   }
@@ -63,7 +74,7 @@ export class ProjectService {
     const engine = await this.worker.request<Record<string, unknown>>("environment_status", { configured_files: configuredFiles });
     const expectedHash = project.config.baseline_sha256?.toUpperCase();
     const actualHash = sourceHash?.sha256.toUpperCase();
-    const readOnlyTools = ["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_validate_map", "wc3_compare_maps"];
+    const readOnlyTools = ["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps"];
     const transactionTools = ["wc3_begin_transaction", "wc3_apply_operations", "wc3_transaction_diff", "wc3_validate_transaction", "wc3_discard_transaction"];
     const laterTools = ["wc3_build_map", "wc3_build_report", "wc3_launch_editor", "wc3_launch_test_map", "wc3_record_test_result", "wc3_get_test_session", "wc3_promote_build"];
     const enabledTools = project.config.enabled_tools.length > 0
@@ -79,10 +90,10 @@ export class ProjectService {
       server: { name: "wc3-map-mcp", version: "0.1.0", runtime: `Node.js ${process.version}` },
       engine,
       configured: (engine.configured_files as Record<string, unknown> | undefined) ?? {},
-      capability_summary: { inspection: "enabled", comparison: "enabled", validation: project.config.write_policy === "read_only" ? "read_only" : "transactional", mutation: project.config.write_policy === "read_only" ? "disabled" : "typed_write_enabled", build: project.config.write_policy === "read_only" ? "disabled" : "available_after_validation", launch: project.config.write_policy === "read_only" ? "disabled" : "approval_gated", deletion: project.config.write_policy === "read_only" ? "disabled" : "confirmed_transaction_only" },
+      capability_summary: { inspection: "enabled", comparison: "enabled", validation: project.config.write_policy === "read_only" ? "read_only" : "transactional", mutation: project.config.write_policy === "read_only" ? "disabled" : "typed_write_enabled", script_source: project.config.write_policy === "read_only" ? "disabled" : project.config.script_policy, build: project.config.write_policy === "read_only" ? "disabled" : "available_after_validation", launch: project.config.write_policy === "read_only" ? "disabled" : "approval_gated", deletion: project.config.write_policy === "read_only" ? "disabled" : "confirmed_transaction_only" },
       enabled_tools: enabledTools.filter(tool => (project.config.write_policy !== "read_only" || readOnlyTools.includes(tool))),
       disabled_tools: [...transactionTools, ...laterTools].filter(tool => !enabledTools.includes(tool)),
-      disabled_until_evidence: ["script_source_mutation", "generic_archive_patch", "autonomous_promotion"],
+      disabled_until_evidence: [...(project.config.script_policy === "disabled" ? ["script_source_mutation"] : []), "generic_archive_patch", "autonomous_promotion"],
       roots: { staging: relativeProjectPath(project, project.stagingRoot), artifacts: relativeProjectPath(project, project.artifactRoot), builds: relativeProjectPath(project, project.buildRoot) }
     };
   }

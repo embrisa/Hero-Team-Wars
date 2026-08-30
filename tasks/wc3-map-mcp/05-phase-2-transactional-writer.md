@@ -94,7 +94,7 @@ Target operations, enabled only with compatibility proof:
 - `create_region`, `update_region`, `delete_region`;
 - `place_unit`, `move_unit`, `remove_placed_unit`;
 - one narrow object-data operation;
-- `set_script_source` only after a tested script-ownership decision.
+- `set_script_source` for the existing `war3map.j` entry point, after an exact expected hash, MCP-owned JASS policy, static parse, and copied-map round-trip check.
 
 Do not expose generic archive patching, arbitrary writes, raw shell, or untyped object fields.
 
@@ -127,7 +127,7 @@ Handoff states, schemas, enabled/disabled operations, storage/locking behavior, 
 
 - The TypeScript transaction service now stages and inspects an isolated source copy, rechecks the original and staged hashes, records server/engine/schema/protocol/dependency versions, and exposes begin/apply/diff/validate/discard tools only when project write policy permits them.
 - The transaction store uses UUID-owned directories under the configured staging root, same-directory atomic temporary files, canonical/revision hashes, manifest state transitions, exact-parent and symlink/junction checks, bounded lock waiting, and audit tombstones for confirmed discard.
-- The .NET engine applies six typed operations with clone-before-apply semantics and explicit expected-value preconditions: selected map metadata, player slots, forces, and region create/update/delete. Opaque unit placement, object-data, and script operations remain schema-recognized but return `UNSUPPORTED_OPERATION` until their binary ownership and round-trip behavior are proven.
+- The .NET engine applies seven typed operations with clone-before-apply semantics and explicit expected-value preconditions: selected map metadata, player slots, forces, region create/update/delete, and hash-checked MCP-owned JASS source replacement for `war3map.j`. Opaque unit placement and object-data operations remain schema-recognized but return `UNSUPPORTED_OPERATION` until their binary ownership and round-trip behavior are proven.
 - Semantic diffs are grouped by component and target, preserve before/after values, operation IDs, and provenance, and exclude parser/container observations from gameplay semantic claims. Canonical validation checks schema, metadata, player slots, forces, region identity, and finite ordered bounds.
 - A copied Hero Team Wars source was staged, dry-run, changed, diffed, validated, built through the existing Phase 3 no-op profile, and rehashed in the integration suite. Failed batches and stale revisions were rejected without changing the prior revision; a confirmed discard removed only the exact transaction directory and retained its audit tombstone. The source map was unchanged.
 

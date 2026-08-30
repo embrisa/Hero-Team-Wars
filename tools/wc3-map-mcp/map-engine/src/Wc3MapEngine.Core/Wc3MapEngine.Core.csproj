@@ -7,5 +7,6 @@
     <ProjectReference Include="..\Wc3MapEngine.Contracts\Wc3MapEngine.Contracts.csproj" />
     <PackageReference Include="War3Net.IO.Mpq" Version="6.0.3" />
     <PackageReference Include="War3Net.Build.Core" Version="6.0.3" />
+    <PackageReference Include="War3Net.CodeAnalysis.Jass" Version="6.0.2" />
   </ItemGroup>
 </Project>

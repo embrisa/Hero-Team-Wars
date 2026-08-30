@@ -20,7 +20,7 @@ The exact set varies by map/editor version. During inspection, list what actuall
 | `war3map.w3c` | cameras | inspect early; edit later |
 | `war3map.wtg` | GUI trigger definitions | inspect if library supports exact version; otherwise opaque |
 | `war3map.wct` | custom trigger text/comments | inspect; never assume imported text executes |
-| `war3map.j` | generated JASS map script | inspect/validate; replacing requires an explicit build strategy |
+| `war3map.j` | generated JASS map script | inspect/validate; MCP-owned replacement is enabled through the explicit hash-checked build strategy in ADR 0002 |
 | `war3map.lua` | Lua map script on Lua maps | inspect/validate; entry-point behavior must be proven |
 | `war3map.w3u` | custom unit data | parse and typed edits after proof |
 | `war3map.w3a` | custom ability data | parse and typed edits after proof |
@@ -80,7 +80,7 @@ GUI triggers, custom trigger text, generated JASS, and Lua are related but not i
 Phase 0 must determine the current map's script language and contents. Phase 3 must choose and document exactly one script ownership strategy:
 
 1. **Editor-owned script**: MCP edits GUI/custom-text structures supported by the library, then World Editor generates the final script.
-2. **Build-owned script**: source files are compiled/injected during the MCP build, and the map is treated as generated output that may not round-trip through arbitrary editor saves.
+2. **Build-owned script**: source files are compiled/injected during the MCP build, and the map is treated as generated output that may not round-trip through arbitrary editor saves. This project uses MCP-owned JASS for `war3map.j`; GUI/custom-text members remain preserved opaque data.
 
 Do not mix the two without a documented merge point.
 
@@ -133,7 +133,7 @@ The initial .NET spike should use:
 - `War3Net.IO.Mpq` to enumerate and preserve archive contents;
 - `War3Net.Build.Core` to parse/serialize supported map members;
 - `War3Net.Build` only after inspection proves the required builder path;
-- `War3Net.CodeAnalysis.Jass` only if JASS parsing becomes part of the selected script strategy.
+- `War3Net.CodeAnalysis.Jass` is pinned for the selected MCP-owned JASS script strategy and static source validation.
 
 Do not assume War3Net's future CLI/runtime roadmap is implemented. Write our own narrow engine CLI around the library APIs we verify.
 

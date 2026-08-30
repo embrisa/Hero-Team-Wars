@@ -152,20 +152,64 @@ public sealed class OperationTests
     }
 
     [Fact]
-    public void OpaqueOperationsRemainDisabled()
+    public void ScriptOperationStagesMcpOwnedJassWithHashPrecondition()
     {
+        const string before = "function main takes nothing returns nothing\nendfunction\n";
+        const string after = "function main takes nothing returns nothing\n    call BJDebugMsg(\"phase changed\")\nendfunction\n";
+        var canonical = Canonical();
+        canonical["scripts"] = new JsonArray(new JsonObject
+        {
+            ["archive_path"] = "war3map.j",
+            ["language"] = "Jass",
+            ["size_bytes"] = System.Text.Encoding.UTF8.GetByteCount(before),
+            ["sha256"] = Hashing.Sha256(System.Text.Encoding.UTF8.GetBytes(before)),
+            ["source_sha256"] = Hashing.Sha256(System.Text.Encoding.UTF8.GetBytes(before)),
+            ["capability"] = "preserved_opaque",
+            ["provenance"] = "observed_archive"
+        });
         var operation = new JsonArray(new JsonObject
         {
             ["operation_id"] = "c0a80101-0000-4000-8000-000000000008",
             ["type"] = "set_script_source",
             ["target"] = new JsonObject { ["archive_path"] = "war3map.j" },
-            ["value"] = "function main takes nothing returns nothing endfunction",
-            ["rationale"] = "This must remain disabled until script ownership is proven."
+            ["expected"] = Hashing.Sha256(System.Text.Encoding.UTF8.GetBytes(before)),
+            ["value"] = new JsonObject { ["language"] = "jass", ["source"] = after },
+            ["rationale"] = "Change the gameplay debug message."
         });
 
-        var exception = Assert.Throws<EngineException>(() => OperationApplier.Apply(Canonical(), operation));
+        var result = OperationApplier.Apply(canonical, operation);
 
-        Assert.Equal("UNSUPPORTED_OPERATION", exception.Code);
+        var staged = result["canonical_map"]!["scripts"]![0]!;
+        Assert.Equal(after, staged["source"]!.GetValue<string>());
+        Assert.Equal(Hashing.Sha256(System.Text.Encoding.UTF8.GetBytes(after)), staged["source_sha256"]!.GetValue<string>());
+        Assert.Contains(result["diff"]!["changes"]!.AsArray().OfType<JsonObject>(), change => change["component"]!.GetValue<string>() == "scripts");
+    }
+
+    [Fact]
+    public void ScriptOperationRequiresTheCurrentHash()
+    {
+        var canonical = Canonical();
+        canonical["scripts"] = new JsonArray(new JsonObject
+        {
+            ["archive_path"] = "war3map.j",
+            ["language"] = "Jass",
+            ["size_bytes"] = 1,
+            ["sha256"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            ["source_sha256"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            ["capability"] = "preserved_opaque",
+            ["provenance"] = "observed_archive"
+        });
+
+        var exception = Assert.Throws<EngineException>(() => OperationApplier.Apply(canonical, new JsonArray(new JsonObject
+        {
+            ["operation_id"] = "c0a80101-0000-4000-8000-000000000009",
+            ["type"] = "set_script_source",
+            ["target"] = new JsonObject { ["archive_path"] = "war3map.j" },
+            ["value"] = new JsonObject { ["language"] = "jass", ["source"] = "function main takes nothing returns nothing\nendfunction\n" },
+            ["rationale"] = "Missing precondition must be rejected."
+        })));
+
+        Assert.Equal("PRECONDITION_REQUIRED", exception.Code);
     }
 
     private static JsonObject Canonical() => new()
@@ -174,7 +218,8 @@ public sealed class OperationTests
         ["metadata"] = new JsonArray(new JsonObject { ["field"] = "title", ["value"] = "Before", ["provenance"] = "observed_archive", ["capability"] = "parsed_read_only" }),
         ["regions"] = new JsonArray(new JsonObject { ["name"] = "Arena_A", ["min_x"] = 0, ["min_y"] = 0, ["max_x"] = 64, ["max_y"] = 64 }),
         ["players"] = new JsonArray(),
-        ["forces"] = new JsonArray()
+        ["forces"] = new JsonArray(),
+        ["scripts"] = new JsonArray()
     };
 
     private static JsonObject MetadataOperation(string id, string expected, string value) => new()

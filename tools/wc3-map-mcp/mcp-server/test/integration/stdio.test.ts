@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const projectRoot = resolve(serverRoot, "../../..");
 const sourcePath = resolve(projectRoot, "map/HeroTeamWars_M0_2Arena.w3m");
+const configPath = resolve(serverRoot, "../config/wc3-map-mcp.example.json");
 
 function hashSource(): string {
   return createHash("sha256").update(readFileSync(sourcePath)).digest("hex").toUpperCase();
@@ -15,7 +16,7 @@ function hashSource(): string {
 
 function requestProcess(): Promise<{ lines: string[]; stderr: string }> {
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, [resolve(serverRoot, "dist/index.js")], { cwd: serverRoot, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(process.execPath, [resolve(serverRoot, "dist/index.js")], { cwd: serverRoot, env: { ...process.env, WC3_MAP_MCP_CONFIG: configPath }, stdio: ["pipe", "pipe", "pipe"] });
     const lines: string[] = [];
     let stdout = "";
     let stderr = "";
@@ -44,6 +45,7 @@ function requestProcess(): Promise<{ lines: string[]; stderr: string }> {
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 16, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: sourcePath } } } )}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 17, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: "map" } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 18, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: "design/07-editor-state.yaml" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 19, method: "tools/call", params: { name: "wc3_get_script_source", arguments: { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", archive_path: "war3map.j" } } })}\n`);
     child.stdin.end();
   });
 }
@@ -80,6 +82,7 @@ describe("MCP STDIO", () => {
       "wc3_inspect_map",
       "wc3_list_archive_files",
       "wc3_get_component",
+      "wc3_get_script_source",
       "wc3_validate_map",
       "wc3_compare_maps"
     ]);
@@ -131,5 +134,9 @@ describe("MCP STDIO", () => {
     expectDomainError(result.lines, 16, "PATH_OUTSIDE_ROOT");
     expectDomainError(result.lines, 17, "INVALID_ARGUMENT");
     expectDomainError(result.lines, 18, "PATH_OUTSIDE_ROOT");
+    const script = response(result.lines, 19);
+    expect(script.result.structuredContent.ok).toBe(true);
+    expect(script.result.structuredContent.data.language).toBe("jass");
+    expect(script.result.structuredContent.data.source).toMatch(/function main takes nothing returns nothing/);
   });
 });

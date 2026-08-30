@@ -10,7 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
-    "test": "npm run build && vitest run",
+    "test": "npm run build && vitest run --no-file-parallelism",
     "test:watch": "vitest"
   },
   "dependencies": {

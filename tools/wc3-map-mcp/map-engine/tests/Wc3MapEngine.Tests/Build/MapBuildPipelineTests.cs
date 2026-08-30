@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Nodes;
 using Wc3MapEngine.Core;
 using Xunit;
@@ -82,6 +83,54 @@ public sealed class MapBuildPipelineTests
             Assert.Equal(
                 MapArchive.Read(first).Members.Select(x => (x.Path, x.Sha256)),
                 MapArchive.Read(second).Members.Select(x => (x.Path, x.Sha256)));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task McpOwnedJassBuildReplacesOnlyTheScriptMemberAndPreservesTheSource()
+    {
+        var source = FindSourceMap();
+        var before = (await Hashing.HashFileAsync(source)).Sha256;
+        var sourceArchive = MapArchive.Read(source);
+        var sourceScript = sourceArchive.Find("war3map.j");
+        Assert.NotNull(sourceScript);
+        var originalScript = Encoding.UTF8.GetString(sourceScript!.Bytes);
+        var updatedScript = originalScript + "\n// MCP script source round-trip test.\n";
+        var directory = Path.Combine(Path.GetTempPath(), "wc3-map-mcp-script", Guid.NewGuid().ToString("N"));
+        var canonical = Path.Combine(directory, "canonical.json");
+        var output = Path.Combine(directory, "script.w3m");
+
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var model = MapInspector.Inspect(source);
+            var operation = new JsonArray(new JsonObject
+            {
+                ["operation_id"] = "c0a80101-0000-4000-8000-000000000010",
+                ["type"] = "set_script_source",
+                ["target"] = new JsonObject { ["archive_path"] = "war3map.j" },
+                ["expected"] = sourceScript.Sha256,
+                ["value"] = new JsonObject { ["language"] = "jass", ["source"] = updatedScript },
+                ["rationale"] = "Verify MCP-owned gameplay source replacement."
+            });
+            var staged = OperationApplier.Apply(model, operation)["canonical_map"]!;
+            JsonUtilities.WriteAtomic(canonical, staged);
+
+            var result = MapBuilder.Build(source, canonical, output, "debug");
+
+            Assert.True(result["reopened"]!.GetValue<bool>());
+            Assert.True(result["opaque_members_preserved"]!.GetValue<bool>());
+            Assert.Contains("war3map.j", result["archive_comparison"]!["content_changes"]!.AsArray().Select(x => x!["path"]!.GetValue<string>()));
+            Assert.Equal(before, (await Hashing.HashFileAsync(source)).Sha256);
+            var rebuiltScript = MapArchive.Read(output).Find("war3map.j");
+            Assert.NotNull(rebuiltScript);
+            Assert.Equal(Hashing.Sha256(Encoding.UTF8.GetBytes(updatedScript)), rebuiltScript!.Sha256);
+            Assert.Equal(sourceArchive.Find("war3map.wtg")?.Sha256, MapArchive.Read(output).Find("war3map.wtg")?.Sha256);
+            Assert.Equal(sourceArchive.Find("war3map.wct")?.Sha256, MapArchive.Read(output).Find("war3map.wct")?.Sha256);
         }
         finally
         {

@@ -33,7 +33,7 @@ docs/decisions/0002-map-script-ownership.md
 
 ## Decide script ownership
 
-Inspect the current script language and trigger members. ADR `0002-map-script-ownership.md` must choose editor-owned GUI/custom-text script or build-owned JASS/Lua injection. Explain World Editor save effects, entry-point connection, round-trip behavior, and user limitations. If uncertain, disable script mutation while permitting proven non-script builds.
+Inspect the current script language and trigger members. ADR `0002-map-script-ownership.md` chooses MCP-owned JASS source for the existing `war3map.j` entry point while preserving GUI/custom-text members opaque. Explain World Editor save effects, entry-point connection, round-trip behavior, static parser checks, and user limitations. Lua and GUI trigger mutation remain disabled until separately proven.
 
 ## Tools
 

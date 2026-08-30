@@ -26,6 +26,16 @@ export class InspectionService {
     return this.worker.request<Record<string, unknown>>("list_archive_members", { map_path: mapPath }, correlationId);
   }
 
+  public async getScriptSource(projectId: string, map: string, archivePath: string, expectedScriptHash: string | undefined, correlationId: string): Promise<Record<string, unknown>> {
+    this.projects.assertToolAvailable(projectId, "wc3_get_script_source");
+    const result = await this.worker.request<Record<string, unknown>>("read_script_source", { map_path: this.projects.map(projectId, map), archive_path: archivePath }, correlationId);
+    const actualHash = String(result.sha256 ?? "");
+    if (expectedScriptHash && actualHash.toUpperCase() !== expectedScriptHash.toUpperCase()) {
+      throw new AppError("SOURCE_CHANGED", "The expected script hash does not match the current map script.", false, { expected_sha256: expectedScriptHash.toUpperCase(), actual_sha256: actualHash });
+    }
+    return result;
+  }
+
   public async getComponent(projectId: string, map: string, component: ComponentName, filter: string | undefined, cursor: string | undefined, maxItems: number, correlationId: string): Promise<Record<string, unknown>> {
     const inspection = await this.worker.request<Record<string, unknown>>("inspect_map", { map_path: this.projects.map(projectId, map) }, correlationId);
     const value = inspection[component];

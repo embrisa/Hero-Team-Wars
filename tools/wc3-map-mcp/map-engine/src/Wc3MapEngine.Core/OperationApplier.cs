@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json.Nodes;
+using Wc3MapEngine.Core.Scripts;
 
 namespace Wc3MapEngine.Core;
 
@@ -13,7 +15,7 @@ public static class OperationApplier
     private static readonly HashSet<string> SupportedTypes = new(StringComparer.Ordinal)
     {
         "set_map_metadata", "set_player_slot", "set_force",
-        "create_region", "update_region", "delete_region"
+        "create_region", "update_region", "delete_region", "set_script_source"
     };
 
     private static readonly HashSet<string> MetadataFields = new(StringComparer.Ordinal)
@@ -110,6 +112,9 @@ public static class OperationApplier
                 break;
             case "set_force":
                 SetForce(root, target, expected, value);
+                break;
+            case "set_script_source":
+                SetScriptSource(root, target, expected, value);
                 break;
         }
     }
@@ -303,6 +308,84 @@ public static class OperationApplier
 
         force["provenance"] = "intended_design";
         force["capability"] = "typed_write_enabled";
+    }
+
+    private static void SetScriptSource(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
+    {
+        EnsureAllowed(target, "archive_path");
+        var archivePath = RequiredString(target, "archive_path");
+        if (!archivePath.Equals("war3map.j", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new EngineException("UNSUPPORTED_OPERATION", "Only the map's JASS entry point war3map.j is enabled for MCP-owned gameplay source.");
+        }
+
+        var scripts = RequiredArray(root, "scripts");
+        var script = scripts.OfType<JsonObject>().FirstOrDefault(x => string.Equals(x["archive_path"]?.GetValue<string>(), archivePath, StringComparison.OrdinalIgnoreCase));
+        if (script is null)
+        {
+            throw new EngineException("UNSUPPORTED_COMPONENT", "The canonical map does not contain a war3map.j script entry point.");
+        }
+
+        var expectedHash = ExpectedScriptHash(expected);
+        var actualHash = script["sha256"]?.GetValue<string>();
+        if (expectedHash is null)
+        {
+            throw new EngineException("PRECONDITION_REQUIRED", "set_script_source must include the expected current war3map.j SHA-256.");
+        }
+        if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new EngineException("PRECONDITION_FAILED", "The expected war3map.j SHA-256 does not match the staged script.");
+        }
+
+        if (value is not JsonObject sourceValue)
+        {
+            throw new EngineException("INVALID_ARGUMENT", "set_script_source requires an object value with language and source.");
+        }
+        EnsureAllowed(sourceValue, "language", "source");
+        var language = RequiredString(sourceValue, "language");
+        if (!language.Equals("jass", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new EngineException("UNSUPPORTED_OPERATION", "The first MCP-owned gameplay source strategy supports JASS only.");
+        }
+
+        var source = RequiredString(sourceValue, "source");
+        try
+        {
+            ScriptOwnership.ValidateMcpOwnedJass(archivePath, source);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new EngineException("INVALID_ARGUMENT", exception.Message, false, exception, new JsonObject
+            {
+                ["component"] = "scripts",
+                ["archive_path"] = archivePath
+            });
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(source);
+        var sha256 = Hashing.Sha256(bytes);
+        script["language"] = "Jass";
+        script["source"] = source;
+        script["source_sha256"] = sha256;
+        script["size_bytes"] = bytes.Length;
+        script["sha256"] = sha256;
+        script["provenance"] = "intended_design";
+        script["capability"] = "staged_typed_write";
+    }
+
+    private static string? ExpectedScriptHash(JsonNode? expected)
+    {
+        if (expected is JsonValue text && text.TryGetValue<string>(out var hash))
+        {
+            return hash;
+        }
+
+        if (expected is JsonObject expectedObject && expectedObject["sha256"] is JsonValue value && value.TryGetValue<string>(out var objectHash))
+        {
+            return objectHash;
+        }
+
+        return null;
     }
 
     private static void EnsureExpected(JsonNode? actual, JsonNode? expected, string field)

@@ -451,6 +451,7 @@ public static class MapInspector
                 ["language"] = language,
                 ["size_bytes"] = x.Size,
                 ["sha256"] = x.Sha256,
+                ["source_sha256"] = x.Sha256,
                 ["capability"] = "preserved_opaque",
                 ["provenance"] = "observed_archive"
             }).ToArray());

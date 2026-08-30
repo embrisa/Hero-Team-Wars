@@ -14,16 +14,19 @@ Implement `HTW-00` through `HTW-06` as reviewed MCP transactions. Each chunk has
 
 ## Gameplay source layout
 
-Exact language follows the Phase 3 ADR. Lua example:
+The current map uses JASS. The MCP-owned source is supplied through the
+`set_script_source` operation as a complete `war3map.j` source revision. Keep
+gameplay modules organized under the project source tree and generate the
+complete map entry point from those modules before applying the operation:
 
 ```text
 scripts/mcp/
-  main.lua
-  config/{tuning,teams,regions}.lua
-  core/{bootstrap,state,events,debug}.lua
-  systems/{phases,waves,heroes,lives,elimination,economy,sending,routing,information}.lua
-  content/{base-waves,send-units}.lua
-  tests/assertions.lua
+  main.j
+  config/{tuning,teams,regions}.j
+  core/{bootstrap,state,events,debug}.j
+  systems/{phases,waves,heroes,lives,elimination,economy,sending,routing,information}.j
+  content/{base-waves,send-units}.j
+  tests/assertions.j
 ```
 
 Add modules only when their chunk starts. Centralize tuning. Use explicit teams and named regions, never color.

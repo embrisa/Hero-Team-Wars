@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json.Nodes;
 using Wc3MapEngine.Core.Build;
+using Wc3MapEngine.Core.Scripts;
 using War3Net.Build;
 using War3Net.Build.Extensions;
 using War3Net.IO.Mpq;
@@ -36,6 +38,7 @@ public static class MapBuilder
         var replacements = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         ApplyMetadataChanges(source, staged, sourcePath, replacements);
         ApplyRegionChanges(source, staged, sourcePath, replacements);
+        ApplyScriptChanges(source, staged, sourcePath, replacements);
 
         var outputDirectory = Path.GetDirectoryName(outputPath)
             ?? throw new EngineException("INVALID_ARGUMENT", "The build output must have a parent directory.");
@@ -146,6 +149,25 @@ public static class MapBuilder
         if (changed) replacements["war3map.w3r"] = SerializeRegions(current.Regions);
     }
 
+    private static void ApplyScriptChanges(JsonObject source, JsonObject staged, string sourcePath, Dictionary<string, byte[]> replacements)
+    {
+        _ = source;
+        foreach (var script in Scripts(staged))
+        {
+            if (script["source"] is not JsonValue sourceValue || !sourceValue.TryGetValue<string>(out var sourceText))
+            {
+                continue;
+            }
+
+            var archivePath = script["archive_path"]?.GetValue<string>()
+                ?? throw new EngineException("INVALID_JSON", "Staged script entry is missing archive_path.");
+            var member = MapArchive.Read(sourcePath).Find(archivePath)
+                ?? throw new EngineException("BUILD_FAILED", $"The staged script member '{archivePath}' is not present in the source archive.");
+            _ = member;
+            replacements[archivePath] = Encoding.UTF8.GetBytes(sourceText);
+        }
+    }
+
     private static Map ReadMap(string path, MapFiles files)
     {
         using var archive = MpqArchive.Open(path, loadListFile: true);
@@ -173,6 +195,9 @@ public static class MapBuilder
 
     private static List<JsonObject> Regions(JsonObject root)
         => root["regions"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
+
+    private static List<JsonObject> Scripts(JsonObject root)
+        => root["scripts"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
 
     private static string Name(JsonObject region) => region["name"]?.GetValue<string>() ?? string.Empty;
 
