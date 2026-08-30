@@ -2,7 +2,7 @@
 
 Project scaffold for the local Warcraft III map MCP described in `../../tasks/wc3-map-mcp/README.md`.
 
-Status: structure only. No server, map engine, package installation, build, or test has been implemented yet.
+Status: structure only. Required runtimes are installed (Node.js 24.19.0/npm 11.17.0 and .NET SDK 10.0.400); no server, map engine, package installation, build, or test has been implemented yet.
 
 ## Planned components
 

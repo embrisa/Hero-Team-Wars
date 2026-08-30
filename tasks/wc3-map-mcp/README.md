@@ -1,6 +1,6 @@
 # WC3 Map MCP Implementation Plan
 
-Status: planned; project scaffold created, implementation not started.
+Status: planning and project scaffold complete; required runtimes are installed (Node.js 24.19.0/npm 11.17.0 and .NET SDK 10.0.400), and no implementation has started.
 
 This folder is the execution plan for a local Model Context Protocol server that lets AI agents inspect, modify, build, validate, and test Warcraft III custom maps without directly patching the World Editor executable.
 
