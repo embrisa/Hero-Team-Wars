@@ -462,11 +462,14 @@ public static class GameplayModelValidator
                 if (value["region_id"] is null && value["region_name"] is null) throw new EngineException("INVALID_ARGUMENT", "region_entry requires region_id or region_name.");
                 break;
             case "player_state_change":
+            {
                 PlayerId(value, "player_id");
-                _ = RequiredIdentifier(value, "state");
+                var state = RequiredIdentifier(value, "state");
+                if (!JassNativeCatalogue.IsPlayerState(state)) throw new EngineException("INVALID_ARGUMENT", $"player_state_change state '{state}' is not in the pinned JASS native catalogue '{JassNativeCatalogue.Version}'.");
                 if (!ComparisonOperators.Contains(RequiredString(value, "operator"))) throw new EngineException("INVALID_ARGUMENT", "player_state_change operator is unsupported.");
                 Number(value, "value");
                 break;
+            }
             case "custom_event": _ = RequiredIdentifier(value, "name"); break;
         }
     }

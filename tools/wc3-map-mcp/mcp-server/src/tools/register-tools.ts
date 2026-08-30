@@ -17,6 +17,7 @@ import { registerBuildTools } from "./builds.js";
 import { registerLaunchTools } from "./launches.js";
 import { registerGameplayTools } from "./gameplay.js";
 import { GameplayService } from "../services/gameplay-service.js";
+import { isToolEnabledForProject } from "../services/capability-catalog.js";
 
 export interface ToolServices {
   config: Wc3Config;
@@ -29,11 +30,12 @@ export interface ToolServices {
 }
 
 export function registerTools(server: McpServer, services: ToolServices): void {
-  const phaseOneReadOnly = new Set(["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps", "wc3_compose_gameplay_source", "wc3_validate_gameplay_source"]);
-  const enabled = (name: string): boolean => Object.values(services.config.projects).some(project => {
-    if (project.write_policy === "read_only" && !phaseOneReadOnly.has(name)) return false;
-    return project.enabled_tools.length === 0 || project.enabled_tools.includes(name);
-  });
+  // MCP tools are registered at server scope, while project/profile is a
+  // request field. Register only the intersection supported by every
+  // configured project; otherwise one project's capability would make a
+  // tool appear callable for another project's profile.
+  const enabled = (name: string): boolean => Object.values(services.config.projects).length > 0
+    && Object.values(services.config.projects).every(project => isToolEnabledForProject(project, name));
   const register = (name: string, config: Record<string, unknown>, handler: (input: any) => Promise<Record<string, unknown>>): void => {
     if (enabled(name)) server.registerTool(name, config as never, handler as never);
   };

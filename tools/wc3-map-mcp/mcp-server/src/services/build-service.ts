@@ -25,6 +25,7 @@ export interface BuildManifest {
   transaction_id: string;
   revision: number;
   profile: "debug" | "release" | "noop";
+  capability_profile: "mvp_2arena" | "full_6team" | "gui_compatible";
   source_sha256: string;
   output_path: string;
   output_sha256: string;
@@ -135,6 +136,7 @@ export class BuildService {
           transaction_id: transactionId,
           revision,
           profile,
+          capability_profile: project.config.profile,
           source_sha256: expectedSourceHash.toUpperCase(),
           output_path: outputRelative,
           output_sha256: hash.sha256,
@@ -153,6 +155,16 @@ export class BuildService {
         const current = this.store.read(project, transactionId);
         current.manifest.state = "built";
         current.manifest.build_ids.push(buildId);
+        const buildEvidence = {
+          build_id: buildId,
+          output_sha256: hash.sha256,
+          manifest_path: manifestArtifact.path,
+          manifest_sha256: manifestArtifact.sha256
+        };
+        current.manifest.operation_records = current.manifest.operation_records.map(record => ({
+          ...record,
+          build_artifacts: [...(record.build_artifacts ?? []), buildEvidence]
+        }));
         this.store.update(current.paths, current.manifest);
         transactionUpdated = true;
         return {
@@ -235,8 +247,11 @@ export class BuildService {
     const loaded = this.load(projectId, buildId);
     assertUuid(sessionId, "Session ID");
     const transaction = this.store.read(loaded.project, loaded.manifest.transaction_id);
-    if (transaction.manifest.test_session_ids.includes(sessionId)) return;
-    transaction.manifest.test_session_ids.push(sessionId);
+    if (!transaction.manifest.test_session_ids.includes(sessionId)) transaction.manifest.test_session_ids.push(sessionId);
+    transaction.manifest.operation_records = transaction.manifest.operation_records.map(record => ({
+      ...record,
+      test_session_ids: Array.from(new Set([...(record.test_session_ids ?? []), sessionId]))
+    }));
     this.store.update(transaction.paths, transaction.manifest);
   }
 
@@ -329,7 +344,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 function validateManifest(manifest: BuildManifest, projectId: string, buildId: string): void {
   if (manifest.schema_version !== BUILD_SCHEMA_VERSION || manifest.build_id !== buildId || manifest.project_id !== projectId || !/^[0-9A-F]{64}$/.test(manifest.output_sha256) || !/^[0-9A-F]{64}$/.test(manifest.source_sha256)) throw new AppError("INTERNAL_ERROR", "Build manifest identity, schema, or hashes are invalid.");
   if (!["debug", "release", "noop"].includes(manifest.profile) || !["untested", "process_started", "editor_opened", "game_loaded", "smoke_passed", "playtest_passed"].includes(manifest.runtime_status)) throw new AppError("INTERNAL_ERROR", "Build manifest profile or runtime status is invalid.");
-  if (!manifest.output_path || !manifest.validation_report?.path || !manifest.writer_version || !manifest.validator_version) throw new AppError("INTERNAL_ERROR", "Build manifest is missing required Phase 3 fields.");
+  if (!manifest.output_path || !manifest.validation_report?.path || !manifest.writer_version || !manifest.validator_version || !["mvp_2arena", "full_6team", "gui_compatible"].includes(manifest.capability_profile)) throw new AppError("INTERNAL_ERROR", "Build manifest is missing required Phase 5F fields.");
 }
 
 function assertUuid(value: string, label: string): void {

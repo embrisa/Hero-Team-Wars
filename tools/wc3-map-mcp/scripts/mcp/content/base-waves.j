@@ -6,16 +6,12 @@ function HTW_Content_BaseWaves takes nothing returns nothing
     local unit creep
     set arenaIndex = 1
     loop
-        exitwhen arenaIndex > 2
+        exitwhen arenaIndex > HTW_ArenaCount
         if HTW_ArenaCreepGroup[arenaIndex] == null then
             set HTW_ArenaCreepGroup[arenaIndex] = CreateGroup()
         endif
-        set x = GetRectCenterX(HTW_ArenaRectA)
-        set y = GetRectCenterY(HTW_ArenaRectA)
-        if arenaIndex == 2 then
-            set x = GetRectCenterX(HTW_ArenaRectB)
-            set y = GetRectCenterY(HTW_ArenaRectB)
-        endif
+        set x = GetRectCenterX(HTW_ArenaRect[arenaIndex])
+        set y = GetRectCenterY(HTW_ArenaRect[arenaIndex])
         set creepIndex = 1
         loop
             exitwhen creepIndex > 3
@@ -39,7 +35,7 @@ function HTW_Content_CleanupBaseWaves takes nothing returns nothing
     local integer arenaIndex
     set arenaIndex = 1
     loop
-        exitwhen arenaIndex > 2
+        exitwhen arenaIndex > HTW_ArenaCount
         if HTW_ArenaCreepGroup[arenaIndex] != null then
             set HTW_CleanupGroup = HTW_ArenaCreepGroup[arenaIndex]
             call ForGroup(HTW_CleanupGroup, function HTW_Content_RemoveCreep)

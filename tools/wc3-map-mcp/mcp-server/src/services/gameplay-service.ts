@@ -24,6 +24,7 @@ export class GameplayService {
 
   public async compose(projectId: string, manifestPath: string, profile: string | undefined, correlationId: string, expectedManifestHash?: string, expectedModuleHashes?: Record<string, string>): Promise<Record<string, unknown>> {
     this.projects.assertToolAvailable(projectId, "wc3_compose_gameplay_source");
+    this.projects.assertProfile(projectId, profile, "wc3_compose_gameplay_source");
     const project = this.projectManifest(projectId, manifestPath);
     const result = await this.worker.request<Record<string, unknown>>("compose_gameplay_source", {
       manifest_path: project.manifest,
@@ -36,6 +37,7 @@ export class GameplayService {
 
   public async validate(projectId: string, manifestPath: string, profile: string | undefined, correlationId: string, expectedManifestHash?: string, expectedModuleHashes?: Record<string, string>): Promise<Record<string, unknown>> {
     this.projects.assertToolAvailable(projectId, "wc3_validate_gameplay_source");
+    this.projects.assertProfile(projectId, profile, "wc3_validate_gameplay_source");
     const project = this.projectManifest(projectId, manifestPath);
     const result = await this.worker.request<Record<string, unknown>>("validate_gameplay_source", {
       manifest_path: project.manifest,
@@ -59,6 +61,8 @@ export class GameplayService {
     correlationId: string
   ): Promise<Record<string, unknown>> {
     if (!CHUNK.test(chunkId)) throw new AppError("INVALID_ARGUMENT", "chunk_id must use an HTW-## design chunk identifier.");
+    this.projects.assertProfile(projectId, profile, "wc3_prepare_gameplay_chunk");
+    assertChunkProfile(projectId, chunkId, this.projects);
     this.projects.assertScriptMutationAllowed(projectId);
     const composed = await this.compose(projectId, manifestPath, profile, correlationId);
     const source = String(composed.source ?? "");
@@ -92,12 +96,14 @@ export class GameplayService {
     correlationId: string
   ): Promise<Record<string, unknown>> {
     if (!CHUNK.test(chunkId)) throw new AppError("INVALID_ARGUMENT", "chunk_id must use an HTW-## design chunk identifier.");
+    const resolvedProfile = this.projects.assertProfile(projectId, profile, "wc3_run_scenario_build");
+    assertChunkProfile(projectId, chunkId, this.projects);
     const built = await this.builds.build(projectId, transactionId, revision, expectedSourceHash, "debug", `scenario-${chunkId}`, correlationId);
     const build = built.build as Record<string, unknown>;
     const buildId = String(build.build_id ?? "");
     const buildHash = String(build.output_sha256 ?? "").toUpperCase();
     const scenarioPayload: Record<string, unknown> = {
-      profile: profile ?? "mvp_2arena",
+      profile: resolvedProfile,
       chunk_id: chunkId
     };
     if (scenarioIds && scenarioIds.length > 0) scenarioPayload.scenario_ids = scenarioIds;
@@ -109,6 +115,7 @@ export class GameplayService {
       revision,
       build_id: buildId,
       build_sha256: buildHash,
+      capability_profile: resolvedProfile,
       evidence_level: "static_only",
       runtime_verified: false,
       scenarios
@@ -124,6 +131,8 @@ export class GameplayService {
     notes: string; test_session_id?: string;
   }): Promise<Record<string, unknown>> {
     if (!CHUNK.test(input.chunk_id)) throw new AppError("INVALID_ARGUMENT", "chunk_id must use an HTW-## design chunk identifier.");
+    this.projects.assertProfile(input.project_id, undefined, "wc3_record_chunk_result");
+    assertChunkProfile(input.project_id, input.chunk_id, this.projects);
     this.projects.assertMutationAllowed(input.project_id, "wc3_record_chunk_result");
     const loaded = this.builds.load(input.project_id, input.build_id);
     if (loaded.manifest.output_sha256.toUpperCase() !== input.expected_build_hash.toUpperCase()) throw new AppError("SOURCE_CHANGED", "The expected build hash does not match the exact build artifact.");
@@ -133,6 +142,7 @@ export class GameplayService {
       session = await this.launches.get(input.project_id, input.test_session_id);
       const sessionRecord = session as { session?: { build_id?: string; build_sha256?: string } };
       if (sessionRecord.session?.build_id !== input.build_id || sessionRecord.session.build_sha256?.toUpperCase() !== input.expected_build_hash.toUpperCase()) throw new AppError("PRECONDITION_FAILED", "The test session does not reference the expected build.");
+      this.builds.attachTestSession(input.project_id, input.build_id, input.test_session_id);
     }
     const project = this.projects.project(input.project_id);
     const value = {
@@ -172,6 +182,12 @@ export class GameplayService {
     const report = withoutSource(result);
     const manifestArtifact = writeJsonArtifact(project, artifactPath(project, `gameplay/source/${sourceHash}/composition.json`), report, "gameplay_manifest");
     return { ...report, source_artifact: sourceArtifact, manifest_artifact: manifestArtifact, source };
+  }
+}
+
+function assertChunkProfile(projectId: string, chunkId: string, projects: ProjectService): void {
+  if (chunkId === "HTW-06" && projects.project(projectId).config.profile !== "full_6team") {
+    throw new AppError("CAPABILITY_GATED", "HTW-06 is enabled only for the full_6team capability profile.", false, { project_id: projectId, chunk_id: chunkId, required_profile: "full_6team", actual_profile: projects.project(projectId).config.profile });
   }
 }
 

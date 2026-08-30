@@ -98,6 +98,7 @@ public sealed class Phase5TypedOperationTests
         var renamed = result["canonical_map"]!["regions"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == region["id"]!.GetValue<string>());
         Assert.Equal("Arena_A_Renamed", renamed["name"]!.GetValue<string>());
         Assert.Equal("Arena_A_Renamed", result["canonical_map"]!["gameplay_triggers"]![0]! ["references"]!["region_name"]!.GetValue<string>());
+        Assert.Contains(result["diff"]!["reference_rewrites"]!.AsArray().OfType<JsonObject>(), rewrite => rewrite["path"]!.GetValue<string>().Contains("region_name", StringComparison.Ordinal));
 
         var stale = Operation("rename_region", new JsonObject { ["id"] = region["id"]!.DeepClone() }, new JsonObject { ["name"] = "Arena_A" }, new JsonObject { ["name"] = "Nope" });
         var exception = Assert.Throws<EngineException>(() => OperationApplier.Apply(model, new JsonArray(stale)));

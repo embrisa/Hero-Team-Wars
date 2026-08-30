@@ -55,6 +55,7 @@ public static class GameplaySourceComposer
         if (profile is not ("mvp_2arena" or "full_6team" or "gui_compatible")) throw new EngineException("INVALID_ARGUMENT", $"Unsupported gameplay profile '{profile}'.");
         if (profile == "gui_compatible") throw new EngineException("CAPABILITY_GATED", "GUI-compatible trigger composition is gated pending exact WTG/WCT/WTS fixtures and World Editor evidence.");
         if (StringValue(manifest, "schema_version") is { } schema && schema != "1.0") throw new EngineException("INVALID_ARGUMENT", $"Unsupported gameplay manifest schema '{schema}'.");
+        if (StringValue(manifest, "native_catalogue_version") is { } nativeCatalogue && nativeCatalogue != JassNativeCatalogue.Version) throw new EngineException("INVALID_ARGUMENT", $"Gameplay manifest native catalogue '{nativeCatalogue}' does not match pinned engine catalogue '{JassNativeCatalogue.Version}'.");
         if (manifest["profiles"] is JsonObject profiles && profiles[profile] is not JsonObject) throw new EngineException("INVALID_ARGUMENT", $"Gameplay manifest has no definition for profile '{profile}'.");
 
         var profileSpec = (manifest["profiles"] as JsonObject)?[profile] as JsonObject ?? HtwProfileModel.ProfileSpec(profile);
@@ -65,7 +66,7 @@ public static class GameplaySourceComposer
         var modules = ReadModules(manifest, manifestPath);
         var variables = ReadVariables(manifest, manifestPath);
         var triggers = ReadTriggers(manifest, manifestPath);
-        var regions = ReadRegions(manifest["regions"]);
+        var regions = ReadRegions(profileSpec["regions"] ?? manifest["regions"]);
         var regionRoles = ReadRegionRoles(manifest, profile, regions);
         var model = new JsonObject
         {
@@ -135,6 +136,7 @@ public static class GameplaySourceComposer
             ["schema_version"] = "1.0",
             ["composer_version"] = ComposerVersion,
             ["mode"] = GameplayModelValidator.NativeMode,
+            ["native_catalogue_version"] = JassNativeCatalogue.Version,
             ["profile"] = profile,
             ["modules"] = moduleResults.DeepClone(),
             ["triggers"] = triggerManifest.DeepClone(),
@@ -152,6 +154,7 @@ public static class GameplaySourceComposer
             ["schema_version"] = "1.0",
             ["composer_version"] = ComposerVersion,
             ["mode"] = GameplayModelValidator.NativeMode,
+            ["native_catalogue_version"] = JassNativeCatalogue.Version,
             ["profile"] = profile,
             ["profile_spec"] = profileSpec.DeepClone(),
             ["manifest_path"] = manifestPath,
@@ -173,7 +176,7 @@ public static class GameplaySourceComposer
             ["main_count"] = Regex.Matches(source, "(?im)^\\s*function\\s+main\\s+takes\\s+nothing\\s+returns\\s+nothing\\b").Count,
             ["source_bytes"] = Encoding.UTF8.GetByteCount(source),
             ["source_sha256"] = Hashing.Sha256(Encoding.UTF8.GetBytes(source)),
-            ["static_validation"] = new JsonObject { ["status"] = "passed", ["evidence_level"] = "static_only", ["validation_scope"] = "syntax_and_symbols", ["parser"] = "War3Net.CodeAnalysis.Jass", ["runtime_verified"] = false },
+            ["static_validation"] = new JsonObject { ["status"] = "passed", ["evidence_level"] = "static_only", ["validation_scope"] = "syntax_symbols_and_native_catalogue", ["parser"] = "War3Net.CodeAnalysis.Jass", ["native_catalogue_version"] = JassNativeCatalogue.Version, ["runtime_verified"] = false },
             ["source_manifest"] = sourceManifest,
             ["canonical_model"] = new JsonObject
             {
@@ -305,6 +308,14 @@ public static class GameplaySourceComposer
             region => region,
             StringComparer.Ordinal);
 
+    private static bool IsArenaRegion(JsonObject region)
+    {
+        var name = StringValue(region, "name") ?? string.Empty;
+        return name.StartsWith("Arena_", StringComparison.Ordinal)
+            && !name.Contains("_Entrance", StringComparison.Ordinal)
+            && !name.Contains("_Backline", StringComparison.Ordinal);
+    }
+
     private static List<JsonObject> ReadRegionRoles(JsonObject manifest, string profile, IReadOnlyList<JsonObject> regions)
     {
         var byId = regions.ToDictionary(region => GameplayModelValidator.RequiredString(region, "id"), StringComparer.Ordinal);
@@ -402,6 +413,8 @@ public static class GameplaySourceComposer
         var regionHandles = triggers.SelectMany(x => (x["events"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()).Where(x => StringValue(x, "type") == "region_entry").Select(x => ResolveRegionReference(x, regionBindings)).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         var customEvents = triggers.SelectMany(x => (x["events"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()).Where(x => StringValue(x, "type") == "custom_event").Select(x => StringValue(x, "name")).Where(x => x is not null).Cast<string>().Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         var variableNames = variables.Select(variable => GameplayModelValidator.RequiredString(variable, "name")).ToHashSet(StringComparer.Ordinal);
+        var arenaRegions = regions.Where(IsArenaRegion).OrderBy(region => GameplayModelValidator.RequiredString(region, "id"), StringComparer.Ordinal).ToArray();
+        if (arenaRegions.Length < teams.Count) throw new EngineException("INVALID_ARGUMENT", $"Profile '{profile}' requires at least {teams.Count} arena regions, but the gameplay manifest defines {arenaRegions.Length}.");
         builder.AppendLine("globals");
         var declaredGlobals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         void DeclareGlobal(string type, string name, bool array = false)
@@ -419,6 +432,11 @@ public static class GameplaySourceComposer
         DeclareGlobal("string", "HTW_TeamArena", true);
         DeclareGlobal("boolean", "HTW_TeamLiving", true);
         DeclareGlobal("integer", "HTW_TeamDestination", true);
+        DeclareGlobal("integer", "HTW_ActivePlayerCount");
+        DeclareGlobal("integer", "HTW_ArenaCount");
+        DeclareGlobal("rect", "HTW_ArenaRect", true);
+        DeclareGlobal("rect", "HTW_ArenaRectA");
+        DeclareGlobal("rect", "HTW_ArenaRectB");
         DeclareGlobal("integer", "HTW_LivingTeamCount");
         DeclareGlobal("integer", "HTW_LivingTeamIds", true);
         DeclareGlobal("integer", "HTW_RouteOffset");
@@ -435,6 +453,18 @@ public static class GameplaySourceComposer
         builder.AppendLine("endglobals");
         builder.AppendLine();
 
+        builder.AppendLine("function HTW_Regions_InitializeProfile takes nothing returns nothing");
+        builder.AppendLine($"    set HTW_ArenaCount = {arenaRegions.Length}");
+        for (var index = 0; index < arenaRegions.Length; index++)
+        {
+            var region = arenaRegions[index];
+            builder.AppendLine($"    set HTW_ArenaRect[{index + 1}] = Rect({JassReal(Number(region["min_x"]!, "min_x"))}, {JassReal(Number(region["min_y"]!, "min_y"))}, {JassReal(Number(region["max_x"]!, "max_x"))}, {JassReal(Number(region["max_y"]!, "max_y"))})");
+        }
+        builder.AppendLine("    set HTW_ArenaRectA = HTW_ArenaRect[1]");
+        if (arenaRegions.Length > 1) builder.AppendLine("    set HTW_ArenaRectB = HTW_ArenaRect[2]");
+        builder.AppendLine("endfunction");
+        builder.AppendLine();
+
         builder.AppendLine("function HTW_Teams_ConfigureProfile takes nothing returns nothing");
         var orderedTeams = teams.OfType<JsonObject>().OrderBy(team => team["id"]?.GetValue<string>(), StringComparer.Ordinal).ToArray();
         var livingTeams = orderedTeams.Where(team => !string.Equals(team["life_state"]?.GetValue<string>(), "eliminated", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -442,6 +472,9 @@ public static class GameplaySourceComposer
         builder.AppendLine($"    set HTW_LivingTeamCount = {livingTeams.Length}");
         var teamIndex = 0;
         var livingIndex = 0;
+        var maxPlayerId = 0;
+        foreach (var team in orderedTeams) foreach (var member in team["member_player_ids"]?.AsArray() ?? new JsonArray()) maxPlayerId = Math.Max(maxPlayerId, member?.GetValue<int>() ?? 0);
+        builder.AppendLine($"    set HTW_ActivePlayerCount = {maxPlayerId}");
         foreach (var team in orderedTeams)
         {
             teamIndex++;

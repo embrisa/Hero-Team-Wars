@@ -139,6 +139,7 @@ export class TransactionService {
           transaction_id: transactionId,
           revision: expectedRevision,
           dry_run: true,
+          requested_operation_ids: operationIds,
           applied_operation_ids: stringArray(result.applied_operation_ids),
           diff: semanticDiff(result.diff),
           note: "Dry run only; no revision, canonical state, manifest, or report was written."
@@ -164,11 +165,12 @@ export class TransactionService {
         }, correlationId);
         if (!existsSync(revisionPath)) throw new AppError("ENGINE_PROTOCOL_ERROR", "The map engine reported success without writing the requested revision.");
         const appliedIds = stringArray(result.applied_operation_ids);
-        if (appliedIds.length !== parsedOperations.length || appliedIds.some((id, index) => id !== parsedOperations[index]?.operation_id)) {
-          throw new AppError("ENGINE_PROTOCOL_ERROR", "The map engine returned an incomplete or reordered operation result.");
+        const requestedIds = new Set(parsedOperations.map(operation => operation.operation_id));
+        if (appliedIds.length !== requestedIds.size || new Set(appliedIds).size !== requestedIds.size || appliedIds.some(id => !requestedIds.has(id))) {
+          throw new AppError("ENGINE_PROTOCOL_ERROR", "The map engine returned an incomplete or unknown operation result.");
         }
         const diff = semanticDiff(result.diff);
-        writeJsonArtifact(project, relativeProjectPath(project, diffPath), diff, "semantic_diff");
+        const diffArtifact = writeJsonArtifact(project, relativeProjectPath(project, diffPath), diff, "semantic_diff");
         replaceFileAtomic(revisionPath, loaded.paths.canonical);
         const canonicalHash = sha256File(loaded.paths.canonical).sha256;
         const manifest: TransactionManifest = {
@@ -181,9 +183,12 @@ export class TransactionService {
           operation_revisions: { ...loaded.manifest.operation_revisions },
           operation_records: [...loaded.manifest.operation_records]
         };
-        for (const operation of parsedOperations) {
+        const operationsById = new Map(parsedOperations.map(operation => [operation.operation_id, operation]));
+        for (const operationId of appliedIds) {
+          const operation = operationsById.get(operationId);
+          if (!operation) throw new AppError("ENGINE_PROTOCOL_ERROR", `The map engine returned an unknown operation '${operationId}'.`);
           manifest.operation_revisions[operation.operation_id] = nextRevision;
-          manifest.operation_records.push(operationRecord(operation, nextRevision));
+          manifest.operation_records.push(operationRecord(operation, transactionId, nextRevision, loaded.manifest.source.sha256, diffArtifact));
         }
         this.store.update(loaded.paths, manifest);
       } catch (error) {
@@ -243,6 +248,7 @@ export class TransactionService {
     }
 
     const changes = reports.flatMap(item => Array.isArray(item.value.changes) ? item.value.changes : []);
+    const referenceRewrites = reports.flatMap(item => Array.isArray(item.value.reference_rewrites) ? item.value.reference_rewrites : []);
     const groups = groupChanges(changes);
     const singleReport = reports.length === 1 ? reports[0] : undefined;
     return {
@@ -250,7 +256,7 @@ export class TransactionService {
       source_sha256: loaded.manifest.source.sha256,
       from_revision: from,
       to_revision: to,
-      diff: { schema_version: SCHEMA_VERSION, changes },
+      diff: { schema_version: SCHEMA_VERSION, changes, groups, reference_rewrites: referenceRewrites },
       groups,
       ...(singleReport ? { artifact_path: relativeProjectPath(project, singleReport.path) } : {}),
       ...(changes.length === 0 ? { note: "No semantic changes were recorded for this revision range." } : {})
@@ -285,6 +291,9 @@ export class TransactionService {
       const artifact = writeJsonArtifact(project, relativeProjectPath(project, reportPath), report, "validation_report");
       const manifest = loaded.manifest;
       manifest.validation_reports = Array.from(new Set([...manifest.validation_reports, artifact.path]));
+      manifest.operation_records = manifest.operation_records.map(record => record.revision === revision
+        ? { ...record, validation_report_artifacts: [...(record.validation_report_artifacts ?? []), { path: artifact.path, sha256: artifact.sha256 }] }
+        : record);
       manifest.state = report.buildable === true ? "validated" : "modified";
       this.store.update(loaded.paths, manifest);
       if (report.buildable !== true) throw new AppError("VALIDATION_FAILED", "The transaction contains validation errors.", false, { report_path: artifact.path, report_sha256: artifact.sha256 });
@@ -349,8 +358,9 @@ function parseOperations(operations: unknown[], maxOperationCount: number, expec
   return parsed;
 }
 
-function operationRecord(operation: OperationInput, revision: number): TransactionOperationRecord {
+function operationRecord(operation: OperationInput, transactionId: string, revision: number, sourceSha256: string, diffArtifact: ArtifactRef): TransactionOperationRecord {
   return {
+    transaction_id: transactionId,
     operation_id: operation.operation_id,
     revision,
     type: operation.type,
@@ -358,7 +368,12 @@ function operationRecord(operation: OperationInput, revision: number): Transacti
     ...(operation.expected !== undefined ? { expected: operation.expected } : {}),
     ...(operation.value !== undefined ? { value: operation.value } : {}),
     rationale: operation.rationale,
-    ...(operation.design_reference ? { design_reference: operation.design_reference } : {})
+    ...(operation.design_reference ? { design_reference: operation.design_reference } : {}),
+    source_sha256: sourceSha256,
+    semantic_diff_artifact: { path: diffArtifact.path, sha256: diffArtifact.sha256 },
+    validation_report_artifacts: [],
+    build_artifacts: [],
+    test_session_ids: []
   };
 }
 
@@ -384,7 +399,10 @@ function semanticDiff(value: unknown): Record<string, unknown> {
       throw new AppError("ENGINE_PROTOCOL_ERROR", "The map engine returned an invalid semantic diff design reference.");
     }
   }
-  return { schema_version: SCHEMA_VERSION, changes };
+  const groups = Array.isArray((value as Record<string, unknown>).groups) ? (value as Record<string, unknown>).groups : groupChanges(changes);
+  const referenceRewrites = Array.isArray((value as Record<string, unknown>).reference_rewrites) ? (value as Record<string, unknown>).reference_rewrites : [];
+  const dependencyOrder = Array.isArray((value as Record<string, unknown>).dependency_order) ? (value as Record<string, unknown>).dependency_order : [];
+  return { schema_version: SCHEMA_VERSION, changes, groups, reference_rewrites: referenceRewrites, dependency_order: dependencyOrder };
 }
 
 function stringArray(value: unknown): string[] {

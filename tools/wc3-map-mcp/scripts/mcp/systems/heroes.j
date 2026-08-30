@@ -5,14 +5,10 @@ function HTW_Heroes_Initialize takes nothing returns nothing
     local real y
     set playerId = 1
     loop
-        exitwhen playerId > 4
+        exitwhen playerId > HTW_ActivePlayerCount
         set teamIndex = HTW_Teams_FindByPlayer(playerId)
-        set x = GetRectCenterX(HTW_ArenaRectA)
-        set y = GetRectCenterY(HTW_ArenaRectA)
-        if teamIndex == 2 then
-            set x = GetRectCenterX(HTW_ArenaRectB)
-            set y = GetRectCenterY(HTW_ArenaRectB)
-        endif
+        set x = GetRectCenterX(HTW_ArenaRect[teamIndex])
+        set y = GetRectCenterY(HTW_ArenaRect[teamIndex])
         set HTW_HeroUnitByPlayer[playerId] = HTW_Content_CreateHero(playerId, x + I2R(playerId * 64), y + I2R(playerId * 48))
         set HTW_HeroAliveByPlayer[playerId] = true
         set HTW_HeroDeathAccountedByPlayer[playerId] = false
@@ -65,15 +61,11 @@ function HTW_Heroes_ReviveLiving takes nothing returns nothing
     local real y
     set playerId = 1
     loop
-        exitwhen playerId > 4
+        exitwhen playerId > HTW_ActivePlayerCount
         set teamIndex = HTW_Teams_FindByPlayer(playerId)
         if teamIndex > 0 and HTW_TeamLiving[teamIndex] and not HTW_HeroAliveByPlayer[playerId] then
-            set x = GetRectCenterX(HTW_ArenaRectA)
-            set y = GetRectCenterY(HTW_ArenaRectA)
-            if teamIndex == 2 then
-                set x = GetRectCenterX(HTW_ArenaRectB)
-                set y = GetRectCenterY(HTW_ArenaRectB)
-            endif
+            set x = GetRectCenterX(HTW_ArenaRect[teamIndex])
+            set y = GetRectCenterY(HTW_ArenaRect[teamIndex])
             call ReviveHero(HTW_HeroUnitByPlayer[playerId], x, y, true)
             set HTW_HeroAliveByPlayer[playerId] = true
             set HTW_HeroDeathAccountedByPlayer[playerId] = false

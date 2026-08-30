@@ -30,6 +30,7 @@ export interface TransactionVersions {
 }
 
 export interface TransactionOperationRecord {
+  transaction_id: string;
   operation_id: string;
   revision: number;
   type: string;
@@ -38,6 +39,11 @@ export interface TransactionOperationRecord {
   value?: unknown;
   rationale: string;
   design_reference?: string;
+  source_sha256: string;
+  semantic_diff_artifact: { path: string; sha256: string };
+  validation_report_artifacts: Array<{ path: string; sha256: string }>;
+  build_artifacts: Array<{ build_id: string; output_sha256: string; manifest_path: string; manifest_sha256: string }>;
+  test_session_ids: string[];
 }
 
 export interface TransactionManifest {

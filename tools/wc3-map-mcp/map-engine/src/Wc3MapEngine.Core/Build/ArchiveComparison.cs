@@ -12,6 +12,7 @@ public static class ArchiveComparison
         var contentChanges = new JsonArray();
         var compressionChanges = new JsonArray();
         var unexpectedChanges = new JsonArray();
+        var preservedOpaqueMembers = new JsonArray();
         foreach (var path in sourceByPath.Keys.Union(rebuiltByPath.Keys, StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
         {
             sourceByPath.TryGetValue(path, out var left);
@@ -21,6 +22,17 @@ public static class ArchiveComparison
                 contentChanges.Add(Change(path, left?.Sha256, right?.Sha256, left?.Size, right?.Size, "membership"));
                 if (!expectedChangedMembers.Contains(path)) unexpectedChanges.Add(JsonValue.Create(path));
                 continue;
+            }
+
+            if (!expectedChangedMembers.Contains(path))
+            {
+                preservedOpaqueMembers.Add(new JsonObject
+                {
+                    ["path"] = path,
+                    ["source_sha256"] = left.Sha256,
+                    ["rebuilt_sha256"] = right.Sha256,
+                    ["content_hash_equal"] = left.Sha256.Equals(right.Sha256, StringComparison.OrdinalIgnoreCase)
+                });
             }
 
             if (!string.Equals(left.Sha256, right.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -67,10 +79,12 @@ public static class ArchiveComparison
             ["rebuilt_member_order"] = new JsonArray(rebuilt.Members.Select(x => JsonValue.Create(x.Path)).ToArray()),
             ["member_order_changed"] = !source.Members.Select(x => x.Path).SequenceEqual(rebuilt.Members.Select(x => x.Path), StringComparer.OrdinalIgnoreCase),
             ["content_changes"] = contentChanges,
+            ["changed_member_hashes"] = contentChanges.DeepClone(),
             ["compression_metadata_changes"] = compressionChanges,
             ["unexpected_content_changes"] = unexpectedChanges,
             ["planned_membership_changes"] = new JsonArray(contentChanges.OfType<JsonObject>().Where(item => item["kind"]?.GetValue<string>() == "membership").Select(item => item["path"]?.DeepClone()).ToArray()),
             ["opaque_members_preserved"] = opaqueEqual,
+            ["preserved_opaque_members"] = preservedOpaqueMembers,
             ["special_member_checks"] = special
         };
     }

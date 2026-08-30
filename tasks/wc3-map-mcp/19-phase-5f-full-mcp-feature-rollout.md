@@ -1,6 +1,6 @@
 # Phase 5F Work Packet - Full MCP Feature Rollout
 
-Status: MCP-native/static feature rollout is implemented with typed operations and build/test wiring; release remains gated on fresh baseline, fixture coverage, exact editor/game evidence, and GUI compatibility where requested.
+Status: MCP-native/static feature rollout is implemented for the MVP map and the map-independent full six-team gameplay profile. The checked-in source map remains an MVP two-arena map; full-profile archive/runtime promotion, exact editor/game evidence, and GUI compatibility remain explicitly gated until their map/editor fixtures exist.
 
 ## Scope
 
@@ -70,6 +70,25 @@ It must not expose a tool simply because another profile supports it.
   support and must pass for the selected map/editor profile when applicable.
 - World Editor/game observations are recorded separately from static/engine
   evidence.
+
+## Current automated evidence
+
+Captured 2026-08-31 in the working tree:
+
+- 67 .NET engine tests pass, including cross-feature dependency ordering,
+  native-catalogue rejection, waygate reference protection, special-doodad
+  preservation, MVP invariants, and the static six-team scenario harness.
+- 43 MCP server tests pass, including MCP-wire capability reporting, the
+  reverse-request-order cross-feature transaction, validation/build/reopen
+  checks, per-operation diff/validation/build evidence fields, and HTW-06
+  profile gating. Test-session fields remain empty until an exact observed
+  session is recorded.
+- The published engine build succeeds and reports archive reopen plus opaque
+  member preservation for the tested MVP build.
+- The source map hash remains
+  `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`.
+- Static/engine evidence is not World Editor evidence, Warcraft III load
+  evidence, gameplay playtest evidence, or GUI-trigger compatibility evidence.
 
 ## Explicit non-goals
 

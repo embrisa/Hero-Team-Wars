@@ -31,7 +31,7 @@ function HTW_State_Reset takes nothing returns nothing
     endloop
     set index = 1
     loop
-        exitwhen index > 12
+        exitwhen index > HTW_TeamCount
         set HTW_TeamLives[index] = HTW_StartingLives
         set HTW_TeamDeathsThisWave[index] = 0
         set HTW_ArenaCreepGroup[index] = null

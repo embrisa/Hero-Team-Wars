@@ -356,6 +356,17 @@ public static class ValidationPipeline
     private static string PlacementIdentity(JsonObject value)
         => StringValue(value["id"]) ?? $"{StringValue(value["member"])}:{StringValue(value["creation_number"])}";
 
+    private static string? SpecialDoodadId(JsonObject placement)
+    {
+        var rawcode = StringValue(placement["rawcode"]);
+        var position = placement["position"] as JsonObject;
+        var x = IntegerValue(position?["x"]);
+        var y = IntegerValue(position?["y"]);
+        return rawcode is not null && x is not null && y is not null
+            ? FormattableString.Invariant($"special-doodad:{rawcode}:{x}:{y}")
+            : null;
+    }
+
     private static void ValidateGameplayModel(JsonObject root, JsonArray findings)
     {
         if (root["gameplay_modules"] is null && root["gameplay_triggers"] is null && root["gameplay_variables"] is null && root["gameplay_source"] is null) return;
@@ -878,8 +889,16 @@ public static class ValidationPipeline
             if (id is null || !ids.Add(id)) Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Placed objects require unique stable MCP IDs.", "Assign one stable id to every placement.");
             var creation = IntegerValue(placement["creation_number"]);
             var expectedIdKind = member?.Equals("war3map.doo", StringComparison.OrdinalIgnoreCase) == true ? "doodad" : "unit";
-            if (creation is null || id is null || id != $"{expectedIdKind}:{creation}") Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Placed-object IDs must be derived from the native creation number and archive member.", "Use unit:<creation_number> or doodad:<creation_number>.");
-            if (creation is not null && member is not null && !nativeIdentities.Add($"{member}:{creation}")) Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Native placement creation numbers must be unique within an archive member.", "Preserve one canonical placement per native creation number.");
+            if (kind == "special_doodad")
+            {
+                var expectedSpecialId = SpecialDoodadId(placement);
+                if (creation is not null || id is null || expectedSpecialId is null || id != expectedSpecialId) Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Special doodad IDs must be derived from rawcode and integer position because the native record has no creation number.", "Use special-doodad:<rawcode>:<x>:<y>.");
+            }
+            else
+            {
+                if (creation is null || id is null || id != $"{expectedIdKind}:{creation}") Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Placed-object IDs must be derived from the native creation number and archive member.", "Use unit:<creation_number> or doodad:<creation_number>.");
+                if (creation is not null && member is not null && !nativeIdentities.Add($"{member}:{creation}")) Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Native placement creation numbers must be unique within an archive member.", "Preserve one canonical placement per native creation number.");
+            }
             var owner = IntegerValue(placement["owner_id"]);
             if (owner is not null && (owner is < 1 or > 24 || !PlayerExists(root, owner.Value))) Add(findings, "error", "PLACEMENT_OWNER_INVALID", "placed_objects", id, "Placement owner_id must reference a declared player slot from 1 through 24.", "Use an explicit valid player ID.");
             if (placement["position"] is JsonObject position)

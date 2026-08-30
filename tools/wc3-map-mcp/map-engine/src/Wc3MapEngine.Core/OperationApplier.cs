@@ -45,6 +45,7 @@ public static class OperationApplier
         var working = root.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Canonical map could not be cloned.");
         RefreshRegionReferences(working);
         var allChanges = new JsonArray();
+        var referenceRewrites = new JsonArray();
         var applied = new JsonArray();
         var operationIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var operationTypes = operations.OfType<JsonObject>().Select(operation => RequiredString(operation, "type")).ToArray();
@@ -53,7 +54,8 @@ public static class OperationApplier
             throw new EngineException("INVALID_ARGUMENT", "set_trigger_mode must be the only operation in a transaction batch.");
         }
 
-        foreach (var operationNode in operations)
+        var orderedOperations = OrderOperations(operations);
+        foreach (var operationNode in orderedOperations)
         {
             if (operationNode is not JsonObject operation)
             {
@@ -80,6 +82,20 @@ public static class OperationApplier
                 }
 
                 allChanges.Add(change.DeepClone());
+                if (string.Equals(operation["type"]?.GetValue<string>(), "rename_region", StringComparison.Ordinal)
+                    && IsReferenceRewritePath(change["path"]?.GetValue<string>()))
+                {
+                    referenceRewrites.Add(new JsonObject
+                    {
+                        ["operation_id"] = operationId,
+                        ["component"] = change["component"]?.DeepClone(),
+                        ["path"] = change["path"]?.DeepClone(),
+                        ["before"] = change["before"]?.DeepClone(),
+                        ["after"] = change["after"]?.DeepClone(),
+                        ["kind"] = "generated_reference_rewrite",
+                        ["provenance"] = "derived"
+                    });
+                }
             }
 
             applied.Add(operationId);
@@ -121,10 +137,66 @@ public static class OperationApplier
             ["diff"] = new JsonObject
             {
                 ["schema_version"] = "1.0",
-                ["changes"] = allChanges
+                ["changes"] = allChanges,
+                ["groups"] = GroupChanges(allChanges),
+                ["reference_rewrites"] = referenceRewrites,
+                ["dependency_order"] = new JsonArray(orderedOperations.Select(operation => (JsonNode?)new JsonObject
+                {
+                    ["operation_id"] = operation["operation_id"]?.DeepClone(),
+                    ["type"] = operation["type"]?.DeepClone(),
+                    ["phase"] = OperationPhase(operation["type"]?.GetValue<string>() ?? string.Empty)
+                }).ToArray())
             },
             ["applied_operation_ids"] = applied
         };
+    }
+
+    private static IReadOnlyList<JsonObject> OrderOperations(JsonArray operations)
+    {
+        return operations.OfType<JsonObject>()
+            .Select((operation, index) => (operation, index))
+            .OrderBy(item => OperationPhase(RequiredString(item.operation, "type")))
+            .ThenBy(item => item.index)
+            .Select(item => item.operation)
+            .ToArray();
+    }
+
+    private static int OperationPhase(string type) => type switch
+    {
+        "set_map_metadata" => 0,
+        "create_player_slot" or "set_player_slot" => 10,
+        "create_force" or "set_force" or "create_team" or "set_team" or "set_team_arena" or "set_team_members" or "delete_team" => 20,
+        "delete_player_slot" or "delete_force" => 25,
+        "create_region" or "update_region" or "rename_region" or "reorder_regions" or "set_region_role" or "delete_region" => 30,
+        "create_object_definition" or "update_object_definition" or "set_object_data" => 40,
+        "place_object" or "place_unit" or "move_object" or "move_unit" or "update_placed_object" or "remove_placed_object" or "remove_placed_unit" => 50,
+        "set_object_reference" => 55,
+        "delete_object_definition" => 70,
+        "upsert_script_module" or "remove_script_module" or "create_trigger" or "update_trigger" or "move_trigger" or "delete_trigger" or "create_variable" or "update_variable" or "delete_variable" => 80,
+        "set_script_source" => 85,
+        "set_trigger_mode" => 90,
+        _ => 100
+    };
+
+    private static bool IsReferenceRewritePath(string? path)
+        => path is not null && (path.Contains("references", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("region_name", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("region_roles", StringComparison.OrdinalIgnoreCase));
+
+    private static JsonArray GroupChanges(JsonArray changes)
+    {
+        var groups = new JsonArray();
+        foreach (var group in changes.OfType<JsonObject>().GroupBy(change => change["component"]?.GetValue<string>() ?? "unknown", StringComparer.Ordinal))
+        {
+            groups.Add(new JsonObject
+            {
+                ["component"] = group.Key,
+                ["change_count"] = group.Count(),
+                ["changes"] = new JsonArray(group.Select(change => (JsonNode?)change.DeepClone()).ToArray())
+            });
+        }
+
+        return groups;
     }
 
     private static void ApplyOne(JsonObject root, JsonObject operation)
@@ -1151,13 +1223,23 @@ public static class OperationApplier
         if (kind is not ("unit" or "item" or "building" or "doodad" or "destructable" or "special_doodad")) throw new EngineException("INVALID_ARGUMENT", $"Placement kind '{kind}' is not supported.");
         var expectedMember = ObjectPlacementSupport.MemberForPlacementKind(kind);
         if (!string.Equals(result["member"]!.GetValue<string>(), expectedMember, StringComparison.OrdinalIgnoreCase)) throw new EngineException("INVALID_ARGUMENT", "Placement kind and archive member do not agree.");
-        result["creation_number"] ??= NextPlacementCreationNumber(root, expectedMember);
         var identityKind = ObjectPlacementSupport.IdentityKindForMember(expectedMember);
-        var derivedId = $"{identityKind}:{IntValue(result["creation_number"])}";
         var requestedId = StringValue(target, "id") ?? StringValue(result, "id");
-        if (requestedId is not null && !string.Equals(requestedId, derivedId, StringComparison.Ordinal)
-            && !string.Equals(requestedId, $"{kind}:{IntValue(result["creation_number"])}", StringComparison.Ordinal)) throw new EngineException("INVALID_ARGUMENT", $"Placement id '{requestedId}' must equal its native stable id '{derivedId}' for binary round-trip.");
-        result["id"] = derivedId;
+        if (kind == "special_doodad")
+        {
+            var specialId = requestedId ?? SpecialDoodadId(result);
+            if (!string.Equals(specialId, SpecialDoodadId(result), StringComparison.Ordinal)) throw new EngineException("INVALID_ARGUMENT", $"Special doodad id '{specialId}' must be derived from its rawcode and integer position.");
+            result["id"] = specialId;
+            result.Remove("creation_number");
+        }
+        else
+        {
+            result["creation_number"] ??= NextPlacementCreationNumber(root, expectedMember);
+            var derivedId = $"{identityKind}:{IntValue(result["creation_number"])}";
+            if (requestedId is not null && !string.Equals(requestedId, derivedId, StringComparison.Ordinal)
+                && !string.Equals(requestedId, $"{kind}:{IntValue(result["creation_number"])}", StringComparison.Ordinal)) throw new EngineException("INVALID_ARGUMENT", $"Placement id '{requestedId}' must equal its native stable id '{derivedId}' for binary round-trip.");
+            result["id"] = derivedId;
+        }
         result["rawcode"] = StringValue(result, "rawcode") ?? throw new EngineException("INVALID_ARGUMENT", "Placement rawcode is required.");
         result["skin_rawcode"] ??= result["rawcode"]!.DeepClone();
         result["variation"] ??= 0;
@@ -1194,6 +1276,15 @@ public static class OperationApplier
         result["provenance"] = "intended_design";
         result["capability"] = "typed_write_enabled";
         return result;
+    }
+
+    private static string SpecialDoodadId(JsonObject placement)
+    {
+        var position = placement["position"] as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "Special doodad placement requires position.");
+        var rawcode = StringValue(placement, "rawcode") ?? throw new EngineException("INVALID_ARGUMENT", "Special doodad placement requires rawcode.");
+        var x = RequiredIntValue(position["x"] ?? throw new EngineException("INVALID_ARGUMENT", "Special doodad position requires integer x."), "position.x", int.MinValue, int.MaxValue);
+        var y = RequiredIntValue(position["y"] ?? throw new EngineException("INVALID_ARGUMENT", "Special doodad position requires integer y."), "position.y", int.MinValue, int.MaxValue);
+        return FormattableString.Invariant($"special-doodad:{rawcode}:{x}:{y}");
     }
 
     private static void ValidatePlacement(JsonObject root, JsonObject placement)
@@ -1694,7 +1785,7 @@ public static class OperationApplier
 
     private static void RewriteKnownRegionReferences(JsonObject root, string oldName, string newName, string? regionId)
     {
-        foreach (var section in new[] { "triggers", "variables", "gameplay_triggers", "gameplay_variables", "teams", "region_roles" })
+        foreach (var section in new[] { "triggers", "variables", "gameplay_triggers", "gameplay_variables", "teams", "region_roles", "placed_objects" })
         {
             if (root[section] is not JsonNode sectionValue) continue;
             Rewrite(sectionValue, oldName, newName, regionId);
@@ -1726,7 +1817,7 @@ public static class OperationApplier
     {
         var name = StringValue(region, "name");
         var id = StringValue(region, "id");
-        foreach (var (section, value) in new[] { "triggers", "variables", "gameplay_triggers", "gameplay_variables", "teams", "region_roles" }
+        foreach (var (section, value) in new[] { "triggers", "variables", "gameplay_triggers", "gameplay_variables", "teams", "region_roles", "placed_objects" }
             .Where(section => root[section] is not null)
             .Select(section => (section, value: root[section]!)))
         {
@@ -1776,6 +1867,7 @@ public static class OperationApplier
             ("gameplay_variables", "mcp_owned"),
             ("teams", "mcp_owned"),
             ("region_roles", "derived_roles"),
+            ("placed_objects", "mcp_owned"),
             ("custom_text", "custom_text")
         })
         {
@@ -1801,6 +1893,12 @@ public static class OperationApplier
                 else if (property.Key == "region_id" && StringValue(property.Value) == id)
                 {
                     output.Add(new JsonObject { ["section"] = section, ["path"] = propertyPath, ["kind"] = "id" });
+                }
+                else if (property.Key == "waygate_destination_region_id"
+                    && RegionCreationNumber(id) is int creationNumber
+                    && IntValue(property.Value) == creationNumber)
+                {
+                    output.Add(new JsonObject { ["section"] = section, ["path"] = propertyPath, ["kind"] = "creation_number" });
                 }
                 else if (property.Key == "regions" && property.Value is JsonArray regionNames)
                 {
@@ -1833,6 +1931,9 @@ public static class OperationApplier
             {
                 if (property.Key is "region_name" or "region" or "region_handle" && name is not null && StringValue(property.Value) == name) return true;
                 if (property.Key == "region_id" && id is not null && StringValue(property.Value) == id) return true;
+                if (property.Key == "waygate_destination_region_id"
+                    && RegionCreationNumber(id) is int creationNumber
+                    && IntValue(property.Value) == creationNumber) return true;
                 if (property.Key == "regions" && property.Value is JsonArray names && names.Any(item => StringValue(item) == name)) return true;
                 if (property.Value is not null && ContainsRegionReference(property.Value, name, id)) return true;
             }
@@ -1843,6 +1944,12 @@ public static class OperationApplier
         }
         return false;
     }
+
+    private static int? RegionCreationNumber(string? id)
+        => id is not null && id.StartsWith("region:", StringComparison.Ordinal)
+            && int.TryParse(id["region:".Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var creationNumber)
+            ? creationNumber
+            : null;
 
     private static void EnsureCreateExpected(JsonNode? expected, string operation)
     {

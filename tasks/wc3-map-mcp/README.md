@@ -1,6 +1,6 @@
 # WC3 Map MCP - Agent Task Index
 
-Status: Phase 4 launch/evidence implementation complete; the full MCP feature-extension packets are now defined, while manual World Editor/Warcraft III compatibility gates and feature implementation remain pending.
+Status: Phase 5F MCP-native/static rollout implemented; fixture and cross-feature integration coverage are checked in. Manual World Editor/Warcraft III compatibility gates, exact GUI trigger compatibility, and runtime gameplay evidence remain separate acceptance gates.
 
 This directory is a self-contained implementation manual for agents that know nothing about the preceding conversation. The objective is a local Model Context Protocol server that allows Codex or another MCP-capable agent to inspect, safely modify, build, validate, and test Warcraft III custom maps.
 
@@ -53,7 +53,7 @@ No phase may be marked complete because source code exists or a command exited s
 
 The completion report must say which evidence level was actually reached and list anything not tested. The feature packets distinguish MCP-native JASS gameplay support from editor-compatible GUI trigger support; they are separate capabilities.
 
-Current implementation evidence: Phase 3 engine/MCP build-validation paths and Phase 4 launch/session paths are implemented, with 29 .NET tests and 37 MCP tests passing. The current source remains hash-stable at `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. Runtime launch is not marked passed until the exact build is observed in World Editor and Warcraft III.
+Current implementation evidence: the Phase 5F MCP-native/static rollout is implemented, with 67 .NET engine tests and 43 MCP tests passing. The current source remains hash-stable at `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. Runtime launch is not marked passed until the exact build is observed in World Editor and Warcraft III.
 
 ## Existing Hero Team Wars authority layers
 

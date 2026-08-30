@@ -5,6 +5,7 @@ import { readPath, relativeProjectPath, resolveConfiguredPath, resolveProject, s
 import { AppError } from "../errors/app-error.js";
 import { sha256File } from "./artifact-service.js";
 import { WorkerClient } from "../transport/worker-client.js";
+import { capabilityMatrix, isToolEnabledForProject, isToolSupportedByProfile, type CapabilityProfile } from "./capability-catalog.js";
 
 export class ProjectService {
   public constructor(private readonly config: Wc3Config, private readonly worker: WorkerClient) {}
@@ -22,9 +23,24 @@ export class ProjectService {
 
   public assertToolAvailable(projectId: string, toolName: string): void {
     const project = this.project(projectId);
-    if (project.config.enabled_tools.length > 0 && !project.config.enabled_tools.includes(toolName)) {
+    if (!isToolEnabledForProject(project.config, toolName)) {
       throw new AppError("INVALID_ARGUMENT", `Tool '${toolName}' is not enabled for project '${projectId}'.`);
     }
+  }
+
+  public assertProfile(projectId: string, requested: string | undefined, operation: string): CapabilityProfile {
+    const project = this.project(projectId);
+    const profile = requested ?? project.config.profile;
+    if (!isToolSupportedByProfile(project.config.profile, operation)) {
+      throw new AppError("CAPABILITY_GATED", `Operation '${operation}' is not enabled for project profile '${project.config.profile}'.`, false, { project_id: projectId, profile: project.config.profile, operation });
+    }
+    if (profile !== project.config.profile) {
+      throw new AppError("CAPABILITY_GATED", `Requested profile '${profile}' does not match project profile '${project.config.profile}'.`, false, { project_id: projectId, requested_profile: profile, project_profile: project.config.profile });
+    }
+    if (profile === "gui_compatible") {
+      throw new AppError("CAPABILITY_GATED", `Operation '${operation}' is gated for gui_compatible until exact GUI trigger evidence exists.`, false, { project_id: projectId, profile });
+    }
+    return profile as CapabilityProfile;
   }
 
   public assertMutationAllowed(projectId: string, toolName: string): void {
@@ -78,9 +94,8 @@ export class ProjectService {
     const transactionTools = ["wc3_begin_transaction", "wc3_apply_operations", "wc3_transaction_diff", "wc3_validate_transaction", "wc3_discard_transaction"];
     const gameplayTools = ["wc3_compose_gameplay_source", "wc3_validate_gameplay_source", "wc3_prepare_gameplay_chunk", "wc3_run_scenario_build", "wc3_record_chunk_result"];
     const laterTools = ["wc3_build_map", "wc3_build_report", "wc3_launch_editor", "wc3_launch_test_map", "wc3_record_test_result", "wc3_get_test_session", "wc3_promote_build", ...gameplayTools];
-    const enabledTools = project.config.enabled_tools.length > 0
-      ? project.config.enabled_tools
-      : project.config.write_policy === "read_only" ? readOnlyTools : [...readOnlyTools, ...transactionTools, ...laterTools];
+    const allTools = [...new Set([...readOnlyTools, ...transactionTools, ...laterTools])];
+    const enabledTools = allTools.filter(tool => isToolEnabledForProject(project.config, tool));
     return {
       schema_version: "1.0",
       project_id: project.id,
@@ -94,8 +109,9 @@ export class ProjectService {
       capability_summary: { inspection: "enabled", comparison: "enabled", validation: project.config.write_policy === "read_only" ? "read_only" : "transactional", mutation: project.config.write_policy === "read_only" ? "disabled" : "typed_write_enabled", script_source: project.config.write_policy === "read_only" ? "disabled" : project.config.script_policy, build: project.config.write_policy === "read_only" ? "disabled" : "available_after_validation", launch: project.config.write_policy === "read_only" ? "disabled" : "approval_gated", deletion: project.config.write_policy === "read_only" ? "disabled" : "confirmed_transaction_only" },
       profile: project.config.profile,
       gameplay_capabilities: { source_composition: "mcp_native_jass", gui_trigger_compatibility: "gated_pending_exact_fixture_and_editor_evidence", scenarios: "static_only", runtime_evidence: "explicit_observation_only" },
-      enabled_tools: enabledTools.filter(tool => (project.config.write_policy !== "read_only" || readOnlyTools.includes(tool))),
-      disabled_tools: [...transactionTools, ...laterTools].filter(tool => !enabledTools.includes(tool)),
+      capability_matrix: capabilityMatrix(project.config),
+      enabled_tools: enabledTools,
+      disabled_tools: allTools.filter(tool => !enabledTools.includes(tool)),
       disabled_until_evidence: [...(project.config.script_policy === "disabled" ? ["script_source_mutation"] : []), "generic_archive_patch", "autonomous_promotion"],
       roots: { staging: relativeProjectPath(project, project.stagingRoot), artifacts: relativeProjectPath(project, project.artifactRoot), builds: relativeProjectPath(project, project.buildRoot) }
     };

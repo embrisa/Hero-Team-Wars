@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0",
   "profile": "mvp_2arena",
+  "native_catalogue_version": "war3-jass-native-catalogue-1.0",
   "regions": [
     { "id": "region:0", "name": "Arena_A", "min_x": 1152, "min_y": -3072, "max_x": 2496, "max_y": -448, "creation_number": 0 },
     { "id": "region:1", "name": "Arena_B", "min_x": -2464, "min_y": -64, "max_x": -320, "max_y": 2240, "creation_number": 1 },
@@ -69,6 +70,22 @@
       "active_player_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       "team_ids": ["team_1", "team_2", "team_3", "team_4", "team_5", "team_6"],
       "arena_ids": ["arena_1", "arena_2", "arena_3", "arena_4", "arena_5", "arena_6"],
+      "regions": [
+        { "id": "region:0", "name": "Arena_1", "min_x": 1152, "min_y": -3072, "max_x": 2496, "max_y": -448, "creation_number": 0 },
+        { "id": "region:1", "name": "Arena_2", "min_x": -2464, "min_y": -64, "max_x": -320, "max_y": 2240, "creation_number": 1 },
+        { "id": "region:2", "name": "Arena_3", "min_x": -2880, "min_y": -1600, "max_x": -1600, "max_y": -320, "creation_number": 2 },
+        { "id": "region:3", "name": "Arena_4", "min_x": -1600, "min_y": -1600, "max_x": -320, "max_y": -320, "creation_number": 3 },
+        { "id": "region:4", "name": "Arena_5", "min_x": 320, "min_y": -1400, "max_x": 960, "max_y": -320, "creation_number": 4 },
+        { "id": "region:5", "name": "Arena_6", "min_x": 1100, "min_y": -300, "max_x": 2300, "max_y": 900, "creation_number": 5 }
+      ],
+      "region_roles": [
+        { "region_name": "Arena_1", "role": "arena" },
+        { "region_name": "Arena_2", "role": "arena" },
+        { "region_name": "Arena_3", "role": "arena" },
+        { "region_name": "Arena_4", "role": "arena" },
+        { "region_name": "Arena_5", "role": "arena" },
+        { "region_name": "Arena_6", "role": "arena" }
+      ],
       "shared_team_lives": 15,
       "shared_vision": true,
       "shared_unit_control": false,

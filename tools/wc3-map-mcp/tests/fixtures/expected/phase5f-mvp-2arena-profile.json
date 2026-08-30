@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "fixture_id": "phase5f-mvp-2arena-profile",
+  "origin": "Hero Team Wars design manifest; no Blizzard asset bytes",
+  "distribution": "checked-in JSON expectation only; the source .w3m remains local and immutable",
+  "profile": "mvp_2arena",
+  "active_player_ids": [1, 2, 3, 4],
+  "team_ids": ["team_1", "team_2"],
+  "arena_ids": ["arena_a", "arena_b"],
+  "required_chunks": ["HTW-01", "HTW-02", "HTW-03", "HTW-04", "HTW-05"],
+  "required_typed_members": ["war3map.w3i", "war3map.w3r", "war3map.j"],
+  "required_object_members": ["war3map.w3u", "war3map.w3a", "war3map.w3t", "war3map.w3b", "war3map.w3d", "war3map.w3h", "war3map.w3q"],
+  "required_placement_members": ["war3mapUnits.doo", "war3map.doo"],
+  "gui_trigger_support": "gated",
+  "runtime_evidence": "separate_exact_build_observation_required"
+}

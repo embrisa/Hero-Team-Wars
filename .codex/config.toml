@@ -14,6 +14,8 @@ enabled_tools = [
   "wc3_get_script_source",
   "wc3_validate_map",
   "wc3_compare_maps",
+  "wc3_compose_gameplay_source",
+  "wc3_validate_gameplay_source",
   "wc3_begin_transaction",
   "wc3_apply_operations",
   "wc3_transaction_diff",
@@ -26,5 +28,8 @@ enabled_tools = [
   "wc3_launch_test_map",
   "wc3_record_test_result",
   "wc3_get_test_session",
+  "wc3_prepare_gameplay_chunk",
+  "wc3_run_scenario_build",
+  "wc3_record_chunk_result",
 ]
 default_tools_approval_mode = "writes"

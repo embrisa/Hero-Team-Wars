@@ -36,20 +36,33 @@ const objectDefinitionUpdateSchema = z.object({ display_name: z.string().min(1).
 const positionSchema = z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite() }).strict();
 const placementInventorySchema = z.object({ slot: z.number().int().min(0).max(5), rawcode }).strict();
 const placementAbilitySchema = z.object({ rawcode, autocast_active: z.boolean().optional(), hero_ability_level: z.number().int().nonnegative().optional() }).strict();
+const placementId = z.string().regex(/^(unit|doodad):[0-9]+$|^special-doodad:.+:-?[0-9]+:-?[0-9]+$/);
 const placementSchema = z.object({
-  id: z.string().regex(/^(unit|doodad):[0-9]+$/).optional(), member: z.enum(["war3mapUnits.doo", "war3map.doo"]).optional(),
+  id: placementId.optional(), member: z.enum(["war3mapUnits.doo", "war3map.doo"]).optional(),
   kind: z.enum(["unit", "building", "item", "doodad", "destructable", "special_doodad"]), rawcode, skin_rawcode: rawcode.optional(), owner_id: z.number().int().min(1).max(24).optional(),
-  flags: z.number().int().optional(), inventory: z.array(placementInventorySchema).optional(), abilities: z.array(placementAbilitySchema).optional(), position: positionSchema,
-  facing: z.number().finite().optional(), scale: positionSchema.optional(), variation: z.number().int().nonnegative().optional(), creation_number: z.number().int().nonnegative().optional(),
-  waygate_destination_region_id: z.number().int().min(-1).optional(), map_region_role: z.unknown().optional(), provenance: z.string().optional(), capability: z.string().optional()
+  flags: z.number().int().optional(), unknown_1: z.number().int().min(0).max(255).optional(), unknown_2: z.number().int().min(0).max(255).optional(),
+  hit_points: z.number().int().optional(), mana_points: z.number().int().optional(), gold_amount: z.number().int().nonnegative().optional(), target_acquisition: z.number().finite().optional(),
+  hero_level: z.number().int().nonnegative().optional(), hero_strength: z.number().int().nonnegative().optional(), hero_agility: z.number().int().nonnegative().optional(), hero_intelligence: z.number().int().nonnegative().optional(),
+  inventory: z.array(placementInventorySchema).optional(), abilities: z.array(placementAbilitySchema).optional(), random_data_mode: z.string().optional(), random_data: z.unknown().optional(),
+  custom_player_color_id: z.number().int().min(-1).max(24).optional(), waygate_destination_region_id: z.number().int().min(-1).optional(),
+  position: positionSchema, facing: z.number().finite().optional(), scale: positionSchema.optional(), variation: z.number().int().nonnegative().optional(),
+  map_item_table_id: z.number().int().min(-1).optional(), item_table_sets: z.array(z.unknown()).optional(), state: z.string().optional(), life: z.number().finite().optional(),
+  creation_number: z.number().int().nonnegative().optional(), map_region_role: z.unknown().optional(), provenance: z.string().optional(), capability: z.string().optional()
 }).strict();
 const placementUpdateSchema = placementSchema.partial().omit({ id: true, member: true, kind: true, creation_number: true }).refine(value => Object.keys(value).length > 0, "Placed-object update requires at least one typed field.");
 const objectTargetSchema = z.object({ id: z.string().min(1).optional(), category: objectCategory.optional(), rawcode: rawcode.optional() }).strict();
-const placementTargetSchema = z.object({ id: z.string().regex(/^(unit|doodad):[0-9]+$/).optional(), creation_number: z.number().int().nonnegative().optional() }).strict().refine(value => Object.keys(value).length > 0, "Placement target requires id or creation_number.");
+const placementTargetSchema = z.object({ id: placementId.optional(), creation_number: z.number().int().nonnegative().optional() }).strict().refine(value => Object.keys(value).length > 0, "Placement target requires id or creation_number.");
 const objectReferenceValueSchema = z.union([rawcode, z.object({ rawcode }).strict(), z.number().int().nonnegative(), z.object({ player_id: z.number().int().min(1).max(24) }).strict(), z.object({ region_id: z.union([z.number().int().nonnegative(), z.string().regex(/^region:[0-9]+$/)]) }).strict()]);
 
 const scriptSourceValue = z.object({ language: z.string().regex(/^jass$/i), source: z.string().min(1).max(16 * 1024 * 1024), source_strategy: z.literal("composed").optional() }).strict();
 const scriptExpectedValue = z.union([sha256Schema, z.object({ sha256: sha256Schema }).strict()]);
+const playerState = z.enum([
+  "PLAYER_STATE_GAME_RESULT", "PLAYER_STATE_RESOURCE_GOLD", "PLAYER_STATE_RESOURCE_LUMBER", "PLAYER_STATE_RESOURCE_FOOD_CAP", "PLAYER_STATE_RESOURCE_FOOD_USED",
+  "PLAYER_STATE_FOOD_CAP_CEILING", "PLAYER_STATE_GIVES_BOUNTY", "PLAYER_STATE_ALLIED_VICTORY", "PLAYER_STATE_PLACED", "PLAYER_STATE_OBSERVER_ON_DEATH",
+  "PLAYER_STATE_OBSERVER", "PLAYER_STATE_UNFOLLOWABLE", "PLAYER_STATE_GOLD_UPKEEP_RATE", "PLAYER_STATE_LUMBER_UPKEEP_RATE", "PLAYER_STATE_GOLD_GATHERED",
+  "PLAYER_STATE_LUMBER_GATHERED", "PLAYER_STATE_RESCUABLE", "PLAYER_STATE_SHARED_CONTROL", "PLAYER_STATE_SHARED_ADVANCED_CONTROL", "PLAYER_STATE_UNIT_CAP",
+  "PLAYER_STATE_HERO_LIMIT", "PLAYER_STATE_RESOURCE_HERO_TOKENS", "PLAYER_STATE_RESOURCE_DEATH", "PLAYER_STATE_RESOURCE_HERO_LEVEL", "PLAYER_STATE_RESOURCE_HERO_SKILL"
+]);
 
 const eventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("map_initialization") }).strict(),
@@ -58,7 +71,7 @@ const eventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("player_chat"), player_id: z.number().int().min(1).max(24), message: z.string().min(1), exact: z.boolean().optional() }).strict(),
   z.object({ type: z.literal("unit_death"), player_id: z.number().int().min(1).max(24).optional(), unit_rawcode: rawcode.optional() }).strict(),
   z.object({ type: z.literal("region_entry"), region_id: identifier.optional(), region_name: z.string().min(1).optional() }).strict().refine(value => value.region_id !== undefined || value.region_name !== undefined, "region_entry requires region_id or region_name"),
-  z.object({ type: z.literal("player_state_change"), player_id: z.number().int().min(1).max(24), state: identifier, operator: z.enum(["equal", "not_equal", "less", "less_equal", "greater", "greater_equal"]), value: z.number() }).strict(),
+  z.object({ type: z.literal("player_state_change"), player_id: z.number().int().min(1).max(24), state: playerState, operator: z.enum(["equal", "not_equal", "less", "less_equal", "greater", "greater_equal"]), value: z.number() }).strict(),
   z.object({ type: z.literal("custom_event"), name: identifier }).strict()
 ]);
 
@@ -262,7 +275,7 @@ export const operationSchema = z.object({
     if (!objectReferenceValueSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_object_reference requires a typed rawcode, player, or region reference." });
   }
   if (["place_object", "place_unit"].includes(operation.type)) {
-    if (!z.object({ id: z.string().regex(/^(unit|doodad):[0-9]+$/).optional() }).strict().safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Placement creation targets may contain only an optional stable id." });
+    if (!z.object({ id: placementId.optional() }).strict().safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Placement creation targets may contain only an optional stable id." });
     if (operation.expected !== undefined) context.addIssue({ code: "custom", path: ["expected"], message: "Placement creation requires an absent expected value." });
     if (!placementSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "Placement creation requires a typed kind, rawcode, and position." });
   }

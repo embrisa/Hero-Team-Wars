@@ -3,7 +3,7 @@ function HTW_Economy_GrantPersonalGold takes nothing returns nothing
     local integer teamIndex
     set playerId = 1
     loop
-        exitwhen playerId > 12
+        exitwhen playerId > HTW_ActivePlayerCount
         set teamIndex = HTW_Teams_FindByPlayer(playerId)
         if teamIndex > 0 and HTW_TeamLiving[teamIndex] then
             set HTW_PlayerGold[playerId] = HTW_PlayerGold[playerId] + HTW_WaveReward + HTW_InterestGold
@@ -15,7 +15,7 @@ endfunction
 function HTW_Economy_Purchase takes integer playerId, integer unitType, integer quantity, integer cost returns boolean
     local integer teamIndex
     local integer destinationTeam
-    if playerId < 1 or playerId > 12 or quantity <= 0 or cost < 0 or unitType == 0 then
+    if playerId < 1 or playerId > HTW_ActivePlayerCount or quantity <= 0 or cost < 0 or unitType == 0 then
         return false
     endif
     if HTW_Phase != 1 or HTW_MatchOver then

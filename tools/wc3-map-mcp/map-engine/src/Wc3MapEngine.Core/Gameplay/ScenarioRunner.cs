@@ -26,6 +26,10 @@ public static class ScenarioRunner
         var profile = payload["profile"]?.GetValue<string>() ?? HtwProfileModel.MvpProfile;
         if (!HtwProfileModel.IsKnown(profile)) throw new EngineException("INVALID_ARGUMENT", $"Unknown scenario profile '{profile}'.");
         var chunkId = payload["chunk_id"]?.GetValue<string>() ?? "unassigned";
+        if (string.Equals(chunkId, "HTW-06", StringComparison.Ordinal) && profile != HtwProfileModel.FullProfile)
+        {
+            throw new EngineException("CAPABILITY_GATED", "HTW-06 scenario evidence requires the full_6team profile.");
+        }
         var requested = payload["scenario_ids"] as JsonArray;
         var scenarios = requested is null
             ? KnownScenarios.Where(name => profile == HtwProfileModel.FullProfile || !name.StartsWith("six_team_", StringComparison.Ordinal)).ToList()

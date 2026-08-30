@@ -37,6 +37,22 @@ public sealed class GameplayComposerTests
     }
 
     [Fact]
+    public void ComposerExpandsFullProfileToTwelvePlayersSixTeamsAndSixArenas()
+    {
+        var composed = GameplaySourceComposer.Compose(FindManifest(), "full_6team");
+        var source = composed["source"]!.GetValue<string>();
+
+        Assert.Equal("full_6team", composed["profile"]!.GetValue<string>());
+        Assert.Equal(12, composed["teams"]!.AsArray().SelectMany(team => team!["member_player_ids"]!.AsArray()).Count());
+        Assert.Equal(6, composed["region_roles"]!.AsArray().Count(item => item!["role"]!.GetValue<string>() == "arena"));
+        Assert.Contains("set HTW_ActivePlayerCount = 12", source);
+        Assert.Contains("set HTW_ArenaCount = 6", source);
+        Assert.DoesNotContain("for i = 1 to 4", source);
+        Assert.DoesNotContain("for i = 1 to 2", source);
+        Assert.Equal(JassNativeCatalogue.Version, composed["native_catalogue_version"]!.GetValue<string>());
+    }
+
+    [Fact]
     public void ScenarioHarnessUsesLockedSixTeamOffset()
     {
         var report = ScenarioRunner.Run(new JsonObject
@@ -157,6 +173,26 @@ public sealed class GameplayComposerTests
         var reference = Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateCollections(unresolved));
         Assert.Equal("INVALID_ARGUMENT", reference.Code);
         Assert.Contains("unknown region", reference.Message);
+    }
+
+    [Fact]
+    public void GameplayValidatorRejectsPlayerStateOutsidePinnedNativeCatalogue()
+    {
+        var trigger = new JsonObject
+        {
+            ["id"] = "state",
+            ["name"] = "State",
+            ["folder_path"] = "MCP",
+            ["events"] = new JsonArray(new JsonObject
+            {
+                ["type"] = "player_state_change", ["player_id"] = 1, ["state"] = "PLAYER_STATE_NOT_REAL", ["operator"] = "equal", ["value"] = 1
+            })
+        };
+
+        var exception = Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateTrigger(trigger));
+
+        Assert.Equal("INVALID_ARGUMENT", exception.Code);
+        Assert.Contains(JassNativeCatalogue.Version, exception.Message);
     }
 
     private static string FindManifest()

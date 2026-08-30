@@ -152,6 +152,44 @@ public sealed class OperationTests
     }
 
     [Fact]
+    public void CrossFeatureBatchIsAppliedInDeclaredDependencyOrder()
+    {
+        var canonical = Canonical();
+        var ids = Enumerable.Range(1, 4).Select(_ => Guid.NewGuid().ToString()).ToArray();
+        var operations = new JsonArray(
+            new JsonObject
+            {
+                ["operation_id"] = ids[3], ["type"] = "place_object", ["target"] = new JsonObject(),
+                ["value"] = new JsonObject { ["kind"] = "unit", ["rawcode"] = "Z001", ["owner_id"] = 2, ["position"] = new JsonObject { ["x"] = 32, ["y"] = 32, ["z"] = 0 } },
+                ["rationale"] = "Exercise placement dependency ordering."
+            },
+            new JsonObject
+            {
+                ["operation_id"] = ids[2], ["type"] = "create_object_definition", ["target"] = new JsonObject { ["category"] = "unit", ["rawcode"] = "Z001" },
+                ["value"] = new JsonObject { ["category"] = "unit", ["object_kind"] = "custom", ["base_rawcode"] = "hfoo", ["custom_rawcode"] = "Z001", ["rawcode"] = "Z001", ["unknown_ids"] = new JsonArray(), ["modifications"] = new JsonArray() },
+                ["rationale"] = "Exercise object-definition dependency ordering."
+            },
+            new JsonObject
+            {
+                ["operation_id"] = ids[1], ["type"] = "create_force", ["target"] = new JsonObject { ["index"] = 0 },
+                ["value"] = new JsonObject { ["name"] = "Team 1", ["flags"] = 9, ["player_ids"] = new JsonArray(2), ["player_mask"] = 2 },
+                ["rationale"] = "Exercise force dependency ordering."
+            },
+            new JsonObject
+            {
+                ["operation_id"] = ids[0], ["type"] = "create_player_slot", ["target"] = new JsonObject { ["id"] = 2 },
+                ["value"] = new JsonObject { ["id"] = 2, ["name"] = "Player 2", ["controller"] = "User", ["race"] = "Selectable", ["flags"] = 0, ["start"] = new JsonObject { ["x"] = 0, ["y"] = 0 } },
+                ["rationale"] = "Exercise player dependency ordering."
+            });
+
+        var result = OperationApplier.Apply(canonical, operations);
+        Assert.Equal(new[] { ids[0], ids[1], ids[2], ids[3] }, result["applied_operation_ids"]!.AsArray().Select(item => item!.GetValue<string>()));
+        Assert.Equal(new[] { "create_player_slot", "create_force", "create_object_definition", "place_object" }, result["diff"]!["dependency_order"]!.AsArray().Select(item => item!["type"]!.GetValue<string>()));
+        Assert.Contains(result["diff"]!["groups"]!.AsArray().OfType<JsonObject>(), group => group["component"]!.GetValue<string>() == "players");
+        Assert.Contains(result["canonical_map"]!["placed_objects"]!.AsArray().OfType<JsonObject>(), placement => placement["rawcode"]!.GetValue<string>() == "Z001");
+    }
+
+    [Fact]
     public void ScriptOperationStagesMcpOwnedJassWithHashPrecondition()
     {
         const string before = "function main takes nothing returns nothing\nendfunction\n";

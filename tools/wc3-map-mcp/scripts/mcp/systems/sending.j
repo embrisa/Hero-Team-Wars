@@ -17,8 +17,8 @@ function HTW_Sending_ProcessQueues takes nothing returns nothing
     set attempts = 0
     set playerId = HTW_SendCursor
     loop
-        exitwhen attempts >= 12
-        if playerId > 12 then
+        exitwhen attempts >= HTW_ActivePlayerCount
+        if playerId > HTW_ActivePlayerCount then
             set playerId = 1
         endif
         if HTW_PlayerQueueRemaining[playerId] > 0 then

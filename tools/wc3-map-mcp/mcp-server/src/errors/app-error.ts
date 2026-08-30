@@ -19,6 +19,7 @@ export type ErrorCode =
   | "LOCKED"
   | "LAUNCH_FAILED"
   | "PROMOTION_FAILED"
+  | "CAPABILITY_GATED"
   | "DISCARD_FAILED"
   | "OUTPUT_EXISTS"
   | "INTERNAL_ERROR";

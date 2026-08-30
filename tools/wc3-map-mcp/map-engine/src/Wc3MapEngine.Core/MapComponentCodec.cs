@@ -205,7 +205,7 @@ public static class MapComponentCodec
         {
             result.Add(new JsonObject
             {
-                ["id"] = $"special-doodad:{special.TypeId.ToRawcode()}:{special.Position.X}:{special.Position.Y}",
+                ["id"] = SpecialDoodadId(special),
                 ["member"] = "war3map.doo",
                 ["kind"] = "special_doodad",
                 ["rawcode"] = special.TypeId.ToRawcode(),
@@ -267,11 +267,17 @@ public static class MapComponentCodec
     public static MapDoodads BuildDoodads(MapDoodads source, JsonArray placements)
     {
         source.Doodads.Clear();
+        source.SpecialDoodads.Clear();
         source.Doodads.AddRange(placements.OfType<JsonObject>()
             .Where(item => string.Equals(item["member"]?.GetValue<string>(), "war3map.doo", StringComparison.OrdinalIgnoreCase)
                 && (string.Equals(item["kind"]?.GetValue<string>(), "doodad", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(item["kind"]?.GetValue<string>(), "destructable", StringComparison.OrdinalIgnoreCase)))
             .Select(ToDoodad)
+            .ToList());
+        source.SpecialDoodads.AddRange(placements.OfType<JsonObject>()
+            .Where(item => string.Equals(item["member"]?.GetValue<string>(), "war3map.doo", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item["kind"]?.GetValue<string>(), "special_doodad", StringComparison.OrdinalIgnoreCase))
+            .Select(ToSpecialDoodad)
             .ToList());
         return source;
     }
@@ -316,6 +322,8 @@ public static class MapComponentCodec
 
     public static string RegionId(Region region) => $"region:{region.CreationNumber}";
     public static string PlacementId(string kind, int creationNumber) => $"{kind}:{creationNumber}";
+    private static string SpecialDoodadId(SpecialDoodadData value)
+        => FormattableString.Invariant($"special-doodad:{value.TypeId.ToRawcode()}:{value.Position.X}:{value.Position.Y}");
 
     private static PlayerData ToPlayer(JsonObject value)
     {
@@ -443,6 +451,19 @@ public static class MapComponentCodec
             MapItemTableId = RequiredInt(value, "map_item_table_id", -1, int.MaxValue),
             CreationNumber = RequiredInt(value, "creation_number", 0, int.MaxValue)
         };
+
+    private static SpecialDoodadData ToSpecialDoodad(JsonObject value)
+    {
+        var position = value["position"] as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "Special doodad position must be an object.");
+        return new SpecialDoodadData
+        {
+            TypeId = RequiredRawcode(value, "rawcode"),
+            Variation = RequiredInt(value, "variation", 0, int.MaxValue),
+            Position = new System.Drawing.Point(
+                RequiredInt(position, "x", int.MinValue, int.MaxValue),
+                RequiredInt(position, "y", int.MinValue, int.MaxValue))
+        };
+    }
 
     private static RandomUnitData? ToRandomData(JsonObject value)
     {

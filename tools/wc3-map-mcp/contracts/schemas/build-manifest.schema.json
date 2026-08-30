@@ -6,7 +6,7 @@
   "type": "object",
   "required": [
     "schema_version", "build_id", "project_id", "transaction_id", "revision",
-    "profile", "source_sha256", "output_path", "output_sha256", "output_size_bytes",
+    "profile", "capability_profile", "source_sha256", "output_path", "output_sha256", "output_size_bytes",
     "writer_version", "validator_version", "validation_report", "archive_comparison",
     "reinspection", "warnings", "runtime_status", "created_utc", "engine_result"
   ],
@@ -17,6 +17,7 @@
     "transaction_id": { "type": "string", "format": "uuid" },
     "revision": { "type": "integer", "minimum": 0 },
     "profile": { "type": "string", "enum": ["debug", "release", "noop"] },
+    "capability_profile": { "type": "string", "enum": ["mvp_2arena", "full_6team", "gui_compatible"] },
     "source_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
     "output_path": { "type": "string", "pattern": "^(?![A-Za-z]:|/|\\\\).+\\.(w3m|w3x)$" },
     "output_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },

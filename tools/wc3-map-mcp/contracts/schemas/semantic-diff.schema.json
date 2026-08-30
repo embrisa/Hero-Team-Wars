@@ -6,7 +6,10 @@
   "required": ["schema_version", "changes"],
   "properties": {
     "schema_version": { "const": "1.0" },
-    "changes": { "type": "array", "items": { "type": "object", "required": ["component", "path", "before", "after", "change_type", "operation_id", "provenance", "target"], "properties": { "component": { "type": "string" }, "path": { "type": "string" }, "before": {}, "after": {}, "change_type": { "type": "string", "enum": ["added", "removed", "changed"] }, "operation_id": { "type": "string" }, "provenance": { "type": "string" }, "target": { "type": ["object", "null"] }, "design_reference": { "type": "string" } }, "additionalProperties": true } }
+    "changes": { "type": "array", "items": { "type": "object", "required": ["component", "path", "before", "after", "change_type", "operation_id", "provenance", "target"], "properties": { "component": { "type": "string" }, "path": { "type": "string" }, "before": {}, "after": {}, "change_type": { "type": "string", "enum": ["added", "removed", "changed"] }, "operation_id": { "type": "string" }, "provenance": { "type": "string" }, "target": { "type": ["object", "null"] }, "design_reference": { "type": "string" } }, "additionalProperties": true } },
+    "groups": { "type": "array", "items": { "type": "object", "required": ["component", "change_count", "changes"], "properties": { "component": { "type": "string" }, "change_count": { "type": "integer", "minimum": 0 }, "changes": { "type": "array" } }, "additionalProperties": true } },
+    "reference_rewrites": { "type": "array", "items": { "type": "object", "required": ["operation_id", "component", "path", "kind", "provenance"], "properties": { "operation_id": { "type": "string" }, "component": { "type": "string" }, "path": { "type": "string" }, "before": {}, "after": {}, "kind": { "type": "string" }, "provenance": { "type": "string" } }, "additionalProperties": true } },
+    "dependency_order": { "type": "array", "items": { "type": "object", "required": ["operation_id", "type", "phase"], "properties": { "operation_id": { "type": "string" }, "type": { "type": "string" }, "phase": { "type": "integer", "minimum": 0 } }, "additionalProperties": false } }
   },
   "additionalProperties": true
 }
