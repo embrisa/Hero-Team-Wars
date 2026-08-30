@@ -1,0 +1,92 @@
+schema_version: 1
+status: "baseline ledger; reconfirm in World Editor before implementation"
+last_ledger_update: "2026-08-30"
+
+map:
+  path: "map/HeroTeamWars_M0_2Arena.w3m"
+  title_last_verified: "Hero Team Wars - Two Arena MVP"
+  suggested_players_last_verified: 4
+  editor_version: unknown
+  map_format: "w3m"
+  last_map_verification: "2026-08-25"
+  file_sha256_last_verified: "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834"
+  verification_note: "Map was saved and test-launched; a later implementation attempt was interrupted before trigger edits could be verified."
+
+player_slots:
+  last_verified:
+    - { id: 1, status: human, start: fixed }
+    - { id: 2, status: human, start: fixed }
+    - { id: 3, status: human, start: fixed }
+    - { id: 4, status: human, start: fixed }
+    - { id: 5, status: closed }
+    - { id: 6, status: closed }
+    - { id: 7, status: closed }
+    - { id: 8, status: closed }
+    - { id: 9, status: closed }
+    - { id: 10, status: closed }
+    - { id: 11, status: closed }
+    - { id: 12, status: closed }
+  not_inspected: "Any slots beyond the last verified range"
+
+forces:
+  last_verified:
+    - name: "Team 1"
+      players: [1, 2]
+      allied: true
+      shared_vision: true
+      shared_unit_control: false
+    - name: "Team 2"
+      players: [3, 4]
+      allied: true
+      shared_vision: true
+      shared_unit_control: false
+  not_yet_verified: "Exact force display names and relationships to neutral players"
+
+regions:
+  known_names:
+    - name: "Arena_A"
+      purpose: "Two-arena MVP area; exact shape and bounds not yet recorded"
+      status: not_verified
+    - name: "Camp_A_Player1"
+      purpose: "Known existing camp region from prior setup"
+      status: not_verified
+  inventory_status: "partial; capture every region name and purpose during HTW-00"
+
+trigger_tree:
+  last_verified:
+    - path: "Initialization"
+      contents: []
+      status: "empty at last verification"
+  inventory_status: "reconfirm; no implementation trigger is treated as present"
+
+variables: []
+
+object_data:
+  heroes: []
+  units: []
+  abilities_and_spells: []
+  items: []
+  shops_and_buildings: []
+  inventory_status: "not captured; record display name, rawcode, owner, stats, abilities, and intended use"
+
+tuning_values:
+  source_of_intent: "design/04-mvp-build-plan.md"
+  editor_configured_values: {}
+  rule: "Do not copy design placeholders into this section until the editor value is verified."
+
+implementation_status:
+  active_chunk: "HTW-00"
+  last_applied_chunk: none
+  next_required_action: "Capture the current editor state without changing the map"
+
+state_report_format:
+  required_sections:
+    - editor_version
+    - map_path_and_save_time
+    - trigger_tree
+    - variables
+    - regions
+    - player_slots_and_forces
+    - heroes_units_abilities_items
+    - test_result
+  unknown_value: "unknown"

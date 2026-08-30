@@ -1,0 +1,113 @@
+# 4. MVP Build Plan
+
+The MVP is not the full game. It is a test map that answers whether the loop is fun and technically stable.
+
+## Implementation policy
+
+The build is now executed as small editor-led chunks rather than one large trigger-editing pass. The design rules remain here, while the actual editor inventory is maintained in `06-implementation-workflow.md` and `07-editor-state.yaml`. The active chunk queue is `08-implementation-chunks.md`; observed editor changes and test results belong in `09-change-log.md`.
+
+The first action is a no-edit baseline capture. Later chunks may use generated JASS/custom-script blocks, but every block must be connected through the editor, saved into a recoverable map copy, and tested before the next block is prepared.
+
+## Milestone 0 — Rules on paper
+
+Done when:
+
+- The team, wave, life, gold, and victory rules are written in one place.
+- The map is explicitly scoped to six teams of two.
+- All balance values are kept in a tuning table rather than scattered through triggers.
+
+## Milestone 1 — One arena, one team
+
+Build the smallest offline test:
+
+- One team with two heroes.
+- One mirrored arena.
+- One preparation timer.
+- One base wave.
+- Hero death and wave-end respawn.
+- Life loss and elimination.
+
+Acceptance test: two heroes can survive or lose in a repeatable 3–5 minute loop, and the phase transitions never soft-lock.
+
+## Milestone 2 — The sending loop
+
+Add:
+
+- Personal gold.
+- Two personal War Camps per team, each starting at tier 1.
+- Three purchasable creeps.
+- Attack queue.
+- A second test arena that receives the attack queue.
+- Staggered spawning.
+
+Acceptance test: a team can buy an attack composition, another team can see it arrive, and the buyer does not fight its own purchased creeps.
+
+## Milestone 3 — Six-team structure
+
+Add:
+
+- Six mirrored arenas.
+- Twelve human player slots.
+- Team alliances and shared rules.
+- Rotating round-robin attack routing: each team sends to exactly one assigned team per wave, with the destination changing each round.
+- Elimination, spectating, and leaving the game.
+- Immediate cleanup of creeps attacking an eliminated team; recalculate the route from living teams next preparation phase, with no mid-wave retargeting or creep carryover.
+
+Acceptance test: all six teams can complete at least six waves without desynchronization, stuck waves, confusing ownership, duplicate incoming queues, incorrect round-robin destinations, or attack creeps carrying over from an eliminated team.
+
+## Milestone 4 — Hero identity
+
+Add:
+
+- Four heroes with distinct roles.
+- Basic items.
+- A small talent tree for each hero.
+- Shared team experience or fair personal experience.
+
+Acceptance test: two players on the same team can make meaningfully different hero choices and both have useful jobs.
+
+## Milestone 5 — Strategic depth
+
+Add:
+
+- War Camp tiers 2 and 3.
+- Eight-creep roster.
+- Elite counterplay.
+- Comeback economy.
+- Wave preview and combat feedback.
+
+Acceptance test: a playtest team can explain why it spent gold on defense, an attack, or an upgrade after the match.
+
+The preparation UI must make the information policy testable: players can see the incoming wave's composition and total worth, plus every team's two-hero composition and current hero levels. The MVP should not require scouting to access this strategic information.
+
+## First playable tuning table
+
+Keep these in one place so they are easy to change:
+
+| Variable | Starting value | Why it exists |
+|---|---:|---|
+| Teams | 6 | Main format |
+| Players per team | 2 | Core cooperation |
+| Human players | 12 | One player per slot, no AI slot required |
+| Starting lives | 15 | Match pacing |
+| Preparation time | 35 sec | Buying and coordination |
+| Combat soft limit | 90 sec | Prevents stuck waves |
+| Base personal gold per wave | 25 | Economy pace |
+| Starting War Camp tier | 1 | Immediate sending |
+| Max attack threat per player, wave 1 | 6 | Prevents early overwhelm |
+| Max attack threat per player, wave 5 | 14 | Escalation target |
+| Hero death penalty | 1 life | Pressure |
+| Both heroes dead | 3 lives total | Team wipe penalty |
+| Other life-loss sources | None | Hero death is the only life-loss event |
+
+These numbers are placeholders. Do not spend time making them perfect before the two-arena sending test exists.
+
+## Technical risk checklist
+
+- Confirm the target Warcraft III/Reforged editor version before building around editor-only features.
+- Keep unit ownership and team mapping explicit; do not infer team identity from color alone.
+- Make wave spawning deterministic and driven by a small number of timers.
+- Add a failsafe that cleans up remaining wave units when a wave ends.
+- Track a unique wave ID so late deaths or delayed triggers cannot charge the wrong wave.
+- Test with two players first, then four, then twelve.
+- Keep combat unit counts low until performance and synchronization are proven.
