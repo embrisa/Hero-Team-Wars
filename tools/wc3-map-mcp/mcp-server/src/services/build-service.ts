@@ -232,6 +232,16 @@ export class BuildService {
     return { build_id: buildId, runtime_status: status, changed: true, manifest_artifact: artifact };
   }
 
+  /** Persist the session link without changing the build's evidence level. */
+  public attachTestSession(projectId: string, buildId: string, sessionId: string): void {
+    const loaded = this.load(projectId, buildId);
+    assertUuid(sessionId, "Session ID");
+    const transaction = this.store.read(loaded.project, loaded.manifest.transaction_id);
+    if (transaction.manifest.test_session_ids.includes(sessionId)) return;
+    transaction.manifest.test_session_ids.push(sessionId);
+    this.store.update(transaction.paths, transaction.manifest);
+  }
+
   public project(projectId: string): ResolvedProject {
     return this.projects.project(projectId);
   }

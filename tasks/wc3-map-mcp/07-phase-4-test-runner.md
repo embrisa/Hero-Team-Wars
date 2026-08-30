@@ -1,6 +1,8 @@
 # Phase 4 Work Packet - World Editor and Warcraft III Test Runner
 
-Status: blocked until Phase 3 creates exact hash-addressable builds.
+Status: implementation complete; real editor/game observations remain pending.
+
+Implementation note (2026-08-30): exact-build launch, test-copy hashing, durable session records, ordered evidence recording, artifact re-verification, process conflict handling, and fake-runner coverage are implemented. The manual application gate is intentionally still open; no World Editor or Warcraft III pass is claimed from process start.
 
 This automates launch and evidence recording. It does not automatically judge gameplay quality and must not kill unrelated editor/game processes.
 
@@ -77,6 +79,6 @@ Launch Phase 3 no-op in editor, record observed open, launch in game, record obs
 
 ## Completion gate and handoff
 
-Complete when exact builds launch safely, sessions persist, observations are accurate, and no tool can kill unrelated processes or forge evidence from process start.
+The implementation gate is complete: exact builds launch through a native executable/argument-array boundary, sessions persist across server lifetime, evidence upgrades require ordered observations, and no tool can kill unrelated processes or forge evidence from process start. The manual application gate remains open until an exact no-op and minimal changed build are observed in World Editor and Warcraft III.
 
 Handoff contracts, verified arguments, conflict behavior, session schema, session IDs/evidence, log locations, and checklist format.

@@ -1,6 +1,6 @@
 # WC3 Map MCP - Agent Task Index
 
-Status: Phase 3 build and validation implementation complete; required runtimes are installed (Node.js 24.19.0/npm 11.17.0 and .NET SDK 10.0.400), and the manual World Editor/Warcraft III compatibility gate remains pending.
+Status: Phase 4 launch/evidence implementation complete; required runtimes are installed (Node.js 24.19.0/npm 11.17.0 and .NET SDK 10.0.400), and the manual World Editor/Warcraft III compatibility gate remains pending.
 
 This directory is a self-contained implementation manual for agents that know nothing about the preceding conversation. The objective is a local Model Context Protocol server that allows Codex or another MCP-capable agent to inspect, safely modify, build, validate, and test Warcraft III custom maps.
 
@@ -47,7 +47,7 @@ No phase may be marked complete because source code exists or a command exited s
 
 The completion report must say which evidence level was actually reached and list anything not tested.
 
-Current implementation evidence: Phase 3 engine and MCP build/validation paths are implemented, with 24 .NET tests and 24 MCP tests passing. The current source remains hash-stable at `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. Runtime launch is not marked passed: the existing World Editor session was left untouched, and the installed Warcraft III executable exited without exposing a game window during the controlled artifact-load attempt.
+Current implementation evidence: Phase 3 engine/MCP build-validation paths and Phase 4 launch/session paths are implemented, with 24 .NET tests and 35 MCP tests passing. The current source remains hash-stable at `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. Runtime launch is not marked passed: the existing World Editor session was left untouched, and the installed Warcraft III executable exited without exposing a game window during the controlled artifact-load attempt.
 
 ## Existing Hero Team Wars authority layers
 

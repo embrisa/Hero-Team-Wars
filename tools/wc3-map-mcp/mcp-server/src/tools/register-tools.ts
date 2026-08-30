@@ -13,6 +13,7 @@ import { registerValidateMap } from "./validate-map.js";
 import { registerCompareMaps } from "./compare-maps.js";
 import { registerTransactionTools } from "./transactions.js";
 import { registerBuildTools } from "./builds.js";
+import { registerLaunchTools } from "./launches.js";
 
 export interface ToolServices {
   config: Wc3Config;
@@ -41,5 +42,6 @@ export function registerTools(server: McpServer, services: ToolServices): void {
   if (enabled("wc3_compare_maps")) registerCompareMaps(server, services.inspections);
 
   registerTransactionTools(server, services.transactions, enabled);
-  registerBuildTools(register, services.builds, services.launches);
+  registerBuildTools(register, services.builds);
+  registerLaunchTools(register, services.launches);
 }

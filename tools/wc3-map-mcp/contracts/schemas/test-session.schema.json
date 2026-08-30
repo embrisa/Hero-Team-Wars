@@ -2,24 +2,76 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.wc3-map-mcp/schemas/test-session.schema.json",
   "title": "WC3 map test session",
+  "description": "A durable, hash-linked process launch and explicitly observed test record.",
   "type": "object",
-  "required": ["schema_version", "session_id", "project_id", "build_id", "build_sha256", "target", "executable", "arguments", "started_utc", "exit_state", "evidence_level", "milestones"],
+  "required": [
+    "schema_version", "session_id", "project_id", "correlation_id", "transaction_id", "revision",
+    "build_id", "build_sha256", "build_path", "target", "executable",
+    "executable_version", "executable_version_verified", "arguments", "pid", "started_utc", "exit_state",
+    "evidence_level", "milestones", "artifacts", "notes"
+  ],
   "properties": {
     "schema_version": { "const": "1.0" },
     "session_id": { "type": "string", "format": "uuid" },
-    "project_id": { "type": "string" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "correlation_id": { "type": "string", "format": "uuid" },
+    "transaction_id": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 0 },
     "build_id": { "type": "string", "format": "uuid" },
     "build_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+    "build_path": { "type": "string", "minLength": 1 },
     "target": { "type": "string", "enum": ["editor", "game"] },
-    "executable": { "type": "string" },
+    "executable": { "type": "string", "minLength": 1 },
+    "executable_version": { "type": "string", "minLength": 1 },
+    "executable_version_verified": { "type": "boolean" },
     "arguments": { "type": "array", "items": { "type": "string" } },
-    "test_copy_path": { "type": "string" },
+    "test_copy_path": { "type": "string", "minLength": 1 },
     "test_copy_sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
     "pid": { "type": "integer", "minimum": 1 },
     "started_utc": { "type": "string", "format": "date-time" },
     "exit_state": { "type": "string", "enum": ["running", "unknown", "exited"] },
     "evidence_level": { "type": "string", "enum": ["process_started", "editor_opened", "game_loaded", "smoke_passed", "playtest_passed"] },
-    "milestones": { "type": "array", "items": { "type": "object", "required": ["milestone", "result", "recorder", "notes", "observed_utc"], "additionalProperties": true } }
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["milestone", "result", "recorder", "correlation_id", "notes", "observed_utc", "artifacts"],
+        "properties": {
+          "milestone": { "type": "string", "enum": ["editor_opened", "game_loaded", "smoke_test", "playtest"] },
+          "result": { "type": "string", "enum": ["pass", "fail"] },
+          "recorder": { "type": "string", "enum": ["user_observation", "agent_log_observation"] },
+          "correlation_id": { "type": "string", "format": "uuid" },
+          "notes": { "type": "string" },
+          "observed_utc": { "type": "string", "format": "date-time" },
+          "artifacts": { "$ref": "#/$defs/artifacts" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "artifacts": { "$ref": "#/$defs/artifacts" },
+    "notes": { "type": "array", "items": { "type": "string" } }
   },
-  "additionalProperties": true
+  "$defs": {
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "size_bytes", "sha256"],
+        "properties": {
+          "kind": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "target": { "const": "game" } } },
+      "then": { "required": ["test_copy_path", "test_copy_sha256"] }
+    }
+  ],
+  "additionalProperties": false
 }
