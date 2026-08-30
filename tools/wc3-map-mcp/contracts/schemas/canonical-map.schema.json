@@ -39,8 +39,9 @@
     "triggers": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
     "scripts": { "type": "array", "items": { "$ref": "#/$defs/script" } },
     "variables": { "$ref": "#/$defs/component_value" },
-    "object_data": { "type": "array", "items": { "$ref": "#/$defs/object_data" } },
-    "placed_objects": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
+    "object_data": { "type": "array", "items": { "$ref": "#/$defs/object_definition" } },
+    "object_data_members": { "type": "array", "items": { "$ref": "#/$defs/object_data" } },
+    "placed_objects": { "type": "array", "items": { "anyOf": [ { "$ref": "#/$defs/placement" }, { "$ref": "#/$defs/component_member" } ] } },
     "terrain_summary": { "$ref": "#/$defs/component_value" },
     "imports": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
     "opaque_members": { "type": "array", "items": { "$ref": "#/$defs/opaque_member" } },
@@ -252,6 +253,61 @@
         "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
         "capability": { "$ref": "#/$defs/capability_name" },
         "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "additionalProperties": true
+    },
+    "object_definition": {
+      "type": "object",
+      "required": ["id", "archive_path", "category", "object_kind", "base_rawcode", "custom_rawcode", "rawcode", "display_name", "dependencies", "references", "unknown_ids", "modifications", "codec_version", "provenance", "capability"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "archive_path": { "type": "string", "enum": ["war3map.w3u", "war3map.w3a", "war3map.w3t", "war3map.w3b", "war3map.w3d", "war3map.w3h", "war3map.w3q"] },
+        "category": { "enum": ["unit", "ability", "item", "destructable", "doodad", "buff", "upgrade"] },
+        "object_kind": { "enum": ["base", "custom"] },
+        "base_rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" },
+        "custom_rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" },
+        "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" },
+        "display_name": { "type": ["string", "null"] },
+        "dependencies": { "type": "array", "items": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "uniqueItems": true },
+        "references": { "type": "object", "additionalProperties": true },
+        "unknown_ids": { "type": "array", "items": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "uniqueItems": true },
+        "modifications": { "type": "array", "items": { "$ref": "#/$defs/object_modification" } },
+        "codec_version": { "type": "string", "minLength": 1 },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability_name" }
+      },
+      "additionalProperties": true
+    },
+    "object_modification": {
+      "type": "object",
+      "required": ["id", "type", "value"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" },
+        "type": { "enum": ["Int", "Real", "Unreal", "String", "Bool", "Char"] },
+        "value": {}, "level": { "type": "integer", "minimum": 0 }, "pointer": { "type": "integer", "minimum": 0 }, "variation": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "object", "required": ["x", "y", "z"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } },
+      "additionalProperties": false
+    },
+    "placement": {
+      "type": "object",
+      "required": ["id", "member", "kind", "rawcode", "position", "facing", "scale", "creation_number", "codec_version", "provenance", "capability"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(unit|doodad):[0-9]+$" },
+        "member": { "enum": ["war3mapUnits.doo", "war3map.doo"] },
+        "kind": { "enum": ["unit", "building", "item", "doodad", "destructable", "special_doodad"] },
+        "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" },
+        "skin_rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" },
+        "owner_id": { "type": "integer", "minimum": 1, "maximum": 24 }, "flags": { "type": "integer" },
+        "inventory": { "type": "array", "items": { "type": "object", "required": ["slot", "rawcode"], "properties": { "slot": { "type": "integer", "minimum": 0, "maximum": 5 }, "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" } }, "additionalProperties": true } },
+        "abilities": { "type": "array", "items": { "type": "object", "required": ["rawcode"], "properties": { "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" } }, "additionalProperties": true } },
+        "position": { "$ref": "#/$defs/position" }, "scale": { "$ref": "#/$defs/position" }, "facing": { "type": "number" }, "variation": { "type": "integer", "minimum": 0 }, "creation_number": { "type": "integer", "minimum": 0 },
+        "waygate_destination_region_id": { "type": "integer", "minimum": -1 }, "map_region_role": {}, "codec_version": { "type": "string", "minLength": 1 },
+        "provenance": { "$ref": "#/$defs/provenance" }, "capability": { "$ref": "#/$defs/capability_name" }
       },
       "additionalProperties": true
     },

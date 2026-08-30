@@ -5,6 +5,48 @@ const jsonObject = z.record(z.string(), z.unknown());
 const identifier = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
 const moduleIdentifier = z.string().regex(/^[A-Za-z_][A-Za-z0-9_.-]*$/);
 const rawcode = z.string().regex(/^[\x20-\x7E]{4}$/);
+const objectCategory = z.enum(["unit", "ability", "item", "destructable", "doodad", "buff", "upgrade"]);
+const objectModificationSchema = z.object({
+  id: rawcode, type: z.enum(["Int", "Real", "Unreal", "String", "Bool", "Char"]), value: z.union([z.string(), z.number(), z.boolean()]),
+  level: z.number().int().nonnegative().optional(), pointer: z.number().int().nonnegative().optional(), variation: z.number().int().nonnegative().optional()
+}).strict().superRefine((value, context) => {
+  if (value.type === "Char" && (typeof value.value !== "string" || value.value.length !== 1)) context.addIssue({ code: "custom", path: ["value"], message: "Char modifications require exactly one character." });
+  if (["Int"].includes(value.type) && (typeof value.value !== "number" || !Number.isInteger(value.value))) context.addIssue({ code: "custom", path: ["value"], message: "Int modifications require an integer." });
+  if (["Real", "Unreal"].includes(value.type) && typeof value.value !== "number") context.addIssue({ code: "custom", path: ["value"], message: "Real modifications require a number." });
+  if (value.type === "String" && typeof value.value !== "string") context.addIssue({ code: "custom", path: ["value"], message: "String modifications require text." });
+  if (value.type === "Bool" && typeof value.value !== "boolean") context.addIssue({ code: "custom", path: ["value"], message: "Bool modifications require a boolean." });
+});
+const objectDefinitionSchema = z.object({
+  id: z.string().min(1).optional(), archive_path: z.string().min(1).optional(), category: objectCategory, object_kind: z.enum(["base", "custom"]),
+  base_rawcode: rawcode, custom_rawcode: rawcode, rawcode, display_name: z.string().min(1).nullable().optional(),
+  dependencies: z.array(rawcode).default([]), references: z.record(z.string(), z.unknown()).default({}), unknown_ids: z.array(rawcode).default([]),
+  modifications: z.array(objectModificationSchema).default([]), codec_version: z.string().optional(), provenance: z.string().optional(), capability: z.string().optional()
+}).strict().superRefine((value, context) => {
+  const active = value.object_kind === "custom" ? value.custom_rawcode : value.base_rawcode;
+  if (value.rawcode !== active) context.addIssue({ code: "custom", path: ["rawcode"], message: "rawcode must match the active base/custom rawcode." });
+  if (value.object_kind === "custom" && value.base_rawcode === value.custom_rawcode) context.addIssue({ code: "custom", path: ["custom_rawcode"], message: "Custom objects require distinct base and custom rawcodes." });
+  if (value.category === "ability" || value.category === "upgrade") {
+    for (const modification of value.modifications) if (modification.level === undefined || modification.pointer === undefined) context.addIssue({ code: "custom", path: ["modifications"], message: "Ability and upgrade modifications require level and pointer." });
+  }
+  if (value.category === "doodad") {
+    for (const modification of value.modifications) if (modification.variation === undefined || modification.pointer === undefined) context.addIssue({ code: "custom", path: ["modifications"], message: "Doodad modifications require variation and pointer." });
+  }
+});
+const objectDefinitionUpdateSchema = z.object({ display_name: z.string().min(1).nullable().optional(), modifications: z.array(objectModificationSchema).optional() }).strict().refine(value => Object.keys(value).length > 0, "Object definition update requires display_name or modifications.");
+const positionSchema = z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite() }).strict();
+const placementInventorySchema = z.object({ slot: z.number().int().min(0).max(5), rawcode }).strict();
+const placementAbilitySchema = z.object({ rawcode, autocast_active: z.boolean().optional(), hero_ability_level: z.number().int().nonnegative().optional() }).strict();
+const placementSchema = z.object({
+  id: z.string().regex(/^(unit|doodad):[0-9]+$/).optional(), member: z.enum(["war3mapUnits.doo", "war3map.doo"]).optional(),
+  kind: z.enum(["unit", "building", "item", "doodad", "destructable", "special_doodad"]), rawcode, skin_rawcode: rawcode.optional(), owner_id: z.number().int().min(1).max(24).optional(),
+  flags: z.number().int().optional(), inventory: z.array(placementInventorySchema).optional(), abilities: z.array(placementAbilitySchema).optional(), position: positionSchema,
+  facing: z.number().finite().optional(), scale: positionSchema.optional(), variation: z.number().int().nonnegative().optional(), creation_number: z.number().int().nonnegative().optional(),
+  waygate_destination_region_id: z.number().int().min(-1).optional(), map_region_role: z.unknown().optional(), provenance: z.string().optional(), capability: z.string().optional()
+}).strict();
+const placementUpdateSchema = placementSchema.partial().omit({ id: true, member: true, kind: true, creation_number: true }).refine(value => Object.keys(value).length > 0, "Placed-object update requires at least one typed field.");
+const objectTargetSchema = z.object({ id: z.string().min(1).optional(), category: objectCategory.optional(), rawcode: rawcode.optional() }).strict();
+const placementTargetSchema = z.object({ id: z.string().regex(/^(unit|doodad):[0-9]+$/).optional(), creation_number: z.number().int().nonnegative().optional() }).strict().refine(value => Object.keys(value).length > 0, "Placement target requires id or creation_number.");
+const objectReferenceValueSchema = z.union([rawcode, z.object({ rawcode }).strict(), z.number().int().nonnegative(), z.object({ player_id: z.number().int().min(1).max(24) }).strict(), z.object({ region_id: z.union([z.number().int().nonnegative(), z.string().regex(/^region:[0-9]+$/)]) }).strict()]);
 
 const scriptSourceValue = z.object({ language: z.string().regex(/^jass$/i), source: z.string().min(1).max(16 * 1024 * 1024) }).strict();
 const scriptExpectedValue = z.union([sha256Schema, z.object({ sha256: sha256Schema }).strict()]);
@@ -147,6 +189,41 @@ export const operationSchema = z.object({
   if (operation.type === "set_trigger_mode") {
     requireExpected();
     if (!z.object({ mode: z.enum(["mcp_native", "mcp_native_jass", "editor_compatible"]) }).strict().safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_trigger_mode requires mcp_native_jass or editor_compatible." });
+  }
+  if (["create_object_definition", "update_object_definition", "delete_object_definition", "set_object_data"].includes(operation.type)) {
+    if (!objectTargetSchema.safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Object-definition operations require id, category, or rawcode targets only." });
+    if (operation.type === "create_object_definition") {
+      if (operation.expected !== undefined) context.addIssue({ code: "custom", path: ["expected"], message: "create_object_definition requires an absent expected value." });
+      if (!objectDefinitionSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "create_object_definition requires a complete typed object definition." });
+    } else {
+      requireExpected();
+      if (operation.type !== "delete_object_definition" && !objectDefinitionUpdateSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "Object-definition updates allow display_name and/or typed modifications only." });
+    }
+  }
+  if (operation.type === "set_object_reference") {
+    const target = z.object({ id: z.string().min(1).optional(), category: objectCategory.optional(), rawcode: rawcode.optional(), creation_number: z.number().int().nonnegative().optional(), relation: z.enum(["ability", "item", "upgrade", "owner", "region"]) }).strict();
+    if (!target.safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "set_object_reference requires a typed relation and object or placement target." });
+    requireExpected();
+    if (!objectReferenceValueSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "set_object_reference requires a typed rawcode, player, or region reference." });
+  }
+  if (["place_object", "place_unit"].includes(operation.type)) {
+    if (!z.object({ id: z.string().regex(/^(unit|doodad):[0-9]+$/).optional() }).strict().safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Placement creation targets may contain only an optional stable id." });
+    if (operation.expected !== undefined) context.addIssue({ code: "custom", path: ["expected"], message: "Placement creation requires an absent expected value." });
+    if (!placementSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "Placement creation requires a typed kind, rawcode, and position." });
+  }
+  if (["move_object", "move_unit"].includes(operation.type)) {
+    if (!placementTargetSchema.safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Placement movement requires id or creation_number." });
+    requireExpected();
+    if (!z.object({ position: positionSchema }).strict().safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "Placement movement requires a complete position." });
+  }
+  if (operation.type === "update_placed_object") {
+    if (!placementTargetSchema.safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Placement updates require id or creation_number." });
+    requireExpected();
+    if (!placementUpdateSchema.safeParse(operation.value).success) context.addIssue({ code: "custom", path: ["value"], message: "Placement updates require at least one typed placement field." });
+  }
+  if (["remove_placed_object", "remove_placed_unit"].includes(operation.type)) {
+    if (!placementTargetSchema.safeParse(operation.target).success) context.addIssue({ code: "custom", path: ["target"], message: "Placement removal requires id or creation_number." });
+    requireExpected();
   }
   if (operation.type !== "set_script_source") return;
   if (operation.target.archive_path !== "war3map.j") context.addIssue({ code: "custom", path: ["target", "archive_path"], message: "set_script_source targets only the existing war3map.j member." });

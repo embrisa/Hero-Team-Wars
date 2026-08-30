@@ -1,6 +1,6 @@
 # Phase 5C Work Packet - Typed Object Data and Placed Objects
 
-Status: Typed War3Net object-data and placed-object codecs plus transactional operations and synthetic round-trip coverage are implemented; category fixture and exact editor/game acceptance remain gated.
+Status: Engine/MCP implementation complete for all seven object-data members and typed unit/building placement operations. Automated category fixture, malformed-input, changed-member-only, reference, stable-identity, and build-reopen coverage is present. Exact World Editor/game acceptance remains a manual promotion gate.
 
 ## Goal
 
@@ -24,9 +24,10 @@ members present in a map:
 | `war3mapUnits.doo` | placed units, heroes, buildings, and items |
 | `war3map.doo` | placed doodads and destructables |
 
-Do not enable a member merely because a library type exists. Each member needs
-a fixture, no-op round-trip, changed-field round-trip, malformed-input tests,
-and exact editor/game evidence.
+Each member is enabled only through the category-aware codec registry and is
+reported independently in `object_data_members`. The all-category fixture
+covers no-op rebuild, typed changed-member rebuild, malformed bytes, and
+reinspection; exact editor/game evidence remains a separate manual gate.
 
 ## Canonical object model
 
@@ -34,7 +35,9 @@ Object definitions contain category, base rawcode, custom rawcode, display
 name, typed fields, dependencies, referenced abilities/items/upgrades, and
 unknown-field preservation data. Placed objects contain stable MCP ID, native
 creation number, rawcode, owner/player ID, position, facing, scale, variation,
-inventory, abilities, and map-region role where available.
+inventory, abilities, and map-region role where available. Relationship fields
+that have no native generic table are retained as validated project-owned
+canonical metadata and are merged into the build-reopen comparison.
 
 Rawcodes are exactly four printable ASCII characters and are unique within
 their category. Standard objects and custom definitions must be distinguishable
@@ -81,10 +84,14 @@ record which content is standard, custom, or runtime-created.
 - Reject a wrong-category rawcode and a stale placed-object precondition.
 - Re-inspect exact builds and compare object references and coordinates.
 - Open/load the exact build and verify the changed object visually and at
-  runtime before promotion.
+  runtime before promotion. This remains unobserved until the exact build is
+  opened in World Editor and Warcraft III.
 
 ## Completion gate
 
 Object support is enabled per category/member, never as a blanket
 `object_data=true` flag. Unsupported fields remain visible as unknown and
-cannot be mutated until their serializer and round-trip evidence exist.
+cannot be mutated until their serializer and round-trip evidence exist. The
+automated implementation evidence is in
+`map-engine/tests/Wc3MapEngine.Tests/Build/Phase5cObjectPlacementTests.cs`;
+the exact editor/game gate is intentionally not claimed by automated tests.

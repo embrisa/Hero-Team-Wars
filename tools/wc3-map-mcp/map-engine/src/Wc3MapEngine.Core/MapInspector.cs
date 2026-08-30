@@ -13,10 +13,7 @@ namespace Wc3MapEngine.Core;
 
 public static class MapInspector
 {
-    private static readonly HashSet<string> ObjectMembers = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "war3map.w3a", "war3map.w3b", "war3map.w3d", "war3map.w3h", "war3map.w3q", "war3map.w3t", "war3map.w3u"
-    };
+    private static IReadOnlyDictionary<string, string> ObjectMembers => ObjectPlacementSupport.ObjectMembers;
 
     public static JsonObject Inspect(string path)
     {
@@ -105,7 +102,7 @@ public static class MapInspector
 
         if (units is not null) SetTypedStatus(root, "placed_objects", "war3mapUnits.doo", "roundtrip_verified", "War3Net MapUnits was parsed and has a typed serializer.");
         if (doodads is not null) SetTypedStatus(root, "placed_objects", "war3map.doo", "roundtrip_verified", "War3Net MapDoodads was parsed and has a typed serializer.");
-        if (archive.Members.Any(item => ObjectMembers.Contains(item.Path)) && objectDataErrors.Count == 0) SetTypedStatus(root, "object_data", "object-data", "roundtrip_verified", "War3Net object-data records were parsed and have category-specific serializers.");
+        SetObjectDataMemberStatuses(root, archive, parseResults, objectDataErrors);
         if (regions is not null) SetTypedStatus(root, "regions", "war3map.w3r", "typed_write_enabled", "war3map.w3r was parsed with the versioned MapRegions codec and has a typed serializer.");
 
         return root;
@@ -480,13 +477,18 @@ public static class MapInspector
     }
 
     private static JsonArray BuildObjectDataMembers(MapArchiveSnapshot archive, JsonArray parseResults)
-        => new(archive.Members.Where(x => ObjectMembers.Contains(x.Path)).Select(x => (JsonNode)new JsonObject
+        => new(archive.Members.Where(x => ObjectMembers.ContainsKey(x.Path)).Select(x => (JsonNode)new JsonObject
         {
             ["archive_path"] = x.Path,
             ["category"] = MapComponentCodec.ObjectCategory(x.Path),
             ["size_bytes"] = x.Size,
             ["sha256"] = x.Sha256,
             ["capability"] = parseResults.OfType<JsonObject>().First(item => string.Equals(item["path"]?.GetValue<string>(), x.Path, StringComparison.OrdinalIgnoreCase))["status"]?.DeepClone(),
+            ["codec_version"] = MapComponentCodec.CodecVersion,
+            ["supported_operations"] = new JsonArray(new JsonNode?[]
+            {
+                "create_object_definition", "update_object_definition", "delete_object_definition", "set_object_reference"
+            }),
             ["provenance"] = "observed_archive"
         }).ToArray());
 
@@ -551,7 +553,7 @@ public static class MapInspector
     {
         errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var result = new JsonArray();
-        foreach (var member in archive.Members.Where(item => ObjectMembers.Contains(item.Path)))
+        foreach (var member in archive.Members.Where(item => ObjectMembers.ContainsKey(item.Path)))
         {
             try
             {
@@ -579,6 +581,34 @@ public static class MapInspector
                 item["status"] = capability;
                 item["parser"] = item["parser"] ?? "War3Net.Build.Core typed codec";
             }
+        }
+    }
+
+    private static void SetObjectDataMemberStatuses(JsonObject root, MapArchiveSnapshot archive, JsonArray parseResults, IReadOnlyDictionary<string, string> errors)
+    {
+        if (root["component_status"] is not JsonObject statuses) return;
+        var members = archive.Members.Where(item => ObjectMembers.ContainsKey(item.Path)).ToArray();
+        if (members.Length == 0)
+        {
+            statuses["object_data"] = ComponentStatus("preserved_opaque", "observed_archive", "No object-data members are present in this map; category support is enabled independently when a member is present and verified.");
+            return;
+        }
+
+        var capabilityRecords = parseResults.OfType<JsonObject>()
+            .Where(item => ObjectMembers.ContainsKey(item["path"]?.GetValue<string>() ?? string.Empty))
+            .Select(item => item["status"]?.GetValue<string>())
+            .Where(value => value is not null)
+            .Cast<string>()
+            .ToArray();
+        var aggregate = capabilityRecords.Any(value => value == "unsupported_blocking")
+            ? "unsupported_blocking"
+            : "mixed";
+        statuses["object_data"] = ComponentStatus(aggregate, "derived", "Object-data capability is reported per archive member in object_data_members; no blanket object_data write flag is used.");
+        foreach (var member in members)
+        {
+            var memberRecord = (root["object_data_members"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault(item => string.Equals(item["archive_path"]?.GetValue<string>(), member.Path, StringComparison.OrdinalIgnoreCase));
+            if (memberRecord is null) continue;
+            if (errors.ContainsKey(member.Path)) memberRecord["error"] = errors[member.Path];
         }
     }
 

@@ -69,7 +69,7 @@ public static class MapBuilder
             var semanticDifferences = SemanticDiff.CompareCanonical(staged, reopened, "build-reopen");
             if (semanticDifferences.Count != 0)
             {
-                throw new EngineException("BUILD_REOPEN_MISMATCH", "Reopened build semantics do not match the staged canonical model.");
+                throw new EngineException("BUILD_REOPEN_MISMATCH", "Reopened build semantics do not match the staged canonical model.", false, details: new JsonObject { ["semantic_differences"] = semanticDifferences });
             }
 
             var archiveComparison = ArchiveComparison.Compare(MapArchive.Read(sourcePath), MapArchive.Read(temporaryPath), plan.ReplacementMembers);
@@ -109,6 +109,8 @@ public static class MapBuilder
 
     private static void MergeProjectOwnedGameplay(JsonObject reopened, JsonObject staged)
     {
+        MergeProjectOwnedObjectData(reopened, staged);
+        MergeProjectOwnedPlacements(reopened, staged);
         if (staged["regions"] is JsonArray stagedRegions && reopened["regions"] is JsonArray reopenedRegions)
         {
             var stagedById = stagedRegions.OfType<JsonObject>().ToDictionary(item => RegionId(item), StringComparer.Ordinal);
@@ -128,6 +130,45 @@ public static class MapBuilder
         }
         if (staged["region_roles"] is JsonNode regionRoles) reopened["region_roles"] = regionRoles.DeepClone();
         else reopened.Remove("region_roles");
+    }
+
+    private static void MergeProjectOwnedObjectData(JsonObject reopened, JsonObject staged)
+    {
+        if (staged["object_data"] is not JsonArray stagedDefinitions || reopened["object_data"] is not JsonArray reopenedDefinitions) return;
+        var reopenedById = reopenedDefinitions.OfType<JsonObject>()
+            .Where(item => item["id"] is not null)
+            .ToDictionary(item => item["id"]!.GetValue<string>(), StringComparer.Ordinal);
+        foreach (var stagedDefinition in stagedDefinitions.OfType<JsonObject>())
+        {
+            if (stagedDefinition["id"]?.GetValue<string>() is not { } id || !reopenedById.TryGetValue(id, out var reopenedDefinition)) continue;
+            // References/dependencies are the typed project relationship graph.
+            // They are kept separate from the War3Net object-data fields because
+            // Warcraft's object files have no generic relation table.
+            foreach (var field in new[] { "references", "dependencies", "provenance", "capability" })
+            {
+                if (stagedDefinition[field] is JsonNode value) reopenedDefinition[field] = value.DeepClone();
+            }
+        }
+    }
+
+    private static void MergeProjectOwnedPlacements(JsonObject reopened, JsonObject staged)
+    {
+        if (staged["placed_objects"] is not JsonArray stagedPlacements || reopened["placed_objects"] is not JsonArray reopenedPlacements) return;
+        var reopenedById = reopenedPlacements.OfType<JsonObject>()
+            .Where(item => item["id"] is not null)
+            .ToDictionary(item => item["id"]!.GetValue<string>(), StringComparer.Ordinal);
+        foreach (var stagedPlacement in stagedPlacements.OfType<JsonObject>())
+        {
+            if (stagedPlacement["id"]?.GetValue<string>() is not { } id || !reopenedById.TryGetValue(id, out var reopenedPlacement)) continue;
+            // kind and map_region_role are semantic labels; native .doo stores
+            // the raw widget without either label. Keeping them here makes the
+            // canonical reinspection stable without pretending they are native
+            // fields.
+            foreach (var field in new[] { "kind", "map_region_role", "provenance", "capability" })
+            {
+                if (stagedPlacement[field] is JsonNode value) reopenedPlacement[field] = value.DeepClone();
+            }
+        }
     }
 
     private static void ApplyMetadataChanges(JsonObject source, JsonObject staged, string sourcePath, Dictionary<string, byte[]> replacements)

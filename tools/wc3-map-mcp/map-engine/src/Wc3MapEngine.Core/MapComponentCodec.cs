@@ -23,36 +23,15 @@ public static class MapComponentCodec
 {
     public const string CodecVersion = "war3net-6.0.3-typed-components-1";
 
-    private static readonly Dictionary<string, string> ObjectCategoryByMember = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["war3map.w3u"] = "unit",
-        ["war3map.w3a"] = "ability",
-        ["war3map.w3t"] = "item",
-        ["war3map.w3b"] = "destructable",
-        ["war3map.w3d"] = "doodad",
-        ["war3map.w3h"] = "buff",
-        ["war3map.w3q"] = "upgrade"
-    };
+    public static IReadOnlyDictionary<string, string> ObjectMembers => ObjectPlacementSupport.ObjectMembers;
 
-    public static bool IsObjectMember(string path) => ObjectCategoryByMember.ContainsKey(path);
+    public static bool IsObjectMember(string path) => ObjectPlacementSupport.IsObjectMember(path);
 
     public static string ObjectCategory(string path)
-        => ObjectCategoryByMember.TryGetValue(path, out var category)
-            ? category
-            : throw new EngineException("INVALID_ARGUMENT", $"'{path}' is not a supported object-data member.");
+        => ObjectPlacementSupport.CategoryForMember(path);
 
     public static string ObjectMemberForCategory(string category)
-        => category.ToLowerInvariant() switch
-        {
-            "unit" => "war3map.w3u",
-            "ability" => "war3map.w3a",
-            "item" => "war3map.w3t",
-            "destructable" => "war3map.w3b",
-            "doodad" => "war3map.w3d",
-            "buff" => "war3map.w3h",
-            "upgrade" => "war3map.w3q",
-            _ => throw new EngineException("INVALID_ARGUMENT", $"Unsupported object category '{category}'.")
-        };
+        => ObjectPlacementSupport.MemberForCategory(category);
 
     public static JsonObject ToPlayer(PlayerData player)
         => new()
@@ -164,6 +143,7 @@ public static class MapComponentCodec
                 ["map_item_table_id"] = unit.MapItemTableId,
                 ["item_table_sets"] = ToItemTableSets(unit.ItemTableSets),
                 ["creation_number"] = unit.CreationNumber,
+                ["codec_version"] = CodecVersion,
                 ["provenance"] = "observed_archive",
                 ["capability"] = "roundtrip_verified"
             });
@@ -193,6 +173,7 @@ public static class MapComponentCodec
                 ["map_item_table_id"] = doodad.MapItemTableId,
                 ["item_table_sets"] = ToItemTableSets(doodad.ItemTableSets),
                 ["creation_number"] = doodad.CreationNumber,
+                ["codec_version"] = CodecVersion,
                 ["provenance"] = "observed_archive",
                 ["capability"] = "roundtrip_verified"
             });
@@ -208,6 +189,7 @@ public static class MapComponentCodec
                 ["rawcode"] = special.TypeId.ToRawcode(),
                 ["variation"] = special.Variation,
                 ["position"] = new JsonObject { ["x"] = special.Position.X, ["y"] = special.Position.Y, ["z"] = 0 },
+                ["codec_version"] = CodecVersion,
                 ["provenance"] = "observed_archive",
                 ["capability"] = "roundtrip_verified"
             });
@@ -264,7 +246,8 @@ public static class MapComponentCodec
         source.Doodads.Clear();
         source.Doodads.AddRange(placements.OfType<JsonObject>()
             .Where(item => string.Equals(item["member"]?.GetValue<string>(), "war3map.doo", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(item["kind"]?.GetValue<string>(), "doodad", StringComparison.OrdinalIgnoreCase))
+                && (string.Equals(item["kind"]?.GetValue<string>(), "doodad", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item["kind"]?.GetValue<string>(), "destructable", StringComparison.OrdinalIgnoreCase)))
             .Select(ToDoodad)
             .ToList());
         return source;
@@ -456,8 +439,12 @@ public static class MapComponentCodec
             ["base_rawcode"] = oldId.ToRawcode(),
             ["custom_rawcode"] = newId.ToRawcode(),
             ["rawcode"] = (custom ? newId : oldId).ToRawcode(),
+            ["display_name"] = DisplayName(category, modification),
+            ["dependencies"] = new JsonArray(),
+            ["references"] = new JsonObject(),
             ["unknown_ids"] = new JsonArray(GetProperty<List<int>>(modification, "Unk").Select(id => (JsonNode)JsonValue.Create(id.ToRawcode())!).ToArray()),
-            ["modifications"] = new JsonArray()
+            ["modifications"] = new JsonArray(),
+            ["codec_version"] = CodecVersion
         };
         var mods = result["modifications"]!.AsArray();
         foreach (var item in (GetProperty<System.Collections.IEnumerable>(modification, "Modifications") ?? Array.Empty<object>()).Cast<object>())
@@ -605,9 +592,39 @@ public static class MapComponentCodec
             "Real" or "Unreal" => value?.GetValue<float>() ?? throw new EngineException("INVALID_ARGUMENT", "Real object-data value is required."),
             "String" => value?.GetValue<string>() ?? throw new EngineException("INVALID_ARGUMENT", "String object-data value is required."),
             "Bool" => value?.GetValue<bool>() ?? throw new EngineException("INVALID_ARGUMENT", "Bool object-data value is required."),
-            "Char" => (value?.GetValue<string>() ?? throw new EngineException("INVALID_ARGUMENT", "Char object-data value is required."))[0],
+            "Char" => Character(value),
             _ => throw new EngineException("INVALID_ARGUMENT", $"Unknown object-data value type '{kind}'.")
         };
+    }
+
+    private static char Character(JsonNode? value)
+    {
+        var text = value?.GetValue<string>() ?? throw new EngineException("INVALID_ARGUMENT", "Char object-data value is required.");
+        if (text.Length != 1) throw new EngineException("INVALID_ARGUMENT", "Char object-data values must contain exactly one character.");
+        return text[0];
+    }
+
+    private static string? DisplayName(string category, object modification)
+    {
+        var nameId = category switch
+        {
+            "unit" or "item" => "unam",
+            "ability" => "anam",
+            "destructable" => "bnam",
+            "doodad" => "dnam",
+            "buff" => "fnam",
+            "upgrade" => "gnam",
+            _ => string.Empty
+        };
+
+        if (string.IsNullOrEmpty(nameId)) return null;
+        foreach (var item in (GetProperty<System.Collections.IEnumerable>(modification, "Modifications") ?? Array.Empty<object>()).Cast<object>())
+        {
+            if (RequiredObjectId(item, "Id").ToRawcode() != nameId) continue;
+            return ObjectModificationValue(item).GetValue<string>();
+        }
+
+        return null;
     }
 
     private static ObjectDataType ObjectType(JsonNode? value)

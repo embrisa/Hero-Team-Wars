@@ -33,6 +33,7 @@ public static class SemanticDiff
         "stored_value",
         "stored_name",
         "archive_path",
+        "codec_version",
         "sha256",
         "size_bytes",
         "compressed_size_bytes",

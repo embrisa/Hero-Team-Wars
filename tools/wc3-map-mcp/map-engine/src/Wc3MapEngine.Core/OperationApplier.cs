@@ -703,22 +703,33 @@ public static class OperationApplier
         EnsureCreateExpected(expected, "create_object_definition");
         if (value is not JsonObject definition) throw new EngineException("INVALID_ARGUMENT", "create_object_definition requires an object definition.");
         var candidate = definition.DeepClone() as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "Object definition could not be cloned.");
+        EnsureAllowed(candidate, "id", "archive_path", "category", "object_kind", "base_rawcode", "custom_rawcode", "rawcode", "display_name", "dependencies", "references", "unknown_ids", "modifications", "codec_version", "provenance", "capability");
         candidate["category"] ??= target["category"]?.DeepClone();
         candidate["rawcode"] ??= target["rawcode"]?.DeepClone();
         candidate["base_rawcode"] ??= candidate["rawcode"]?.DeepClone();
         candidate["custom_rawcode"] ??= candidate["rawcode"]?.DeepClone();
         candidate["object_kind"] ??= "custom";
-        ValidateObjectDefinition(candidate);
+        ValidateObjectDefinition(root, candidate);
         var definitions = Collection(root, "object_data");
         var category = StringValue(candidate, "category")!;
         var objectKind = StringValue(candidate, "object_kind") ?? "custom";
         var stableId = $"{MapComponentCodec.ObjectMemberForCategory(category)}:{(objectKind.Equals("custom", StringComparison.OrdinalIgnoreCase) ? "new" : "base")}:{StringValue(candidate, "base_rawcode")}:{StringValue(candidate, "custom_rawcode")}";
         var id = StringValue(target["id"]) ?? StringValue(candidate["id"]) ?? stableId;
         if (!string.Equals(id, stableId, StringComparison.Ordinal)) throw new EngineException("INVALID_ARGUMENT", $"Object definition id '{id}' must equal its native stable id '{stableId}' for binary round-trip.");
-        if (definitions.OfType<JsonObject>().Any(item => ObjectId(item) == id || string.Equals(StringValue(item, "rawcode"), StringValue(candidate, "rawcode"), StringComparison.Ordinal))) throw new EngineException("INVALID_ARGUMENT", $"Object definition '{id}' already exists.");
+        if (definitions.OfType<JsonObject>().Any(item => ObjectId(item) == id ||
+            (string.Equals(StringValue(item, "category"), category, StringComparison.OrdinalIgnoreCase) &&
+             string.Equals(StringValue(item, "rawcode"), StringValue(candidate, "rawcode"), StringComparison.Ordinal)))) throw new EngineException("INVALID_ARGUMENT", $"Object definition '{id}' already exists.");
+        if (objectKind.Equals("custom", StringComparison.OrdinalIgnoreCase) && ObjectPlacementSupport.IsKnownStandard(category, StringValue(candidate, "custom_rawcode")!))
+        {
+            throw new EngineException("INVALID_ARGUMENT", $"Custom object rawcode '{StringValue(candidate, "custom_rawcode")}' collides with a known standard {category} object.");
+        }
         var created = candidate;
         created["id"] = id;
         created["archive_path"] = created["archive_path"]?.DeepClone() ?? MapComponentCodec.ObjectMemberForCategory(StringValue(created, "category")!);
+        if (!created.ContainsKey("display_name")) created.Add("display_name", null);
+        created["dependencies"] ??= new JsonArray();
+        created["references"] ??= new JsonObject();
+        created["codec_version"] ??= MapComponentCodec.CodecVersion;
         created["provenance"] = "intended_design";
         created["capability"] = "typed_write_enabled";
         definitions.Add(created);
@@ -726,14 +737,24 @@ public static class OperationApplier
 
     private static void UpdateObjectDefinition(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
+        EnsureAllowed(target, "id", "category", "rawcode");
         var definition = FindObjectDefinition(root, target);
         EnsureExpected(definition, expected, "object_data.update");
         if (value is not JsonObject update) throw new EngineException("INVALID_ARGUMENT", "update_object_definition requires an object value.");
-        EnsureAllowed(update, "unknown_ids", "modifications");
+        EnsureAllowed(update, "display_name", "modifications");
         var merged = definition.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Object definition could not be cloned.");
+        if (update.ContainsKey("display_name"))
+        {
+            SetObjectDisplayName(merged, update["display_name"]);
+            update = update.DeepClone()!.AsObject();
+            update.Remove("display_name");
+        }
         foreach (var property in update) merged[property.Key] = property.Value?.DeepClone();
-        ValidateObjectDefinition(merged);
+        ValidateObjectDefinition(root, merged);
         foreach (var property in update) definition[property.Key] = property.Value?.DeepClone();
+        if (merged["modifications"] is JsonNode modifications) definition["modifications"] = modifications.DeepClone();
+        if (merged.TryGetPropertyValue("display_name", out var display)) definition["display_name"] = display?.DeepClone();
+        if (update.ContainsKey("modifications")) definition["display_name"] = DisplayNameFromModifications(merged);
         definition["provenance"] = "intended_design";
         definition["capability"] = "typed_write_enabled";
     }
@@ -750,14 +771,20 @@ public static class OperationApplier
 
     private static void SetObjectReference(JsonObject root, JsonObject target, JsonNode? expected, JsonNode? value)
     {
-        EnsureAllowed(target, "id", "category", "rawcode", "relation");
-        var definition = FindObjectDefinition(root, target);
+        EnsureAllowed(target, "id", "category", "rawcode", "creation_number", "relation");
         var relation = StringValue(target["relation"]) ?? throw new EngineException("INVALID_ARGUMENT", "set_object_reference requires a typed relation.");
         if (relation is not ("ability" or "item" or "upgrade" or "owner" or "region")) throw new EngineException("UNSUPPORTED_OPERATION", $"Object relation '{relation}' is not supported.");
+        if (TryFindPlacement(root, target, out var placement))
+        {
+            SetPlacementReference(root, placement, relation, expected, value);
+            return;
+        }
+
+        var definition = FindObjectDefinition(root, target);
         var references = definition["references"] as JsonObject ?? new JsonObject();
         EnsureExpectedOrAbsent(references[relation], expected, $"object_data.references.{relation}");
-        if (value is null) throw new EngineException("INVALID_ARGUMENT", "set_object_reference requires a reference value.");
-        references[relation] = value.DeepClone();
+        var normalized = NormalizeDefinitionReference(root, definition, relation, value);
+        references[relation] = normalized;
         definition["references"] = references;
         definition["provenance"] = "intended_design";
         definition["capability"] = "typed_write_enabled";
@@ -772,7 +799,7 @@ public static class OperationApplier
         var normalized = NormalizePlacement(root, target, placement);
         var id = RequiredString(normalized, "id");
         if (placements.OfType<JsonObject>().Any(item => string.Equals(StringValue(item, "id"), id, StringComparison.Ordinal))) throw new EngineException("INVALID_ARGUMENT", $"Placement '{id}' already exists.");
-        ValidatePlacement(normalized);
+        ValidatePlacement(root, normalized);
         placements.Add(normalized);
     }
 
@@ -784,6 +811,7 @@ public static class OperationApplier
         EnsureAllowed(position, "position");
         ValidatePosition(position["position"] ?? throw new EngineException("INVALID_ARGUMENT", "move_object requires position."));
         placement["position"] = position["position"]!.DeepClone();
+        ValidatePlacement(root, placement);
         placement["provenance"] = "intended_design";
     }
 
@@ -794,7 +822,7 @@ public static class OperationApplier
         if (value is not JsonObject update) throw new EngineException("INVALID_ARGUMENT", "update_placed_object requires an object value.");
         EnsureAllowed(update, "rawcode", "skin_rawcode", "owner_id", "flags", "hit_points", "mana_points", "hero_level", "hero_strength", "hero_agility", "hero_intelligence", "inventory", "abilities", "variation", "position", "facing", "scale", "map_region_role", "waygate_destination_region_id", "custom_player_color_id", "life", "state");
         foreach (var property in update) placement[property.Key] = property.Value?.DeepClone();
-        ValidatePlacement(placement);
+        ValidatePlacement(root, placement);
         placement["provenance"] = "intended_design";
         placement["capability"] = "typed_write_enabled";
     }
@@ -1043,53 +1071,67 @@ public static class OperationApplier
     private static JsonObject FindPlacement(JsonObject root, JsonObject target)
     {
         EnsureAllowed(target, "id", "creation_number");
+        return TryFindPlacement(root, target, out var placement)
+            ? placement
+            : throw new EngineException("INVALID_ARGUMENT", "The target placement was not found.");
+    }
+
+    private static bool TryFindPlacement(JsonObject root, JsonObject target, out JsonObject placement)
+    {
         var id = StringValue(target, "id");
         var creation = target["creation_number"] is JsonValue number && number.TryGetValue<int>(out var value) ? value : int.MinValue;
-        return Collection(root, "placed_objects").OfType<JsonObject>().FirstOrDefault(item =>
+        placement = Collection(root, "placed_objects").OfType<JsonObject>().FirstOrDefault(item =>
             (id is not null && StringValue(item, "id") == id)
-            || (creation != int.MinValue && IntValue(item["creation_number"]) == creation))
-            ?? throw new EngineException("INVALID_ARGUMENT", "The target placement was not found.");
+            || (creation != int.MinValue && IntValue(item["creation_number"]) == creation))!;
+        return placement is not null;
     }
 
     private static JsonObject NormalizePlacement(JsonObject root, JsonObject target, JsonObject value)
     {
         EnsureAllowed(value, "id", "member", "kind", "rawcode", "skin_rawcode", "owner_id", "flags", "unknown_1", "unknown_2", "hit_points", "mana_points", "gold_amount", "target_acquisition", "hero_level", "hero_strength", "hero_agility", "hero_intelligence", "inventory", "abilities", "random_data_mode", "random_data", "custom_player_color_id", "waygate_destination_region_id", "variation", "position", "facing", "scale", "map_item_table_id", "item_table_sets", "creation_number", "state", "life", "map_region_role");
         var result = value.DeepClone() as JsonObject ?? throw new EngineException("INVALID_ARGUMENT", "Placement could not be cloned.");
-        var kind = StringValue(result, "kind") ?? "unit";
+        var kind = (StringValue(result, "kind") ?? "unit").ToLowerInvariant();
         result["kind"] = kind;
-        result["member"] = StringValue(result, "member") ?? (kind is "doodad" or "special_doodad" ? "war3map.doo" : "war3mapUnits.doo");
-        if ((kind is "doodad" or "special_doodad") != result["member"]!.GetValue<string>().Equals("war3map.doo", StringComparison.OrdinalIgnoreCase)) throw new EngineException("INVALID_ARGUMENT", "Placement kind and archive member do not agree.");
-        if (kind is not ("unit" or "item" or "building" or "doodad" or "special_doodad")) throw new EngineException("INVALID_ARGUMENT", $"Placement kind '{kind}' is not supported.");
-        result["creation_number"] ??= NextCreationNumber(Collection(root, "placed_objects"));
-        var derivedId = $"{kind}:{IntValue(result["creation_number"])}";
+        result["member"] = StringValue(result, "member") ?? ObjectPlacementSupport.MemberForPlacementKind(kind);
+        if (kind is not ("unit" or "item" or "building" or "doodad" or "destructable" or "special_doodad")) throw new EngineException("INVALID_ARGUMENT", $"Placement kind '{kind}' is not supported.");
+        var expectedMember = ObjectPlacementSupport.MemberForPlacementKind(kind);
+        if (!string.Equals(result["member"]!.GetValue<string>(), expectedMember, StringComparison.OrdinalIgnoreCase)) throw new EngineException("INVALID_ARGUMENT", "Placement kind and archive member do not agree.");
+        result["creation_number"] ??= NextPlacementCreationNumber(root, expectedMember);
+        var identityKind = ObjectPlacementSupport.IdentityKindForMember(expectedMember);
+        var derivedId = $"{identityKind}:{IntValue(result["creation_number"])}";
         var requestedId = StringValue(target, "id") ?? StringValue(result, "id");
-        if (requestedId is not null && !string.Equals(requestedId, derivedId, StringComparison.Ordinal)) throw new EngineException("INVALID_ARGUMENT", $"Placement id '{requestedId}' must equal its native stable id '{derivedId}' for binary round-trip.");
+        if (requestedId is not null && !string.Equals(requestedId, derivedId, StringComparison.Ordinal)
+            && !string.Equals(requestedId, $"{kind}:{IntValue(result["creation_number"])}", StringComparison.Ordinal)) throw new EngineException("INVALID_ARGUMENT", $"Placement id '{requestedId}' must equal its native stable id '{derivedId}' for binary round-trip.");
         result["id"] = derivedId;
         result["rawcode"] = StringValue(result, "rawcode") ?? throw new EngineException("INVALID_ARGUMENT", "Placement rawcode is required.");
         result["skin_rawcode"] ??= result["rawcode"]!.DeepClone();
-        result["owner_id"] ??= 1;
-        result["flags"] ??= 0;
-        result["unknown_1"] ??= 0;
-        result["unknown_2"] ??= 0;
-        result["hit_points"] ??= -1;
-        result["mana_points"] ??= -1;
-        result["gold_amount"] ??= 0;
-        result["target_acquisition"] ??= 0;
-        result["hero_level"] ??= 0;
-        result["hero_strength"] ??= 0;
-        result["hero_agility"] ??= 0;
-        result["hero_intelligence"] ??= 0;
-        result["inventory"] ??= new JsonArray();
-        result["abilities"] ??= new JsonArray();
-        result["custom_player_color_id"] ??= -1;
-        result["waygate_destination_region_id"] ??= -1;
         result["variation"] ??= 0;
         result["position"] ??= new JsonObject { ["x"] = 0, ["y"] = 0, ["z"] = 0 };
         result["facing"] ??= 0;
         result["scale"] ??= new JsonObject { ["x"] = 1, ["y"] = 1, ["z"] = 1 };
         result["map_item_table_id"] ??= -1;
         result["item_table_sets"] ??= new JsonArray();
-        if (kind is "doodad" or "special_doodad")
+        if (kind is "unit" or "building" or "item")
+        {
+            result["owner_id"] ??= 1;
+            result["flags"] ??= 0;
+            result["unknown_1"] ??= 0;
+            result["unknown_2"] ??= 0;
+            result["hit_points"] ??= -1;
+            result["mana_points"] ??= -1;
+            result["gold_amount"] ??= 0;
+            result["target_acquisition"] ??= 0;
+            result["hero_level"] ??= 0;
+            result["hero_strength"] ??= 0;
+            result["hero_agility"] ??= 0;
+            result["hero_intelligence"] ??= 0;
+            result["inventory"] ??= new JsonArray();
+            result["abilities"] ??= new JsonArray();
+            result["random_data_mode"] ??= "None";
+            result["custom_player_color_id"] ??= -1;
+            result["waygate_destination_region_id"] ??= -1;
+        }
+        if (kind is "doodad" or "destructable" or "special_doodad")
         {
             result["state"] ??= "Normal";
             result["life"] ??= 100;
@@ -1099,15 +1141,21 @@ public static class OperationApplier
         return result;
     }
 
-    private static void ValidatePlacement(JsonObject placement)
+    private static void ValidatePlacement(JsonObject root, JsonObject placement)
     {
         var rawcode = StringValue(placement, "rawcode");
         if (rawcode is null || rawcode.Length != 4 || rawcode.Any(character => character < 0x20 || character > 0x7E)) throw new EngineException("INVALID_ARGUMENT", "Placement rawcode must contain exactly four printable ASCII characters.");
-        var owner = IntValue(placement["owner_id"]);
-        if (owner is < 1 or > 24) throw new EngineException("INVALID_ARGUMENT", "Placement owner_id must be between 1 and 24.");
         ValidatePosition(placement["position"] ?? throw new EngineException("INVALID_ARGUMENT", "Placement position is required."));
         ValidatePosition(placement["scale"] ?? throw new EngineException("INVALID_ARGUMENT", "Placement scale is required."));
         if (!double.TryParse(placement["facing"]?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var facing) || !double.IsFinite(facing)) throw new EngineException("INVALID_ARGUMENT", "Placement facing must be finite.");
+        var kind = StringValue(placement, "kind") ?? "unit";
+        if (kind is "unit" or "building" or "item")
+        {
+            var owner = IntValue(placement["owner_id"]);
+            if (owner is < 1 or > 24 || !PlayerExists(root, owner)) throw new EngineException("INVALID_ARGUMENT", "Placement owner_id must reference a declared player slot from 1 through 24.");
+        }
+        ValidatePlacementEnvelope(root, placement);
+        if (kind is "unit" or "building" or "item") ValidatePlacementArrays(root, placement);
     }
 
     private static void ValidatePosition(JsonNode value)
@@ -1116,20 +1164,92 @@ public static class OperationApplier
     }
 
     private static bool Finite(JsonNode? value)
-        => value is JsonValue node && (node.TryGetValue<double>(out var number) ? double.IsFinite(number) : node.TryGetValue<float>(out var single) && float.IsFinite(single));
+        => value is JsonValue node && (node.TryGetValue<double>(out var number) ? double.IsFinite(number)
+            : node.TryGetValue<float>(out var single) ? float.IsFinite(single)
+            : node.TryGetValue<int>(out _) || node.TryGetValue<long>(out _));
 
-    private static void ValidateObjectDefinition(JsonObject definition)
+    private static void ValidatePlacementEnvelope(JsonObject root, JsonObject placement)
     {
-        var category = StringValue(definition, "category");
-        if (category is not ("unit" or "ability" or "item" or "destructable" or "doodad" or "buff" or "upgrade")) throw new EngineException("INVALID_ARGUMENT", "Object definition category is not supported.");
-        var objectKind = StringValue(definition, "object_kind");
+        var bounds = CameraBounds(root);
+        if (bounds is null) return;
+        var position = placement["position"]!.AsObject();
+        var x = Number(position["x"]!);
+        var y = Number(position["y"]!);
+        if (x < bounds.Value.Left || x > bounds.Value.Right || y < bounds.Value.Bottom || y > bounds.Value.Top)
+        {
+            throw new EngineException("COORDINATE_OUT_OF_BOUNDS", "Placement coordinates fall outside the map envelope.");
+        }
+    }
+
+    private static void ValidatePlacementArrays(JsonObject root, JsonObject placement)
+    {
+        var kind = StringValue(placement, "kind") ?? "unit";
+        var category = kind switch
+        {
+            "item" => "item",
+            "doodad" or "special_doodad" => "doodad",
+            "destructable" => "destructable",
+            _ => "unit"
+        };
+        var rawcode = StringValue(placement, "rawcode")!;
+        if (!ObjectRawcodeExists(root, category, rawcode)) throw new EngineException("REFERENCE_MISSING", $"Placement rawcode '{rawcode}' is not a known {category} definition.");
+
+        if (placement["inventory"] is not JsonArray inventory) throw new EngineException("INVALID_ARGUMENT", "Placement inventory must be an array.");
+        var slots = new HashSet<int>();
+        foreach (var item in inventory)
+        {
+            if (item is not JsonObject record) throw new EngineException("INVALID_ARGUMENT", "Placement inventory entries must be objects.");
+            var slot = RequiredInt(record, "slot", 0, 5);
+            if (!slots.Add(slot)) throw new EngineException("INVALID_ARGUMENT", $"Placement inventory slot {slot} occurs more than once.");
+            var itemRawcode = RequiredRawcodeValue(record["rawcode"] ?? throw new EngineException("INVALID_ARGUMENT", "Placement inventory entries require rawcode."));
+            if (!ObjectRawcodeExists(root, "item", itemRawcode)) throw new EngineException("REFERENCE_MISSING", $"Inventory item rawcode '{itemRawcode}' is not a known item definition.");
+        }
+
+        if (placement["abilities"] is not JsonArray abilities) throw new EngineException("INVALID_ARGUMENT", "Placement abilities must be an array.");
+        var abilityIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in abilities)
+        {
+            if (item is not JsonObject record) throw new EngineException("INVALID_ARGUMENT", "Placement ability entries must be objects.");
+            var abilityRawcode = RequiredRawcodeValue(record["rawcode"] ?? throw new EngineException("INVALID_ARGUMENT", "Placement ability entries require rawcode."));
+            if (!abilityIds.Add(abilityRawcode)) throw new EngineException("INVALID_ARGUMENT", $"Placement ability '{abilityRawcode}' occurs more than once.");
+            if (!ObjectRawcodeExists(root, "ability", abilityRawcode)) throw new EngineException("REFERENCE_MISSING", $"Ability rawcode '{abilityRawcode}' is not a known ability definition.");
+        }
+
+        var regionNumber = IntValue(placement["waygate_destination_region_id"]);
+        if (regionNumber is >= 0 && !RegionExists(root, regionNumber)) throw new EngineException("REFERENCE_MISSING", $"Placement waygate region '{regionNumber}' does not exist.");
+        if (placement["map_region_role"] is JsonNode role && role is not JsonValue && role is not JsonObject) throw new EngineException("INVALID_ARGUMENT", "map_region_role must be a scalar or object value.");
+    }
+
+    private static void ValidateObjectDefinition(JsonObject root, JsonObject definition)
+    {
+        var category = StringValue(definition, "category")?.ToLowerInvariant();
+        if (!ObjectPlacementSupport.IsSupportedCategory(category)) throw new EngineException("INVALID_ARGUMENT", "Object definition category is not supported.");
+        definition["category"] = category;
+        var objectKind = StringValue(definition, "object_kind")?.ToLowerInvariant();
         if (objectKind is not ("base" or "custom")) throw new EngineException("INVALID_ARGUMENT", "Object definition object_kind must be base or custom.");
+        definition["object_kind"] = objectKind;
         foreach (var field in new[] { "rawcode", "base_rawcode", "custom_rawcode" })
         {
-            if (StringValue(definition, field) is { } rawcode && (rawcode.Length != 4 || rawcode.Any(character => character < 0x20 || character > 0x7E))) throw new EngineException("INVALID_ARGUMENT", $"Object definition {field} must be exactly four printable ASCII characters.");
+            if (StringValue(definition, field) is { } rawcode && !ObjectPlacementSupport.IsValidRawcode(rawcode)) throw new EngineException("INVALID_ARGUMENT", $"Object definition {field} must be exactly four printable ASCII characters.");
         }
         if (StringValue(definition, "rawcode") is null) throw new EngineException("INVALID_ARGUMENT", "Object definition rawcode is required.");
         if (StringValue(definition, "base_rawcode") is null || StringValue(definition, "custom_rawcode") is null) throw new EngineException("INVALID_ARGUMENT", "Object definition base_rawcode and custom_rawcode are required.");
+        var activeRawcode = objectKind == "custom" ? StringValue(definition, "custom_rawcode")! : StringValue(definition, "base_rawcode")!;
+        if (StringValue(definition, "rawcode") != activeRawcode) throw new EngineException("INVALID_ARGUMENT", "Object definition rawcode must match its active base/custom rawcode.");
+        if (objectKind == "custom" && StringValue(definition, "base_rawcode") == StringValue(definition, "custom_rawcode")) throw new EngineException("INVALID_ARGUMENT", "A custom object must use a rawcode distinct from its base object.");
+        if (objectKind == "custom" && !ObjectPlacementSupport.IsKnownStandard(category!, StringValue(definition, "base_rawcode")!) && !DefinitionExists(root, category!, StringValue(definition, "base_rawcode")!))
+        {
+            throw new EngineException("REFERENCE_MISSING", $"Base {category} rawcode '{StringValue(definition, "base_rawcode")}' is not present in the known standard set or staged object definitions.");
+        }
+        if (definition.TryGetPropertyValue("display_name", out var displayName) && displayName is not null
+            && (displayName is not JsonValue displayValue || !displayValue.TryGetValue<string>(out _))) throw new EngineException("INVALID_ARGUMENT", "Object definition display_name must be a string or null.");
+        if (definition["dependencies"] is not null && definition["dependencies"] is not JsonArray) throw new EngineException("INVALID_ARGUMENT", "Object definition dependencies must be an array.");
+        foreach (var dependency in (definition["dependencies"] as JsonArray ?? new JsonArray()))
+        {
+            var dependencyRawcode = RequiredRawcodeValue(dependency ?? throw new EngineException("INVALID_ARGUMENT", "Object definition dependencies cannot contain null."));
+            if (!ObjectRawcodeExists(root, category!, dependencyRawcode)) throw new EngineException("REFERENCE_MISSING", $"Object dependency rawcode '{dependencyRawcode}' is not a known {category} definition.");
+        }
+        ValidateDefinitionReferences(root, definition);
         if (definition["unknown_ids"] is not null && definition["unknown_ids"] is not JsonArray) throw new EngineException("INVALID_ARGUMENT", "Object definition unknown_ids must be an array.");
         foreach (var unknownId in (definition["unknown_ids"] as JsonArray ?? new JsonArray())) RequiredRawcodeValue(unknownId ?? throw new EngineException("INVALID_ARGUMENT", "Object definition unknown_ids cannot contain null."));
         if (definition["modifications"] is not null && definition["modifications"] is not JsonArray) throw new EngineException("INVALID_ARGUMENT", "Object definition modifications must be an array.");
@@ -1178,11 +1298,221 @@ public static class OperationApplier
         if (!valid) throw new EngineException("INVALID_ARGUMENT", $"Object-data modification value does not match type {type}.");
     }
 
-    private static void RequiredRawcodeValue(JsonNode value)
+    private static string RequiredRawcodeValue(JsonNode value)
     {
         var rawcode = StringValue(value);
-        if (rawcode is null || rawcode.Length != 4 || rawcode.Any(character => character < 0x20 || character > 0x7E)) throw new EngineException("INVALID_ARGUMENT", "Object-data unknown_ids must contain four printable ASCII rawcodes.");
+        if (!ObjectPlacementSupport.IsValidRawcode(rawcode)) throw new EngineException("INVALID_ARGUMENT", "Rawcodes must contain exactly four printable ASCII characters.");
+        return rawcode!;
     }
+
+    private static bool ObjectRawcodeExists(JsonObject root, string category, string rawcode)
+        => ObjectPlacementSupport.IsKnownStandard(category, rawcode)
+            || Collection(root, "object_data").OfType<JsonObject>().Any(item => string.Equals(StringValue(item, "category"), category, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(StringValue(item, "rawcode"), rawcode, StringComparison.OrdinalIgnoreCase));
+
+    private static bool DefinitionExists(JsonObject root, string category, string rawcode)
+        => Collection(root, "object_data").OfType<JsonObject>().Any(item => string.Equals(StringValue(item, "category"), category, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(StringValue(item, "rawcode"), rawcode, StringComparison.OrdinalIgnoreCase));
+
+    private static bool RegionExists(JsonObject root, int creationNumber)
+        => Collection(root, "regions").OfType<JsonObject>().Any(region => IntValue(region["creation_number"]) == creationNumber);
+
+    private static void ValidateDefinitionReferences(JsonObject root, JsonObject definition)
+    {
+        if (definition["references"] is not JsonObject references) return;
+        foreach (var relation in references)
+        {
+            if (relation.Key is not ("ability" or "item" or "upgrade" or "owner" or "region")) throw new EngineException("INVALID_ARGUMENT", $"Object reference relation '{relation.Key}' is unsupported.");
+            if (relation.Value is null) throw new EngineException("INVALID_ARGUMENT", $"Object reference relation '{relation.Key}' cannot be null.");
+            switch (relation.Key)
+            {
+                case "ability":
+                    var ability = ReferenceRawcode(relation.Value, "ability");
+                    if (!ObjectRawcodeExists(root, "ability", ability)) throw new EngineException("REFERENCE_MISSING", $"Ability rawcode '{ability}' is not a known ability definition.");
+                    break;
+                case "item":
+                    var item = ReferenceRawcode(relation.Value, "item");
+                    if (!ObjectRawcodeExists(root, "item", item)) throw new EngineException("REFERENCE_MISSING", $"Item rawcode '{item}' is not a known item definition.");
+                    break;
+                case "upgrade":
+                    var upgrade = ReferenceRawcode(relation.Value, "upgrade");
+                    if (!ObjectRawcodeExists(root, "upgrade", upgrade)) throw new EngineException("REFERENCE_MISSING", $"Upgrade rawcode '{upgrade}' is not a known upgrade definition.");
+                    break;
+                case "owner":
+                    var owner = ReferencePlayerId(relation.Value);
+                    if (!PlayerExists(root, owner)) throw new EngineException("REFERENCE_MISSING", $"Owner player '{owner}' is not declared in the map.");
+                    break;
+                case "region":
+                    var region = ReferenceRegionId(relation.Value);
+                    if (!RegionExists(root, region)) throw new EngineException("REFERENCE_MISSING", $"Region '{region}' does not exist.");
+                    break;
+            }
+        }
+    }
+
+    private static JsonNode NormalizeDefinitionReference(JsonObject root, JsonObject definition, string relation, JsonNode? value)
+    {
+        if (value is null) throw new EngineException("INVALID_ARGUMENT", "set_object_reference requires a reference value.");
+        return relation switch
+        {
+            "ability" => JsonValue.Create(RequireKnownReference(root, "ability", ReferenceRawcode(value, "ability")))!,
+            "item" => JsonValue.Create(RequireKnownReference(root, "item", ReferenceRawcode(value, "item")))!,
+            "upgrade" => JsonValue.Create(RequireKnownReference(root, "upgrade", ReferenceRawcode(value, "upgrade")))!,
+            "owner" => JsonValue.Create(RequirePlayer(root, ReferencePlayerId(value)))!,
+            "region" => JsonValue.Create(RequireRegion(root, ReferenceRegionId(value)))!,
+            _ => throw new EngineException("UNSUPPORTED_OPERATION", $"Object relation '{relation}' is not supported.")
+        };
+    }
+
+    private static void SetPlacementReference(JsonObject root, JsonObject placement, string relation, JsonNode? expected, JsonNode? value)
+    {
+        switch (relation)
+        {
+            case "ability":
+                EnsureExpected(placement["abilities"], expected, "placed_objects.references.ability");
+                var abilityRawcode = RequireKnownReference(root, "ability", ReferenceRawcode(value ?? throw new EngineException("INVALID_ARGUMENT", "Ability reference is required.")));
+                var ability = value is JsonObject abilityValue ? abilityValue.DeepClone()!.AsObject() : new JsonObject();
+                ability["rawcode"] = abilityRawcode;
+                ability["autocast_active"] ??= false;
+                ability["hero_ability_level"] ??= 0;
+                (placement["abilities"] as JsonArray ?? throw new EngineException("INVALID_ARGUMENT", "Placement abilities must be an array.")).Add(ability);
+                break;
+            case "item":
+                EnsureExpected(placement["inventory"], expected, "placed_objects.references.item");
+                var itemValue = value as JsonObject;
+                var itemRawcode = RequireKnownReference(root, "item", ReferenceRawcode(value ?? throw new EngineException("INVALID_ARGUMENT", "Item reference is required.")));
+                var inventory = placement["inventory"] as JsonArray ?? throw new EngineException("INVALID_ARGUMENT", "Placement inventory must be an array.");
+                var slot = itemValue is null ? Enumerable.Range(0, 6).FirstOrDefault(candidate => !inventory.OfType<JsonObject>().Any(item => IntValue(item["slot"]) == candidate), -1) : RequiredInt(itemValue, "slot", 0, 5);
+                if (slot < 0) throw new EngineException("INVALID_ARGUMENT", "The placement has no free inventory slot.");
+                var existing = inventory.OfType<JsonObject>().FirstOrDefault(item => IntValue(item["slot"]) == slot);
+                if (existing is not null) existing["rawcode"] = itemRawcode;
+                else inventory.Add(new JsonObject { ["slot"] = slot, ["rawcode"] = itemRawcode });
+                break;
+            case "owner":
+                EnsureExpected(placement["owner_id"], expected, "placed_objects.references.owner");
+                placement["owner_id"] = RequirePlayer(root, ReferencePlayerId(value ?? throw new EngineException("INVALID_ARGUMENT", "Owner reference is required.")));
+                break;
+            case "region":
+                EnsureExpected(placement["waygate_destination_region_id"], expected, "placed_objects.references.region");
+                placement["waygate_destination_region_id"] = RequireRegion(root, ReferenceRegionId(value ?? throw new EngineException("INVALID_ARGUMENT", "Region reference is required.")));
+                break;
+            case "upgrade":
+                throw new EngineException("UNSUPPORTED_OPERATION", "Placed objects have no native upgrade reference field; set upgrade references on an object definition.");
+        }
+        ValidatePlacement(root, placement);
+        placement["provenance"] = "intended_design";
+        placement["capability"] = "typed_write_enabled";
+    }
+
+    private static string RequireKnownReference(JsonObject root, string category, string rawcode)
+    {
+        if (!ObjectRawcodeExists(root, category, rawcode)) throw new EngineException("REFERENCE_MISSING", $"{category} rawcode '{rawcode}' is not a known object definition.");
+        return rawcode;
+    }
+
+    private static int RequirePlayer(JsonObject root, int playerId)
+    {
+        if (!PlayerExists(root, playerId)) throw new EngineException("REFERENCE_MISSING", $"Owner player '{playerId}' is not declared in the map.");
+        return playerId;
+    }
+
+    private static int RequireRegion(JsonObject root, int regionId)
+    {
+        if (!RegionExists(root, regionId)) throw new EngineException("REFERENCE_MISSING", $"Region '{regionId}' does not exist.");
+        return regionId;
+    }
+
+    private static string ReferenceRawcode(JsonNode value, string relation = "object")
+    {
+        var rawcode = value is JsonObject reference ? StringValue(reference, "rawcode") : StringValue(value);
+        if (!ObjectPlacementSupport.IsValidRawcode(rawcode)) throw new EngineException("INVALID_ARGUMENT", $"The {relation} reference must contain a four-character rawcode.");
+        return rawcode!;
+    }
+
+    private static int ReferencePlayerId(JsonNode value)
+    {
+        var node = value is JsonObject reference ? reference["player_id"] : value;
+        return RequiredIntValue(node ?? throw new EngineException("INVALID_ARGUMENT", "The owner reference requires player_id."), "player_id", 1, 24);
+    }
+
+    private static int ReferenceRegionId(JsonNode value)
+    {
+        var node = value is JsonObject reference ? reference["region_id"] : value;
+        var text = StringValue(node);
+        if (text is not null && text.StartsWith("region:", StringComparison.Ordinal) && int.TryParse(text[7..], out var parsed) && parsed >= 0) return parsed;
+        return RequiredIntValue(node ?? throw new EngineException("INVALID_ARGUMENT", "The region reference requires region_id."), "region_id", 0, int.MaxValue);
+    }
+
+    private static bool PlayerExists(JsonObject root, int playerId)
+        => Collection(root, "players").OfType<JsonObject>().Any(player => IntValue(player["id"]) == playerId);
+
+    private static (double Left, double Bottom, double Right, double Top)? CameraBounds(JsonObject root)
+    {
+        if (root["metadata"] is not JsonArray metadata) return null;
+        var entry = metadata.OfType<JsonObject>().FirstOrDefault(item => StringValue(item, "field") == "camera_bounds");
+        var bounds = entry?["value"] as JsonObject;
+        if (bounds is null) return null;
+        var values = new[] { bounds["left"], bounds["bottom"], bounds["right"], bounds["top"] };
+        if (values.Any(item => item is null || !Finite(item))) return null;
+        return (Number(values[0]!), Number(values[1]!), Number(values[2]!), Number(values[3]!));
+    }
+
+    private static double Number(JsonNode value)
+    {
+        if (value is JsonValue json && json.TryGetValue<double>(out var number) && double.IsFinite(number)) return number;
+        if (value is JsonValue single && single.TryGetValue<float>(out var floatValue) && float.IsFinite(floatValue)) return floatValue;
+        if (value is JsonValue integer && integer.TryGetValue<int>(out var intValue)) return intValue;
+        throw new EngineException("INVALID_ARGUMENT", "A finite numeric value is required.");
+    }
+
+    private static void SetObjectDisplayName(JsonObject definition, JsonNode? displayName)
+    {
+        var category = StringValue(definition, "category") ?? throw new EngineException("INVALID_ARGUMENT", "Object definition category is required.");
+        var nameId = ObjectNameField(category);
+        var modifications = definition["modifications"] as JsonArray ?? new JsonArray();
+        definition["modifications"] = modifications;
+        var existing = modifications.OfType<JsonObject>().FirstOrDefault(item => StringValue(item, "id") == nameId);
+        if (displayName is null)
+        {
+            if (existing is not null) modifications.Remove(existing);
+            definition["display_name"] = null;
+            return;
+        }
+        if (displayName is not JsonValue textValue || !textValue.TryGetValue<string>(out var text) || string.IsNullOrWhiteSpace(text)) throw new EngineException("INVALID_ARGUMENT", "Object definition display_name must be a non-empty string or null.");
+        if (existing is null)
+        {
+            existing = new JsonObject { ["id"] = nameId, ["type"] = "String", ["value"] = text };
+            if (category is "ability" or "upgrade") { existing["level"] = 0; existing["pointer"] = 0; }
+            else if (category == "doodad") { existing["variation"] = 0; existing["pointer"] = 0; }
+            modifications.Add(existing);
+        }
+        else
+        {
+            existing["type"] = "String";
+            existing["value"] = text;
+        }
+        definition["display_name"] = text;
+    }
+
+    private static string? DisplayNameFromModifications(JsonObject definition)
+    {
+        if (definition["modifications"] is not JsonArray modifications) return null;
+        var nameId = ObjectNameField(StringValue(definition, "category") ?? string.Empty);
+        return modifications.OfType<JsonObject>().FirstOrDefault(item => StringValue(item, "id") == nameId && StringValue(item, "type") == "String") is { } name
+            ? StringValue(name, "value")
+            : null;
+    }
+
+    private static string ObjectNameField(string category) => category switch
+    {
+        "unit" or "item" => "unam",
+        "ability" => "anam",
+        "destructable" => "bnam",
+        "doodad" => "dnam",
+        "buff" => "fnam",
+        "upgrade" => "gnam",
+        _ => throw new EngineException("INVALID_ARGUMENT", $"Unsupported object category '{category}'.")
+    };
 
     private static void ValidateForceRecord(JsonObject force)
     {
@@ -1418,6 +1748,14 @@ public static class OperationApplier
 
     private static int NextCreationNumber(JsonArray values)
         => values.OfType<JsonObject>().Select(item => IntValue(item["creation_number"])).Where(number => number >= 0).DefaultIfEmpty(-1).Max() + 1;
+
+    private static int NextPlacementCreationNumber(JsonObject root, string member)
+        => Collection(root, "placed_objects").OfType<JsonObject>()
+            .Where(item => string.Equals(StringValue(item, "member"), member, StringComparison.OrdinalIgnoreCase))
+            .Select(item => IntValue(item["creation_number"]))
+            .Where(number => number >= 0)
+            .DefaultIfEmpty(-1)
+            .Max() + 1;
 
     private static string? StringValue(JsonObject value, string property)
         => value[property] is JsonValue node && node.TryGetValue<string>(out var text) ? text : null;

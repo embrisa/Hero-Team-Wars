@@ -112,6 +112,53 @@
         "unresolved": { "type": "array" }
       },
       "additionalProperties": false
+    },
+    "object_target": {
+      "type": "object",
+      "properties": { "id": { "type": "string", "minLength": 1 }, "category": { "enum": ["unit", "ability", "item", "destructable", "doodad", "buff", "upgrade"] }, "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" } },
+      "additionalProperties": false
+    },
+    "object_modification": {
+      "type": "object",
+      "required": ["id", "type", "value"],
+      "properties": { "id": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "type": { "enum": ["Int", "Real", "Unreal", "String", "Bool", "Char"] }, "value": {}, "level": { "type": "integer", "minimum": 0 }, "pointer": { "type": "integer", "minimum": 0 }, "variation": { "type": "integer", "minimum": 0 } },
+      "additionalProperties": false
+    },
+    "object_definition": {
+      "type": "object",
+      "required": ["category", "object_kind", "base_rawcode", "custom_rawcode", "rawcode"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 }, "archive_path": { "type": "string", "minLength": 1 }, "category": { "enum": ["unit", "ability", "item", "destructable", "doodad", "buff", "upgrade"] }, "object_kind": { "enum": ["base", "custom"] },
+        "base_rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "custom_rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "display_name": { "type": ["string", "null"] },
+        "dependencies": { "type": "array", "items": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" } }, "references": { "type": "object" }, "unknown_ids": { "type": "array", "items": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" } }, "modifications": { "type": "array", "items": { "$ref": "#/$defs/object_modification" } }, "codec_version": { "type": "string" }, "provenance": { "type": "string" }, "capability": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "object", "required": ["x", "y", "z"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } },
+      "additionalProperties": false
+    },
+    "placement_target": {
+      "type": "object", "minProperties": 1,
+      "properties": { "id": { "type": "string", "pattern": "^(unit|doodad):[0-9]+$" }, "creation_number": { "type": "integer", "minimum": 0 } },
+      "additionalProperties": false
+    },
+    "placement": {
+      "type": "object", "required": ["kind", "rawcode", "position"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(unit|doodad):[0-9]+$" }, "member": { "enum": ["war3mapUnits.doo", "war3map.doo"] }, "kind": { "enum": ["unit", "building", "item", "doodad", "destructable", "special_doodad"] }, "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "skin_rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "owner_id": { "type": "integer", "minimum": 1, "maximum": 24 }, "flags": { "type": "integer" },
+        "inventory": { "type": "array" }, "abilities": { "type": "array" }, "position": { "$ref": "#/$defs/position" }, "facing": { "type": "number" }, "scale": { "$ref": "#/$defs/position" }, "variation": { "type": "integer", "minimum": 0 }, "creation_number": { "type": "integer", "minimum": 0 }, "waygate_destination_region_id": { "type": "integer", "minimum": -1 }, "map_region_role": {}, "provenance": { "type": "string" }, "capability": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "placement_update": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "skin_rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "owner_id": { "type": "integer", "minimum": 1, "maximum": 24 }, "flags": { "type": "integer" }, "hit_points": { "type": "integer" }, "mana_points": { "type": "integer" }, "hero_level": { "type": "integer", "minimum": 0 }, "hero_strength": { "type": "integer", "minimum": 0 }, "hero_agility": { "type": "integer", "minimum": 0 }, "hero_intelligence": { "type": "integer", "minimum": 0 }, "inventory": { "type": "array" }, "abilities": { "type": "array" }, "variation": { "type": "integer", "minimum": 0 }, "position": { "$ref": "#/$defs/position" }, "facing": { "type": "number" }, "scale": { "$ref": "#/$defs/position" }, "map_region_role": {}, "waygate_destination_region_id": { "type": "integer", "minimum": -1 }, "custom_player_color_id": { "type": "integer" }, "life": { "type": "integer", "minimum": 0, "maximum": 255 }, "state": { "type": "string" }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,
@@ -193,6 +240,38 @@
     {
       "if": { "required": ["type"], "properties": { "type": { "const": "reorder_regions" } } },
       "then": { "required": ["expected", "value"], "properties": { "target": { "type": "object", "maxProperties": 0 }, "expected": { "type": "array", "items": { "type": "string", "pattern": "^region:[0-9]+$" } }, "value": { "type": "object", "required": ["region_ids"], "properties": { "region_ids": { "type": "array", "items": { "type": "string", "pattern": "^region:[0-9]+$" }, "uniqueItems": true } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "create_object_definition" } } },
+      "then": { "required": ["value"], "properties": { "target": { "$ref": "#/$defs/object_target" }, "value": { "$ref": "#/$defs/object_definition" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "enum": ["update_object_definition", "set_object_data", "delete_object_definition"] } } },
+      "then": { "required": ["expected"], "properties": { "target": { "$ref": "#/$defs/object_target" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "enum": ["update_object_definition", "set_object_data"] } } },
+      "then": { "required": ["value"], "properties": { "value": { "type": "object", "minProperties": 1, "properties": { "display_name": { "type": ["string", "null"] }, "modifications": { "type": "array", "items": { "$ref": "#/$defs/object_modification" } } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "set_object_reference" } } },
+      "then": { "required": ["expected", "value"], "properties": { "target": { "type": "object", "required": ["relation"], "properties": { "id": { "type": "string", "minLength": 1 }, "category": { "enum": ["unit", "ability", "item", "destructable", "doodad", "buff", "upgrade"] }, "rawcode": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "creation_number": { "type": "integer", "minimum": 0 }, "relation": { "enum": ["ability", "item", "upgrade", "owner", "region"] } }, "additionalProperties": false }, "value": {} } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "enum": ["place_object", "place_unit"] } } },
+      "then": { "required": ["value"], "properties": { "target": { "type": "object", "properties": { "id": { "type": "string", "pattern": "^(unit|doodad):[0-9]+$" } }, "additionalProperties": false }, "value": { "$ref": "#/$defs/placement" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "enum": ["move_object", "move_unit", "update_placed_object", "remove_placed_object", "remove_placed_unit"] } } },
+      "then": { "required": ["expected"], "properties": { "target": { "$ref": "#/$defs/placement_target" } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "enum": ["move_object", "move_unit"] } } },
+      "then": { "required": ["value"], "properties": { "value": { "type": "object", "required": ["position"], "properties": { "position": { "$ref": "#/$defs/position" } }, "additionalProperties": false } } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "update_placed_object" } } },
+      "then": { "required": ["value"], "properties": { "value": { "$ref": "#/$defs/placement_update" } } }
     }
   ]
 }

@@ -139,8 +139,9 @@ public static class ValidationPipeline
         ValidatePlayers(inspection["players"] as JsonArray, findings, bounds);
         ValidateForces(inspection["players"] as JsonArray, inspection["forces"] as JsonArray, findings, context);
         ValidateRegions(inspection["regions"] as JsonArray, findings, bounds, context);
-        ValidateObjectDefinitions(inspection["object_data"] as JsonArray, findings);
-        ValidatePlacements(inspection["placed_objects"] as JsonArray, findings, bounds);
+        ValidateObjectDefinitions(inspection, inspection["object_data"] as JsonArray, findings);
+        ValidatePlacements(inspection, inspection["placed_objects"] as JsonArray, findings, bounds, context);
+        ValidateObjectReferences(inspection, findings);
         ValidateTeams(inspection, findings, context);
         ValidateRawcodes(inspection, findings);
         ValidateImports(inspection, findings);
@@ -168,8 +169,9 @@ public static class ValidationPipeline
         ValidatePlayers(root["players"] as JsonArray, findings, bounds);
         ValidateForces(root["players"] as JsonArray, root["forces"] as JsonArray, findings, context);
         ValidateRegions(root["regions"] as JsonArray, findings, bounds, context);
-        ValidateObjectDefinitions(root["object_data"] as JsonArray, findings);
-        ValidatePlacements(root["placed_objects"] as JsonArray, findings, bounds);
+        ValidateObjectDefinitions(root, root["object_data"] as JsonArray, findings);
+        ValidatePlacements(root, root["placed_objects"] as JsonArray, findings, bounds, context);
+        ValidateObjectReferences(root, findings);
         ValidateTeams(root, findings, context);
         ValidateRawcodes(root, findings);
         ValidateImports(root, findings);
@@ -215,6 +217,8 @@ public static class ValidationPipeline
             ValidateForceFields(staged["forces"] as JsonArray, findings);
         }
 
+        ValidateBuildableObjectChanges(source, staged, findings);
+        ValidateBuildablePlacementChanges(source, staged, findings);
         ValidateBuildableScripts(source, staged, findings);
         ValidateGameplaySourceHashes(staged, findings);
 
@@ -275,6 +279,78 @@ public static class ValidationPipeline
 
         _ = context;
     }
+
+    private static void ValidateBuildableObjectChanges(JsonObject source, JsonObject staged, JsonArray findings)
+    {
+        var before = EnumerateObjects(source["object_data"]).GroupBy(ObjectIdentity, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var after = EnumerateObjects(staged["object_data"]).GroupBy(ObjectIdentity, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        foreach (var identity in before.Keys.Union(after.Keys, StringComparer.OrdinalIgnoreCase))
+        {
+            before.TryGetValue(identity, out var left);
+            after.TryGetValue(identity, out var right);
+            var member = StringValue(right?["archive_path"]) ?? StringValue(left?["archive_path"])
+                ?? (StringValue(right?["category"]) is { } category ? ObjectPlacementSupport.MemberForCategory(category) : null)
+                ?? (StringValue(left?["category"]) is { } oldCategory ? ObjectPlacementSupport.MemberForCategory(oldCategory) : null);
+            if (member is null || IsMemberBuildable(source, member))
+            {
+                if (left is null || right is null) continue;
+                foreach (var field in left.Select(item => item.Key).Union(right.Select(item => item.Key), StringComparer.Ordinal))
+                {
+                    left.TryGetPropertyValue(field, out var oldValue);
+                    right.TryGetPropertyValue(field, out var newValue);
+                    if (JsonUtilities.Equal(oldValue, newValue) || field is "provenance" or "capability" or "codec_version") continue;
+                    if (field == "unknown_ids") Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "object_data", identity, "Unknown object-data fields are preserved but are not mutable.", "Keep unknown_ids unchanged and edit only typed modifications.");
+                    else if (field is not ("display_name" or "references" or "modifications")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "object_data", identity, $"Object field '{field}' changed without a typed object-data operation.", "Use create/update/delete_object_definition or set_object_reference for supported object fields.");
+                }
+                continue;
+            }
+            Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "object_data", member, "The staged object-data member is not round-trip writable for this map.", "Keep edits disabled until that specific category member has typed round-trip evidence.");
+        }
+    }
+
+    private static void ValidateBuildablePlacementChanges(JsonObject source, JsonObject staged, JsonArray findings)
+    {
+        var before = EnumerateObjects(source["placed_objects"]).GroupBy(PlacementIdentity, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var after = EnumerateObjects(staged["placed_objects"]).GroupBy(PlacementIdentity, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        foreach (var identity in before.Keys.Union(after.Keys, StringComparer.Ordinal))
+        {
+            before.TryGetValue(identity, out var left);
+            after.TryGetValue(identity, out var right);
+            var member = StringValue(right?["member"]) ?? StringValue(left?["member"]);
+            if (member is not null && !IsMemberBuildable(source, member))
+            {
+                Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "placed_objects", identity, "The staged placement member is not round-trip writable for this map.", "Keep edits disabled until the placement member has typed round-trip evidence.");
+                continue;
+            }
+            if (left is null || right is null) continue;
+            foreach (var field in left.Select(item => item.Key).Union(right.Select(item => item.Key), StringComparer.Ordinal))
+            {
+                left.TryGetPropertyValue(field, out var oldValue);
+                right.TryGetPropertyValue(field, out var newValue);
+                if (JsonUtilities.Equal(oldValue, newValue) || field is "provenance" or "capability" or "codec_version") continue;
+                if (field is not ("rawcode" or "skin_rawcode" or "owner_id" or "flags" or "hit_points" or "mana_points" or "hero_level" or "hero_strength" or "hero_agility" or "hero_intelligence" or "inventory" or "abilities" or "variation" or "position" or "facing" or "scale" or "map_region_role" or "waygate_destination_region_id" or "custom_player_color_id" or "life" or "state" or "member" or "kind"))
+                {
+                    Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "placed_objects", identity, $"Placement field '{field}' changed without a typed placement operation.", "Use place/move/update/remove_object operations for supported placement fields.");
+                }
+                if (field is "id" or "creation_number" or "member" or "kind") Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "placed_objects", identity, $"Placement identity field '{field}' is immutable.", "Preserve the native creation number, placement kind, and archive member identity.");
+            }
+        }
+    }
+
+    private static bool IsMemberBuildable(JsonObject source, string member)
+    {
+        var capability = (source["object_data_members"] as JsonArray)?.OfType<JsonObject>()
+            .FirstOrDefault(item => string.Equals(StringValue(item["archive_path"]), member, StringComparison.OrdinalIgnoreCase))?["capability"];
+        capability ??= (source["archive_members"] as JsonArray)?.OfType<JsonObject>()
+            .FirstOrDefault(item => string.Equals(StringValue(item["path"]), member, StringComparison.OrdinalIgnoreCase))?["capability"];
+        return capability is null || StringValue(capability) is "roundtrip_verified" or "typed_write_enabled" or "staged_typed_write";
+    }
+
+    private static string ObjectIdentity(JsonObject value)
+        => StringValue(value["id"]) ?? $"{StringValue(value["category"])}:{StringValue(value["rawcode"])}";
+
+    private static string PlacementIdentity(JsonObject value)
+        => StringValue(value["id"]) ?? $"{StringValue(value["member"])}:{StringValue(value["creation_number"])}";
 
     private static void ValidateGameplayModel(JsonObject root, JsonArray findings)
     {
@@ -574,6 +650,7 @@ public static class ValidationPipeline
         var duplicateDefinitions = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in EnumerateObjects(root["object_data"]))
         {
+            var category = StringValue(item["category"])?.ToLowerInvariant() ?? "unknown";
             foreach (var key in new[] { "rawcode", "new_rawcode", "object_id", "new_id" })
             {
                 var rawcode = StringValue(item[key]);
@@ -582,7 +659,7 @@ public static class ValidationPipeline
                 {
                     Add(findings, "error", "RAWCODE_INVALID", "object_data", rawcode, "Object rawcodes must be exactly four printable ASCII characters.", "Use a category-valid four-character rawcode.");
                 }
-                else if (!definitions.Add(rawcode) && duplicateDefinitions.Add(rawcode))
+                else if (!definitions.Add($"{category}:{rawcode}") && duplicateDefinitions.Add($"{category}:{rawcode}"))
                 {
                     Add(findings, "error", "RAWCODE_DUPLICATE", "object_data", rawcode, "Object rawcodes must be unique within their declared category.", "Choose a unique custom rawcode.");
                 }
@@ -598,22 +675,19 @@ public static class ValidationPipeline
             }
         }
 
-        var objectData = root["object_data"];
-        var opaqueObject = objectData as JsonObject;
-        if (opaqueObject is not null || objectData is JsonArray { Count: 0 })
+        if (root["object_data"] is JsonObject opaqueObject && StringValue(opaqueObject["capability"]) == "preserved_opaque")
         {
-            var capability = opaqueObject is null ? null : StringValue(opaqueObject["capability"]);
-            if (capability == "preserved_opaque" || objectData is JsonArray)
-            {
-                Add(findings, "info", "RAWCODE_VALIDATION_LIMIT", "object_data", null, "Rawcode uniqueness and dangling-reference checks are incomplete because object data is opaque.", "Keep object-data edits disabled until a category-aware parser is proven.");
-            }
+            Add(findings, "info", "RAWCODE_VALIDATION_LIMIT", "object_data", null, "Rawcode uniqueness and dangling-reference checks are incomplete because object data is opaque.", "Keep object-data edits disabled until a category-aware parser is proven.");
         }
     }
 
-    private static void ValidateObjectDefinitions(JsonArray? definitions, JsonArray findings)
+    private static void ValidateObjectDefinitions(JsonObject root, JsonArray? definitions, JsonArray findings)
     {
         if (definitions is null) return;
-        var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var identities = definitions.OfType<JsonObject>()
+            .Select(definition => $"{StringValue(definition["category"])}:{StringValue(definition["rawcode"])}")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var node in definitions)
         {
             if (node is not JsonObject definition)
@@ -623,32 +697,122 @@ public static class ValidationPipeline
             }
 
             var category = StringValue(definition["category"]);
+            var objectKind = StringValue(definition["object_kind"]);
+            var archivePath = StringValue(definition["archive_path"]);
             var rawcode = StringValue(definition["rawcode"]);
             var key = $"{category}:{rawcode}";
-            if (category is not ("unit" or "ability" or "item" or "destructable" or "doodad" or "buff" or "upgrade"))
+            if (!ObjectPlacementSupport.IsSupportedCategory(category))
             {
                 Add(findings, "error", "OBJECT_CATEGORY_INVALID", "object_data", category, "Object definitions must use a supported category.", "Use unit, ability, item, destructable, doodad, buff, or upgrade.");
+            }
+            if (objectKind is not ("base" or "custom"))
+            {
+                Add(findings, "error", "OBJECT_KIND_INVALID", "object_data", rawcode, "Object definitions must declare object_kind as base or custom.", "Preserve the native base/custom object kind.");
+            }
+            if (ObjectPlacementSupport.IsSupportedCategory(category) && archivePath is not null && !string.Equals(archivePath, ObjectPlacementSupport.MemberForCategory(category!), StringComparison.OrdinalIgnoreCase))
+            {
+                Add(findings, "error", "OBJECT_MEMBER_INVALID", "object_data", rawcode, "Object definition category and archive member must agree.", "Keep each object definition in its category-specific member.");
             }
             if (rawcode is null || !Rawcode.IsMatch(rawcode))
             {
                 Add(findings, "error", "RAWCODE_INVALID", "object_data", rawcode, "Object definition rawcodes must be exactly four printable ASCII characters.", "Use a valid category-specific rawcode.");
             }
-            else if (!identities.Add(key))
+            else if (!seen.Add(key))
             {
                 Add(findings, "error", "RAWCODE_DUPLICATE", "object_data", key, "Object rawcodes must be unique within their category.", "Choose a unique custom rawcode.");
+            }
+
+            foreach (var field in new[] { "base_rawcode", "custom_rawcode" })
+            {
+                var value = StringValue(definition[field]);
+                if (value is not null && !Rawcode.IsMatch(value)) Add(findings, "error", "RAWCODE_INVALID", "object_data", value, $"Object definition {field} must be exactly four printable ASCII characters.", "Use a category-valid four-character rawcode.");
+            }
+            var baseRawcode = StringValue(definition["base_rawcode"]);
+            var customRawcode = StringValue(definition["custom_rawcode"]);
+            if (objectKind is "base" or "custom" && (baseRawcode is null || customRawcode is null))
+            {
+                Add(findings, "error", "OBJECT_IDENTITY_INVALID", "object_data", rawcode, "Object definitions require base_rawcode and custom_rawcode.", "Preserve both native object identity rawcodes.");
+            }
+            if (objectKind == "custom" && ObjectPlacementSupport.IsSupportedCategory(category) && baseRawcode is not null && customRawcode is not null
+                && !ObjectPlacementSupport.IsKnownStandard(category!, baseRawcode)
+                && !identities.Contains($"{category}:{baseRawcode}"))
+            {
+                Add(findings, "error", "BASE_REFERENCE_MISSING", "object_data", baseRawcode, "A custom object references a base object that is not known or staged in the same category.", "Use a valid standard base rawcode or stage the base definition first.");
+            }
+            if (objectKind is "base" or "custom" && baseRawcode is not null && customRawcode is not null && rawcode is not null)
+            {
+                var activeRawcode = objectKind == "custom" ? customRawcode : baseRawcode;
+                if (rawcode != activeRawcode) Add(findings, "error", "OBJECT_IDENTITY_INVALID", "object_data", rawcode, "Object rawcode must match the active base/custom rawcode.", "Preserve the native object identity fields.");
+                if (objectKind == "custom" && baseRawcode == customRawcode) Add(findings, "error", "OBJECT_IDENTITY_INVALID", "object_data", rawcode, "Custom objects must use distinct base and custom rawcodes.", "Choose a custom rawcode different from its base rawcode.");
+            }
+            if (definition.TryGetPropertyValue("display_name", out var displayName) && displayName is not null && StringValue(displayName) is null)
+            {
+                Add(findings, "error", "OBJECT_DISPLAY_NAME_INVALID", "object_data", rawcode, "Object display_name must be a string or null.", "Use the category name field through the typed object operation.");
             }
 
             if (definition["modifications"] is not null && definition["modifications"] is not JsonArray)
             {
                 Add(findings, "error", "OBJECT_MODIFICATIONS_INVALID", "object_data", rawcode, "Object modifications must be an array.", "Use typed modification records.");
             }
+            if (definition["dependencies"] is not null && definition["dependencies"] is not JsonArray)
+            {
+                Add(findings, "error", "OBJECT_DEPENDENCIES_INVALID", "object_data", rawcode, "Object dependencies must be an array of rawcodes.", "Use same-category dependency rawcodes.");
+            }
+            if (definition["references"] is not null && definition["references"] is not JsonObject)
+            {
+                Add(findings, "error", "OBJECT_REFERENCES_INVALID", "object_data", rawcode, "Object references must be a typed relation object.", "Use ability, item, upgrade, owner, or region references.");
+            }
+            if (definition["modifications"] is JsonArray modifications)
+            {
+                foreach (var nodeModification in modifications)
+                {
+                    if (nodeModification is not JsonObject modification)
+                    {
+                        Add(findings, "error", "OBJECT_MODIFICATION_INVALID", "object_data", rawcode, "Object modifications must be typed records.", "Use id, type, value, and the category-specific level or variation fields.");
+                        continue;
+                    }
+                    var modificationId = StringValue(modification["id"]);
+                    var modificationType = StringValue(modification["type"]);
+                    if (modificationId is null || !Rawcode.IsMatch(modificationId) || modificationType is not ("Int" or "Real" or "Unreal" or "String" or "Bool" or "Char") || !ValidObjectModificationValue(modification["value"], modificationType))
+                    {
+                        Add(findings, "error", "OBJECT_MODIFICATION_INVALID", "object_data", rawcode, "Object modification id, type, and value must agree.", "Use the typed scalar value that matches the declared object-data type.");
+                    }
+                    if (category is "ability" or "upgrade" && (IntegerValue(modification["level"]) is null || IntegerValue(modification["pointer"]) is null))
+                    {
+                        Add(findings, "error", "OBJECT_MODIFICATION_SCOPE_INVALID", "object_data", rawcode, "Ability and upgrade modifications require level and pointer scope.", "Preserve the native level-based modification scope.");
+                    }
+                    if (category == "doodad" && (IntegerValue(modification["variation"]) is null || IntegerValue(modification["pointer"]) is null))
+                    {
+                        Add(findings, "error", "OBJECT_MODIFICATION_SCOPE_INVALID", "object_data", rawcode, "Doodad modifications require variation and pointer scope.", "Preserve the native variation-based modification scope.");
+                    }
+                    if (category is not ("ability" or "upgrade" or "doodad") && (modification["level"] is not null || modification["pointer"] is not null || modification["variation"] is not null))
+                    {
+                        Add(findings, "error", "OBJECT_MODIFICATION_SCOPE_INVALID", "object_data", rawcode, "Simple object-data modifications cannot carry level or variation scope.", "Remove unsupported scope fields from simple object categories.");
+                    }
+                }
+            }
         }
     }
 
-    private static void ValidatePlacements(JsonArray? placements, JsonArray findings, Bounds? bounds)
+    private static bool ValidObjectModificationValue(JsonNode? value, string type)
+    {
+        if (value is not JsonValue scalar) return false;
+        return type switch
+        {
+            "Int" => IntegerValue(value) is not null,
+            "Real" or "Unreal" => NumericValue(value) is { } number && IsFinite(number),
+            "String" => StringValue(value) is not null,
+            "Bool" => scalar.TryGetValue<bool>(out _),
+            "Char" => StringValue(value) is { Length: 1 },
+            _ => false
+        };
+    }
+
+    private static void ValidatePlacements(JsonObject root, JsonArray? placements, JsonArray findings, Bounds? bounds, JsonObject? context)
     {
         if (placements is null) return;
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        var nativeIdentities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var node in placements)
         {
             if (node is not JsonObject placement)
@@ -660,10 +824,19 @@ public static class ValidationPipeline
             var rawcode = StringValue(placement["rawcode"]);
             var id = StringValue(placement["id"]);
             if (rawcode is null && StringValue(placement["capability"]) == "preserved_opaque") continue;
+            var kind = StringValue(placement["kind"])?.ToLowerInvariant();
+            if (kind is not ("unit" or "building" or "item" or "doodad" or "destructable" or "special_doodad")) Add(findings, "error", "PLACEMENT_KIND_INVALID", "placed_objects", id, "Placed objects must declare a supported placement kind.", "Use unit, building, item, doodad, destructable, or special_doodad.");
+            var expectedMember = kind is null ? null : PlacementMember(kind);
+            var member = StringValue(placement["member"]);
+            if (expectedMember is not null && !string.Equals(member, expectedMember, StringComparison.OrdinalIgnoreCase)) Add(findings, "error", "PLACEMENT_MEMBER_INVALID", "placed_objects", id, "Placement kind and archive member must agree.", "Keep units/buildings/items in war3mapUnits.doo and doodads/destructables in war3map.doo.");
             if (rawcode is null || !Rawcode.IsMatch(rawcode)) Add(findings, "error", "RAWCODE_INVALID", "placed_objects", rawcode, "Placed-object rawcodes must be exactly four printable ASCII characters.", "Use a valid unit, item, doodad, or destructable rawcode.");
             if (id is null || !ids.Add(id)) Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Placed objects require unique stable MCP IDs.", "Assign one stable id to every placement.");
+            var creation = IntegerValue(placement["creation_number"]);
+            var expectedIdKind = member?.Equals("war3map.doo", StringComparison.OrdinalIgnoreCase) == true ? "doodad" : "unit";
+            if (creation is null || id is null || id != $"{expectedIdKind}:{creation}") Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Placed-object IDs must be derived from the native creation number and archive member.", "Use unit:<creation_number> or doodad:<creation_number>.");
+            if (creation is not null && member is not null && !nativeIdentities.Add($"{member}:{creation}")) Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Native placement creation numbers must be unique within an archive member.", "Preserve one canonical placement per native creation number.");
             var owner = IntegerValue(placement["owner_id"]);
-            if (owner is not null and (< 1 or > 24)) Add(findings, "error", "PLACEMENT_OWNER_INVALID", "placed_objects", id, "Placement owner_id must reference a player slot from 1 through 24.", "Use an explicit valid player ID.");
+            if (owner is not null && (owner is < 1 or > 24 || !PlayerExists(root, owner.Value))) Add(findings, "error", "PLACEMENT_OWNER_INVALID", "placed_objects", id, "Placement owner_id must reference a declared player slot from 1 through 24.", "Use an explicit valid player ID.");
             if (placement["position"] is JsonObject position)
             {
                 var x = NumericValue(position["x"]);
@@ -676,8 +849,114 @@ public static class ValidationPipeline
             {
                 Add(findings, "error", "PLACEMENT_POSITION_INVALID", "placed_objects", id, "Placement position must be an object with x/y/z.", "Supply finite world coordinates.");
             }
+
+            if (kind is "unit" or "building" or "item")
+            {
+                var category = kind == "item" ? "item" : "unit";
+                if (!ObjectRawcodeExists(root, category, rawcode)) Add(findings, "error", "PLACEMENT_REFERENCE_MISSING", "placed_objects", id, "The placement rawcode is not known in its category.", "Use a standard or staged object rawcode.");
+                ValidatePlacementArrays(root, placement, findings, id);
+            }
+            else if (kind is "doodad" or "special_doodad" or "destructable")
+            {
+                var category = kind == "destructable" ? "destructable" : "doodad";
+                if (!ObjectRawcodeExists(root, category, rawcode)) Add(findings, "error", "PLACEMENT_REFERENCE_MISSING", "placed_objects", id, "The placement rawcode is not known in its category.", "Use a standard or staged object rawcode.");
+            }
+
+            if (context?["placement_limits"] is JsonObject limits && expectedMember is not null)
+            {
+                var limit = IntegerValue(limits[expectedMember]);
+                if (limit is not null && placements.Count(item => item is JsonObject candidate && string.Equals(StringValue(candidate["member"]), expectedMember, StringComparison.OrdinalIgnoreCase)) > limit.Value)
+                {
+                    Add(findings, "error", "PLACEMENT_LIMIT_EXCEEDED", "placed_objects", expectedMember, $"The placement count exceeds the configured limit of {limit.Value} for {expectedMember}.", "Remove placements or raise the explicit project placement limit.");
+                }
+            }
         }
     }
+
+    private static void ValidatePlacementArrays(JsonObject root, JsonObject placement, JsonArray findings, string? id)
+    {
+        if (placement["inventory"] is not JsonArray inventory) Add(findings, "error", "PLACEMENT_INVENTORY_INVALID", "placed_objects", id, "Unit-like placements require an inventory array.", "Use an empty inventory array when no items are carried.");
+        else
+        {
+            var slots = new HashSet<int>();
+            foreach (var item in inventory.OfType<JsonObject>())
+            {
+                var slot = IntegerValue(item["slot"]);
+                var itemRawcode = StringValue(item["rawcode"]);
+                if (slot is null or < 0 or > 5 || !slots.Add(slot.Value)) Add(findings, "error", "PLACEMENT_INVENTORY_INVALID", "placed_objects", id, "Inventory slots must be unique integers from 0 through 5.", "Normalize each carried item to one unique slot.");
+                if (itemRawcode is null || !ObjectRawcodeExists(root, "item", itemRawcode)) Add(findings, "error", "PLACEMENT_REFERENCE_MISSING", "placed_objects", itemRawcode, "An inventory item rawcode is not known.", "Use a standard or staged item rawcode.");
+            }
+        }
+        if (placement["abilities"] is not JsonArray abilities) Add(findings, "error", "PLACEMENT_ABILITIES_INVALID", "placed_objects", id, "Unit-like placements require an abilities array.", "Use an empty abilities array when no abilities are attached.");
+        else
+        {
+            var abilityIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in abilities.OfType<JsonObject>())
+            {
+                var abilityRawcode = StringValue(item["rawcode"]);
+                if (abilityRawcode is null || !abilityIds.Add(abilityRawcode)) Add(findings, "error", "PLACEMENT_ABILITIES_INVALID", "placed_objects", id, "Ability rawcodes must be valid and unique per placement.", "Normalize attached abilities by rawcode.");
+                if (abilityRawcode is null || !ObjectRawcodeExists(root, "ability", abilityRawcode)) Add(findings, "error", "PLACEMENT_REFERENCE_MISSING", "placed_objects", abilityRawcode, "An attached ability rawcode is not known.", "Use a standard or staged ability rawcode.");
+            }
+        }
+    }
+
+    private static void ValidateObjectReferences(JsonObject root, JsonArray findings)
+    {
+        foreach (var definition in EnumerateObjects(root["object_data"]))
+        {
+            var category = StringValue(definition["category"]);
+            if (!ObjectPlacementSupport.IsSupportedCategory(category)) continue;
+            foreach (var dependency in (definition["dependencies"] as JsonArray ?? new JsonArray()))
+            {
+                var rawcode = StringValue(dependency);
+                if (rawcode is null || !ObjectRawcodeExists(root, category!, rawcode)) Add(findings, "error", "REFERENCE_MISSING", "object_data", rawcode, "An object dependency references a missing same-category object.", "Use a standard or staged object rawcode.");
+            }
+            if (definition["references"] is not JsonObject references) continue;
+            foreach (var reference in references)
+            {
+                if (reference.Key is "ability" or "item" or "upgrade")
+                {
+                    var referenceRawcode = ReferenceRawcode(reference.Value);
+                    if (referenceRawcode is null || !ObjectRawcodeExists(root, reference.Key, referenceRawcode)) Add(findings, "error", "REFERENCE_MISSING", "object_data", reference.Key, "An object reference points to a missing object.", "Use a standard or staged referenced rawcode.");
+                }
+                else if (reference.Key == "owner")
+                {
+                    var owner = ReferenceInteger(reference.Value, "player_id");
+                    if (owner is null || !PlayerExists(root, owner.Value)) Add(findings, "error", "REFERENCE_MISSING", "object_data", "owner", "An object owner reference points to a missing player.", "Use a declared player slot.");
+                }
+                else if (reference.Key == "region")
+                {
+                    var region = ReferenceInteger(reference.Value, "region_id");
+                    if (region is null || !RegionExists(root, region.Value)) Add(findings, "error", "REFERENCE_MISSING", "object_data", "region", "An object region reference points to a missing region.", "Use a declared region creation number.");
+                }
+                else Add(findings, "error", "REFERENCE_RELATION_INVALID", "object_data", reference.Key, "Object reference relations must be ability, item, upgrade, owner, or region.", "Use a supported typed relation.");
+            }
+        }
+    }
+
+    private static string? ReferenceRawcode(JsonNode? value)
+        => value is JsonObject reference ? StringValue(reference["rawcode"]) : StringValue(value);
+
+    private static int? ReferenceInteger(JsonNode? value, string property)
+        => value is JsonObject reference ? IntegerValue(reference[property]) : IntegerValue(value);
+
+    private static bool ObjectRawcodeExists(JsonObject root, string category, string? rawcode)
+        => rawcode is not null && (ObjectPlacementSupport.IsKnownStandard(category, rawcode)
+            || EnumerateObjects(root["object_data"]).Any(item => string.Equals(StringValue(item["category"]), category, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(StringValue(item["rawcode"]), rawcode, StringComparison.OrdinalIgnoreCase)));
+
+    private static bool RegionExists(JsonObject root, int creationNumber)
+        => Regions(root).Any(region => IntegerValue(region["creation_number"]) == creationNumber);
+
+    private static bool PlayerExists(JsonObject root, int playerId)
+        => (root["players"] as JsonArray)?.OfType<JsonObject>().Any(player => IntegerValue(player["id"]) == playerId) == true;
+
+    private static string PlacementMember(string kind) => kind.ToLowerInvariant() switch
+        {
+            "unit" or "building" or "item" => "war3mapUnits.doo",
+            "doodad" or "destructable" or "special_doodad" => "war3map.doo",
+            _ => string.Empty
+        };
 
     private static void ValidateTeams(JsonObject inspection, JsonArray findings, JsonObject? context)
     {
