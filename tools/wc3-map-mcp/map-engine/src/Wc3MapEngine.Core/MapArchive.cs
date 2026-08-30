@@ -115,7 +115,7 @@ public static class MapArchive
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var replacement in replacements.Keys)
             {
-                if (!sourceNames.Contains(MapArchiveSnapshot.NormalizePath(replacement)))
+                if (!sourceNames.Contains(MapArchiveSnapshot.NormalizePath(replacement)) && !IsSupportedAddedMember(replacement))
                 {
                     throw new EngineException("BUILD_FAILED", $"The build plan names archive member '{replacement}', but it is not present in the source archive.");
                 }
@@ -135,11 +135,18 @@ public static class MapArchive
                 }
             }
 
+            foreach (var replacement in replacements.Where(item => !sourceNames.Contains(MapArchiveSnapshot.NormalizePath(item.Key))))
+            {
+                outputFiles.Add(MpqFile.New(new MemoryStream(replacement.Value, writable: false), MapArchiveSnapshot.NormalizePath(replacement.Key)));
+            }
+
             var options = new MpqArchiveCreateOptions
             {
                 BlockSize = MpqArchiveCreateOptions.DefaultBlockSize,
                 WriteArchiveFirst = true,
-                ListFileCreateMode = MpqFileCreateMode.None,
+                ListFileCreateMode = replacements.Keys.Any(path => !sourceNames.Contains(MapArchiveSnapshot.NormalizePath(path)))
+                    ? MpqFileCreateMode.Overwrite
+                    : MpqFileCreateMode.None,
                 AttributesCreateMode = MpqFileCreateMode.None,
                 SignatureCreateMode = MpqFileCreateMode.None
             };
@@ -170,4 +177,9 @@ public static class MapArchive
             // Preserve the original build error. The caller can recover the partial path from its log.
         }
     }
+
+    private static bool IsSupportedAddedMember(string path)
+        => path.Equals("war3mapUnits.doo", StringComparison.OrdinalIgnoreCase)
+            || path.Equals("war3map.doo", StringComparison.OrdinalIgnoreCase)
+            || MapComponentCodec.IsObjectMember(path);
 }

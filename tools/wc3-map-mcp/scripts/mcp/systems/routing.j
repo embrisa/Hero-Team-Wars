@@ -1,0 +1,2 @@
+function HTW_Routing_Compute takes nothing returns nothing
+endfunction

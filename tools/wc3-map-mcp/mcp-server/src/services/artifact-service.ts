@@ -41,6 +41,24 @@ export function writeJsonArtifact(project: ResolvedProject, relativePath: string
   return { kind, path: relativeProjectPath(project, path), size_bytes: hash.size_bytes, sha256: hash.sha256 };
 }
 
+export function writeTextArtifact(project: ResolvedProject, relativePath: string, value: string, kind: string): ArtifactRef {
+  const path = join(project.root, relativePath.replaceAll("/", "\\"));
+  mkdirSync(dirname(path), { recursive: true });
+  const temp = join(dirname(path), `.${path.split(/[\\/]/).pop() ?? "artifact"}.${randomUUID()}.tmp`);
+  try {
+    writeFileSync(temp, value, { encoding: "utf8", flag: "wx" });
+    replaceFile(temp, path);
+  } catch (error) {
+    if (existsSync(temp)) {
+      try { unlinkSync(temp); } catch { /* Preserve the useful original error. */ }
+    }
+    throw new AppError("INTERNAL_ERROR", `Unable to write artifact '${relativePath}': ${error instanceof Error ? error.message : String(error)}`, false, { path: relativePath }, { cause: error });
+  }
+
+  const hash = sha256File(path);
+  return { kind, path: relativeProjectPath(project, path), size_bytes: hash.size_bytes, sha256: hash.sha256 };
+}
+
 function replaceFile(temp: string, destination: string): void {
   if (!existsSync(destination)) {
     renameSync(temp, destination);

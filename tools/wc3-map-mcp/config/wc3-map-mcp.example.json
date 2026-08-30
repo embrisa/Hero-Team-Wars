@@ -16,6 +16,7 @@
       "build_root": "builds/mcp",
       "log_root": "tools/wc3-map-mcp/logs",
       "test_output_root": "tools/wc3-map-mcp/artifacts/tests",
+      "gameplay_source_roots": ["tools/wc3-map-mcp/scripts/mcp"],
       "world_editor": "C:/Warcraft III/_retail_/x86_64/World Editor.exe",
       "warcraft": "C:/Warcraft III/_retail_/x86_64/Warcraft III.exe",
       "test_map_root": "C:/Users/hp/Documents/Warcraft III/Maps/Test",
@@ -26,7 +27,9 @@
         "wc3_get_component",
         "wc3_get_script_source",
         "wc3_validate_map",
-        "wc3_compare_maps"
+        "wc3_compare_maps",
+        "wc3_compose_gameplay_source",
+        "wc3_validate_gameplay_source"
       ],
       "write_policy": "read_only",
       "script_policy": "disabled",

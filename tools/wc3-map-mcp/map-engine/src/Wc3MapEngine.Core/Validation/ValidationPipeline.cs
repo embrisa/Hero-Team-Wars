@@ -138,6 +138,9 @@ public static class ValidationPipeline
         ValidatePlayers(inspection["players"] as JsonArray, findings, bounds);
         ValidateForces(inspection["players"] as JsonArray, inspection["forces"] as JsonArray, findings, context);
         ValidateRegions(inspection["regions"] as JsonArray, findings, bounds, context);
+        ValidateObjectDefinitions(inspection["object_data"] as JsonArray, findings);
+        ValidatePlacements(inspection["placed_objects"] as JsonArray, findings, bounds);
+        ValidateTeams(inspection, findings, context);
         ValidateRawcodes(inspection, findings);
         ValidateImports(inspection, findings);
 
@@ -164,6 +167,9 @@ public static class ValidationPipeline
         ValidatePlayers(root["players"] as JsonArray, findings, bounds);
         ValidateForces(root["players"] as JsonArray, root["forces"] as JsonArray, findings, context);
         ValidateRegions(root["regions"] as JsonArray, findings, bounds, context);
+        ValidateObjectDefinitions(root["object_data"] as JsonArray, findings);
+        ValidatePlacements(root["placed_objects"] as JsonArray, findings, bounds);
+        ValidateTeams(root, findings, context);
         ValidateRawcodes(root, findings);
         ValidateImports(root, findings);
         ValidateScriptEntries(root["scripts"] as JsonArray, findings);
@@ -191,27 +197,21 @@ public static class ValidationPipeline
 
         var sourceRegions = Regions(source);
         var stagedRegions = Regions(staged);
-        var sourceNames = sourceRegions.Select(RegionName).ToArray();
-        var stagedNames = stagedRegions.Select(RegionName).ToArray();
-        if (sourceNames.Length != stagedNames.Length || !sourceNames.SequenceEqual(stagedNames, StringComparer.Ordinal))
+        foreach (var after in stagedRegions)
         {
-            Add(findings, "error", "BUILD_REGION_IDENTITY_CHANGED", "regions", null, "Creating, deleting, reordering, or renaming regions is not supported by the Phase 3 serializer.", "Preserve every existing region name and order.");
-        }
-
-        for (var index = 0; index < Math.Min(sourceRegions.Count, stagedRegions.Count); index++)
-        {
-            var before = sourceRegions[index];
-            var after = stagedRegions[index];
-            foreach (var field in before.Select(x => x.Key).Union(after.Select(x => x.Key), StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal))
+            foreach (var field in after.Select(x => x.Key))
             {
-                before.TryGetPropertyValue(field, out var left);
-                after.TryGetPropertyValue(field, out var right);
-                if (JsonUtilities.Equal(left, right)) continue;
-                if (field is not ("min_x" or "min_y" or "max_x" or "max_y"))
+                if (field is not ("id" or "name" or "min_x" or "min_y" or "max_x" or "max_y" or "creation_number" or "weather" or "ambient_sound" or "color_argb" or "provenance" or "capability"))
                 {
-                    Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "regions", RegionName(before), "Only region rectangle coordinates have a proven serializer.", "Keep region names and non-coordinate fields unchanged.");
+                    Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "regions", RegionName(after), $"Region field '{field}' has no proven typed serializer.", "Use only fields supported by the typed region codec.");
                 }
             }
+        }
+
+        if (!JsonUtilities.Equal(source["players"], staged["players"]) || !JsonUtilities.Equal(source["forces"], staged["forces"]))
+        {
+            ValidatePlayerFields(staged["players"] as JsonArray, findings);
+            ValidateForceFields(staged["forces"] as JsonArray, findings);
         }
 
         ValidateBuildableScripts(source, staged, findings);
@@ -224,6 +224,16 @@ public static class ValidationPipeline
         stagedClone.Remove("metadata");
         sourceClone.Remove("regions");
         stagedClone.Remove("regions");
+        sourceClone.Remove("players");
+        stagedClone.Remove("players");
+        sourceClone.Remove("forces");
+        stagedClone.Remove("forces");
+        sourceClone.Remove("object_data");
+        stagedClone.Remove("object_data");
+        sourceClone.Remove("object_data_members");
+        stagedClone.Remove("object_data_members");
+        sourceClone.Remove("placed_objects");
+        stagedClone.Remove("placed_objects");
         sourceClone.Remove("scripts");
         stagedClone.Remove("scripts");
         sourceClone.Remove("archive_members");
@@ -236,6 +246,26 @@ public static class ValidationPipeline
         stagedClone.Remove("opaque_members");
         sourceClone.Remove("parse_warnings");
         stagedClone.Remove("parse_warnings");
+        sourceClone.Remove("profile");
+        stagedClone.Remove("profile");
+        sourceClone.Remove("profiles");
+        stagedClone.Remove("profiles");
+        sourceClone.Remove("teams");
+        stagedClone.Remove("teams");
+        sourceClone.Remove("team_registry");
+        stagedClone.Remove("team_registry");
+        sourceClone.Remove("region_roles");
+        stagedClone.Remove("region_roles");
+        sourceClone.Remove("gameplay_source");
+        stagedClone.Remove("gameplay_source");
+        sourceClone.Remove("gameplay_triggers");
+        stagedClone.Remove("gameplay_triggers");
+        sourceClone.Remove("gameplay_variables");
+        stagedClone.Remove("gameplay_variables");
+        sourceClone.Remove("gameplay_modules");
+        stagedClone.Remove("gameplay_modules");
+        sourceClone.Remove("trigger_mode");
+        stagedClone.Remove("trigger_mode");
         if (!JsonUtilities.Equal(sourceClone, stagedClone))
         {
             Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "canonical_map", null, "The staged transaction changes a component without a proven binary serializer.", "Use a typed operation backed by a Phase 3 round-trip test.");
@@ -501,6 +531,130 @@ public static class ValidationPipeline
             if (capability == "preserved_opaque" || objectData is JsonArray)
             {
                 Add(findings, "info", "RAWCODE_VALIDATION_LIMIT", "object_data", null, "Rawcode uniqueness and dangling-reference checks are incomplete because object data is opaque.", "Keep object-data edits disabled until a category-aware parser is proven.");
+            }
+        }
+    }
+
+    private static void ValidateObjectDefinitions(JsonArray? definitions, JsonArray findings)
+    {
+        if (definitions is null) return;
+        var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var node in definitions)
+        {
+            if (node is not JsonObject definition)
+            {
+                Add(findings, "error", "OBJECT_DEFINITION_INVALID", "object_data", null, "Every object definition must be an object.", "Regenerate the typed object-data section.");
+                continue;
+            }
+
+            var category = StringValue(definition["category"]);
+            var rawcode = StringValue(definition["rawcode"]);
+            var key = $"{category}:{rawcode}";
+            if (category is not ("unit" or "ability" or "item" or "destructable" or "doodad" or "buff" or "upgrade"))
+            {
+                Add(findings, "error", "OBJECT_CATEGORY_INVALID", "object_data", category, "Object definitions must use a supported category.", "Use unit, ability, item, destructable, doodad, buff, or upgrade.");
+            }
+            if (rawcode is null || !Rawcode.IsMatch(rawcode))
+            {
+                Add(findings, "error", "RAWCODE_INVALID", "object_data", rawcode, "Object definition rawcodes must be exactly four printable ASCII characters.", "Use a valid category-specific rawcode.");
+            }
+            else if (!identities.Add(key))
+            {
+                Add(findings, "error", "RAWCODE_DUPLICATE", "object_data", key, "Object rawcodes must be unique within their category.", "Choose a unique custom rawcode.");
+            }
+
+            if (definition["modifications"] is not null && definition["modifications"] is not JsonArray)
+            {
+                Add(findings, "error", "OBJECT_MODIFICATIONS_INVALID", "object_data", rawcode, "Object modifications must be an array.", "Use typed modification records.");
+            }
+        }
+    }
+
+    private static void ValidatePlacements(JsonArray? placements, JsonArray findings, Bounds? bounds)
+    {
+        if (placements is null) return;
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in placements)
+        {
+            if (node is not JsonObject placement)
+            {
+                Add(findings, "error", "PLACEMENT_INVALID", "placed_objects", null, "Every placement must be an object.", "Regenerate the typed placement section.");
+                continue;
+            }
+
+            var rawcode = StringValue(placement["rawcode"]);
+            var id = StringValue(placement["id"]);
+            if (rawcode is null && StringValue(placement["capability"]) == "preserved_opaque") continue;
+            if (rawcode is null || !Rawcode.IsMatch(rawcode)) Add(findings, "error", "RAWCODE_INVALID", "placed_objects", rawcode, "Placed-object rawcodes must be exactly four printable ASCII characters.", "Use a valid unit, item, doodad, or destructable rawcode.");
+            if (id is null || !ids.Add(id)) Add(findings, "error", "PLACEMENT_ID_INVALID", "placed_objects", id, "Placed objects require unique stable MCP IDs.", "Assign one stable id to every placement.");
+            var owner = IntegerValue(placement["owner_id"]);
+            if (owner is not null and (< 1 or > 24)) Add(findings, "error", "PLACEMENT_OWNER_INVALID", "placed_objects", id, "Placement owner_id must reference a player slot from 1 through 24.", "Use an explicit valid player ID.");
+            if (placement["position"] is JsonObject position)
+            {
+                var x = NumericValue(position["x"]);
+                var y = NumericValue(position["y"]);
+                var z = NumericValue(position["z"]);
+                if (x is null || y is null || z is null || !IsFinite(x.Value) || !IsFinite(y.Value) || !IsFinite(z.Value)) Add(findings, "error", "PLACEMENT_POSITION_INVALID", "placed_objects", id, "Placement coordinates must be finite x/y/z values.", "Supply finite world coordinates.");
+                else if (bounds is not null && !bounds.Value.Contains(x.Value, y.Value)) Add(findings, "error", "COORDINATE_OUT_OF_BOUNDS", "placed_objects", id, "Placement coordinates fall outside the map envelope.", "Move the placement inside the inspected map envelope.");
+            }
+            else if (placement["position"] is not null)
+            {
+                Add(findings, "error", "PLACEMENT_POSITION_INVALID", "placed_objects", id, "Placement position must be an object with x/y/z.", "Supply finite world coordinates.");
+            }
+        }
+    }
+
+    private static void ValidateTeams(JsonObject inspection, JsonArray findings, JsonObject? context)
+    {
+        if (inspection["teams"] is not JsonArray teams) return;
+        var players = inspection["players"]?.AsArray().OfType<JsonObject>().Select(item => IntegerValue(item["id"])).Where(value => value.HasValue).Select(value => value!.Value).ToHashSet() ?? new HashSet<int>();
+        var teamIds = new HashSet<string>(StringComparer.Ordinal);
+        var assigned = new HashSet<int>();
+        foreach (var node in teams)
+        {
+            if (node is not JsonObject team)
+            {
+                Add(findings, "error", "TEAM_INVALID", "teams", null, "Every logical team must be an object.", "Regenerate the explicit team registry.");
+                continue;
+            }
+            var id = StringValue(team["id"]) ?? StringValue(team["team_id"]);
+            if (id is null || !teamIds.Add(id)) Add(findings, "error", "TEAM_ID_INVALID", "teams", id, "Logical team IDs must be unique and explicit.", "Use stable team IDs independent of player color.");
+            if (team["member_player_ids"] is not JsonArray members)
+            {
+                Add(findings, "error", "TEAM_MEMBERS_MISSING", "teams", id, "Every team must declare member_player_ids.", "Assign explicit player slots to the team.");
+                continue;
+            }
+            foreach (var member in members)
+            {
+                var playerId = IntegerValue(member);
+                if (playerId is null || !players.Contains(playerId.Value)) Add(findings, "error", "TEAM_PLAYER_REFERENCE_INVALID", "teams", id, "A logical team references a missing player slot.", "Use declared player IDs only.");
+                else if (!assigned.Add(playerId.Value)) Add(findings, "error", "PLAYER_TEAM_CONTRADICTION", "teams", playerId.Value.ToString(CultureInfo.InvariantCulture), "A player is assigned to multiple logical teams.", "Assign each player to exactly one explicit team.");
+            }
+        }
+
+        var profile = StringValue(inspection["profile"]) ?? StringValue(context?["profile"]);
+        if (profile == "mvp_2arena" && teams.Count != 2) Add(findings, "error", "PROFILE_TEAM_COUNT_INVALID", "teams", profile, "The mvp_2arena profile requires exactly two logical teams.", "Use two explicit teams of two players.");
+        if (profile == "full_6team" && teams.Count != 6) Add(findings, "error", "PROFILE_TEAM_COUNT_INVALID", "teams", profile, "The full_6team profile requires exactly six logical teams.", "Use six explicit teams of two players.");
+    }
+
+    private static void ValidatePlayerFields(JsonArray? players, JsonArray findings)
+    {
+        foreach (var player in players?.OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
+        {
+            foreach (var field in player.Select(item => item.Key))
+            {
+                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "provenance" or "capability")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "players", IntegerValue(player["id"])?.ToString(CultureInfo.InvariantCulture), $"Player field '{field}' has no proven typed serializer.", "Use only fields supported by the map-info codec.");
+            }
+        }
+    }
+
+    private static void ValidateForceFields(JsonArray? forces, JsonArray findings)
+    {
+        foreach (var force in forces?.OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
+        {
+            foreach (var field in force.Select(item => item.Key))
+            {
+                if (field is not ("index" or "name" or "stored_name" or "flags" or "player_ids" or "player_mask" or "provenance" or "capability")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "forces", IntegerValue(force["index"])?.ToString(CultureInfo.InvariantCulture), $"Force field '{field}' has no proven typed serializer.", "Use only fields supported by the map-info codec.");
             }
         }
     }

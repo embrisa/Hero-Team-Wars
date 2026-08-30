@@ -1,6 +1,6 @@
 # Phase 5A Work Packet - MCP Gameplay Sources and Triggers
 
-Status: planned; current MCP-owned JASS replacement is the starting capability.
+Status: MCP-native composition, typed trigger/variable operations, and static validation are implemented; GUI compatibility and exact runtime acceptance remain gated.
 
 ## Goal
 

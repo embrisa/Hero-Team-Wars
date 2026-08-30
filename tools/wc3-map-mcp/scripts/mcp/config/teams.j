@@ -1,0 +1,2 @@
+function HTW_Teams_Initialize takes nothing returns nothing
+endfunction

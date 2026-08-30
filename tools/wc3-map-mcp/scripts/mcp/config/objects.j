@@ -1,0 +1,2 @@
+function HTW_Objects_Initialize takes nothing returns nothing
+endfunction

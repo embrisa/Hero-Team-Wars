@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "profile": "mvp_2arena",
+  "modules": [
+    { "id": "main", "path": "main.j", "dependencies": ["config.tuning", "core.bootstrap", "core.state", "core.debug", "systems.phases", "systems.waves", "systems.routing", "systems.economy", "systems.sending", "systems.information", "content.base-waves", "content.send-units", "content.heroes", "content.items", "content.abilities", "tests.assertions", "tests.scenarios"] },
+    { "id": "config.tuning", "path": "config/tuning.j" },
+    { "id": "core.bootstrap", "path": "core/bootstrap.j", "dependencies": ["config.tuning", "config.teams", "config.regions", "config.objects"] },
+    { "id": "core.state", "path": "core/state.j", "dependencies": ["config.tuning"] },
+    { "id": "config.teams", "path": "config/teams.j", "dependencies": ["config.tuning"] },
+    { "id": "config.regions", "path": "config/regions.j", "dependencies": ["config.tuning"] },
+    { "id": "config.objects", "path": "config/objects.j", "dependencies": ["config.tuning"] },
+    { "id": "core.events", "path": "core/events.j", "dependencies": ["core.state"] },
+    { "id": "core.debug", "path": "core/debug.j", "dependencies": ["core.state"] },
+    { "id": "systems.phases", "path": "systems/phases.j", "dependencies": ["core.state"] },
+    { "id": "systems.waves", "path": "systems/waves.j", "dependencies": ["systems.phases"] },
+    { "id": "systems.heroes", "path": "systems/heroes.j", "dependencies": ["core.state"] },
+    { "id": "systems.lives", "path": "systems/lives.j", "dependencies": ["systems.heroes"] },
+    { "id": "systems.elimination", "path": "systems/elimination.j", "dependencies": ["systems.lives"] },
+    { "id": "systems.economy", "path": "systems/economy.j", "dependencies": ["core.state"] },
+    { "id": "systems.sending", "path": "systems/sending.j", "dependencies": ["systems.economy", "systems.waves"] },
+    { "id": "systems.routing", "path": "systems/routing.j", "dependencies": ["core.state", "systems.elimination"] },
+    { "id": "systems.information", "path": "systems/information.j", "dependencies": ["core.debug", "systems.routing"] },
+    { "id": "content.base-waves", "path": "content/base-waves.j", "dependencies": ["systems.waves"] },
+    { "id": "content.send-units", "path": "content/send-units.j", "dependencies": ["systems.sending"] },
+    { "id": "content.heroes", "path": "content/heroes.j", "dependencies": ["systems.heroes"] },
+    { "id": "content.items", "path": "content/items.j", "dependencies": ["systems.economy"] },
+    { "id": "content.abilities", "path": "content/abilities.j", "dependencies": ["content.heroes"] },
+    { "id": "tests.assertions", "path": "tests/assertions.j", "dependencies": ["core.debug"] },
+    { "id": "tests.scenarios", "path": "tests/scenarios.j", "dependencies": ["tests.assertions", "systems.routing"] }
+  ],
+  "profiles": {
+    "mvp_2arena": {
+      "active_player_ids": [1, 2, 3, 4],
+      "team_ids": ["team_1", "team_2"],
+      "arena_ids": ["arena_a", "arena_b"],
+      "shared_team_lives": 15,
+      "shared_vision": true,
+      "shared_unit_control": false
+    },
+    "full_6team": {
+      "active_player_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      "team_ids": ["team_1", "team_2", "team_3", "team_4", "team_5", "team_6"],
+      "arena_ids": ["arena_1", "arena_2", "arena_3", "arena_4", "arena_5", "arena_6"],
+      "shared_team_lives": 15,
+      "shared_vision": true,
+      "shared_unit_control": false
+    }
+  },
+  "triggers": [
+    { "id": "map_init", "folder": "MCP/Initialization", "handler": "HTW_OnMapInit" },
+    { "id": "round_start", "folder": "MCP/Phases", "handler": "HTW_OnRoundStart" },
+    { "id": "wave_resolved", "folder": "MCP/Waves", "handler": "HTW_OnWaveResolved" }
+  ],
+  "variables": [
+    { "id": "round", "name": "HTW_Round", "type": "integer" },
+    { "id": "wave", "name": "HTW_Wave", "type": "integer" },
+    { "id": "phase", "name": "HTW_Phase", "type": "integer" }
+  ]
+}

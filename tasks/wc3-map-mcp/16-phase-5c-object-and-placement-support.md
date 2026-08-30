@@ -1,6 +1,6 @@
 # Phase 5C Work Packet - Typed Object Data and Placed Objects
 
-Status: planned; current object and placement members are preserved opaque.
+Status: Typed War3Net object-data and placed-object codecs plus transactional operations and synthetic round-trip coverage are implemented; category fixture and exact editor/game acceptance remain gated.
 
 ## Goal
 

@@ -1,0 +1,2 @@
+function HTW_Content_Items takes nothing returns nothing
+endfunction

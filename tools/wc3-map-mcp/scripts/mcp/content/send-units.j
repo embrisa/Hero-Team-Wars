@@ -1,0 +1,2 @@
+function HTW_Content_SendUnits takes nothing returns nothing
+endfunction

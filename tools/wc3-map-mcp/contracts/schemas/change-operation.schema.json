@@ -6,7 +6,7 @@
   "required": ["operation_id", "type", "target", "rationale"],
   "properties": {
     "operation_id": { "type": "string", "format": "uuid" },
-    "type": { "type": "string", "enum": ["set_map_metadata", "update_region", "create_region", "delete_region", "set_player_slot", "set_force", "place_unit", "move_unit", "remove_placed_unit", "set_object_data", "set_script_source"] },
+    "type": { "type": "string", "enum": ["set_map_metadata", "create_player_slot", "set_player_slot", "delete_player_slot", "create_force", "set_force", "delete_force", "create_team", "set_team", "delete_team", "set_team_arena", "set_team_members", "update_region", "create_region", "rename_region", "delete_region", "set_region_role", "create_object_definition", "update_object_definition", "delete_object_definition", "set_object_reference", "place_object", "move_object", "update_placed_object", "remove_placed_object", "place_unit", "move_unit", "remove_placed_unit", "set_object_data", "set_script_source", "upsert_script_module", "remove_script_module", "set_trigger_mode", "create_trigger", "update_trigger", "move_trigger", "delete_trigger", "create_variable", "update_variable", "delete_variable"] },
     "target": { "type": "object", "additionalProperties": true },
     "expected_revision": { "type": "integer", "minimum": 0 },
     "expected": {},

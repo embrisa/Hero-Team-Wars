@@ -1,0 +1,2 @@
+function HTW_Economy_GrantPersonalGold takes nothing returns nothing
+endfunction

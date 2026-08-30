@@ -74,9 +74,10 @@ export class ProjectService {
     const engine = await this.worker.request<Record<string, unknown>>("environment_status", { configured_files: configuredFiles });
     const expectedHash = project.config.baseline_sha256?.toUpperCase();
     const actualHash = sourceHash?.sha256.toUpperCase();
-    const readOnlyTools = ["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps"];
+    const readOnlyTools = ["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps", "wc3_compose_gameplay_source", "wc3_validate_gameplay_source"];
     const transactionTools = ["wc3_begin_transaction", "wc3_apply_operations", "wc3_transaction_diff", "wc3_validate_transaction", "wc3_discard_transaction"];
-    const laterTools = ["wc3_build_map", "wc3_build_report", "wc3_launch_editor", "wc3_launch_test_map", "wc3_record_test_result", "wc3_get_test_session", "wc3_promote_build"];
+    const gameplayTools = ["wc3_compose_gameplay_source", "wc3_validate_gameplay_source", "wc3_prepare_gameplay_chunk", "wc3_run_scenario_build", "wc3_record_chunk_result"];
+    const laterTools = ["wc3_build_map", "wc3_build_report", "wc3_launch_editor", "wc3_launch_test_map", "wc3_record_test_result", "wc3_get_test_session", "wc3_promote_build", ...gameplayTools];
     const enabledTools = project.config.enabled_tools.length > 0
       ? project.config.enabled_tools
       : project.config.write_policy === "read_only" ? readOnlyTools : [...readOnlyTools, ...transactionTools, ...laterTools];
@@ -91,6 +92,8 @@ export class ProjectService {
       engine,
       configured: (engine.configured_files as Record<string, unknown> | undefined) ?? {},
       capability_summary: { inspection: "enabled", comparison: "enabled", validation: project.config.write_policy === "read_only" ? "read_only" : "transactional", mutation: project.config.write_policy === "read_only" ? "disabled" : "typed_write_enabled", script_source: project.config.write_policy === "read_only" ? "disabled" : project.config.script_policy, build: project.config.write_policy === "read_only" ? "disabled" : "available_after_validation", launch: project.config.write_policy === "read_only" ? "disabled" : "approval_gated", deletion: project.config.write_policy === "read_only" ? "disabled" : "confirmed_transaction_only" },
+      profile: project.config.profile,
+      gameplay_capabilities: { source_composition: "mcp_native_jass", gui_trigger_compatibility: "gated_pending_exact_fixture_and_editor_evidence", scenarios: "static_only", runtime_evidence: "explicit_observation_only" },
       enabled_tools: enabledTools.filter(tool => (project.config.write_policy !== "read_only" || readOnlyTools.includes(tool))),
       disabled_tools: [...transactionTools, ...laterTools].filter(tool => !enabledTools.includes(tool)),
       disabled_until_evidence: [...(project.config.script_policy === "disabled" ? ["script_source_mutation"] : []), "generic_archive_patch", "autonomous_promotion"],

@@ -21,8 +21,7 @@ public static class SemanticDiff
         // member hash is an archive observation rather than a semantic claim.
         "triggers",
         "variables",
-        "object_data",
-        "placed_objects",
+        "object_data_members",
         "terrain_summary",
         "imports"
     };

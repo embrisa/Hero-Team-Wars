@@ -1,7 +1,6 @@
 # Phase 5F Work Packet - Full MCP Feature Rollout
 
-Status: planned; this is the dependency and release gate for MCP-changeable
-triggers/scripts, regions, objects, logic, teams, and forces.
+Status: MCP-native/static feature rollout is implemented with typed operations and build/test wiring; release remains gated on fresh baseline, fixture coverage, exact editor/game evidence, and GUI compatibility where requested.
 
 ## Scope
 

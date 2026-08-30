@@ -46,11 +46,10 @@ prove Warcraft III native availability, multiplayer synchronization, or
 gameplay behavior. World Editor open/load and Warcraft III smoke/playtest
 observations remain required before promotion.
 
-Object data, placed units, GUI triggers, custom-text triggers, and generic MPQ
-patching remain outside this ADR and still require separate typed serializers
-or an explicit future decision. The planned full-feature ownership model is
-recorded in ADR 0003; this ADR remains the current MCP implementation boundary
-until those packets are implemented and individually evidenced.
+GUI triggers, custom-text triggers, and generic MPQ patching remain outside this
+ADR. The typed object, placement, region, player/force, and MCP-native gameplay
+paths are now covered by ADR 0003, but each remains subject to its own
+round-trip and exact editor/game evidence gate.
 
 ## Verification completed
 

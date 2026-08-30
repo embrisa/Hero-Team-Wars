@@ -1,0 +1,2 @@
+function HTW_Content_BaseWaves takes nothing returns nothing
+endfunction

@@ -2,13 +2,9 @@
 
 Project scaffold for the local Warcraft III map MCP described in `../../tasks/wc3-map-mcp/README.md`.
 
-Status: Phase 4 launch/evidence implementation complete; manual editor/game compatibility evidence remains pending. The map engine uses War3Net 6.0.3 for MPQ access and WC3 metadata/region parsing; the checked-in example configuration remains safely read-only with seven inspection tools, while the explicitly approved project-local `write_policy: "writes"` configuration also exposes hash-checked MCP-owned JASS gameplay-source mutation, transactional writer, build, test, and approval-gated promotion tools.
+Status: Phase 5 MCP-native typed compiler implementation is present for gameplay source composition, trigger/variable manifests, regions, object data, placements, players, forces, teams, deterministic scenarios, and evidence artifacts. Exact World Editor/Warcraft III compatibility and runtime acceptance remain manual gates; GUI-trigger compatibility is not enabled.
 
-Current evidence: the local source has 17 classified archive members; `war3map.w3i`, `war3map.w3r`, and `war3map.wts` parse read-only; the transaction suite stages an isolated copy, applies and diffs typed metadata/player/force/region/JASS-source changes atomically, validates, rolls back failed batches, and discards with an audit tombstone; Phase 3 adds deterministic no-op/minimal/script-source builds, full member/preservation comparisons, JASS static parsing, persisted validation/build reports, failure cleanup, exact-hash reinspection, and untested build artifacts; Phase 4 adds native executable/argument-array launch policy, unique rehashed game copies, durable build/revision-linked sessions, ordered observation evidence, and artifact verification. The source hash remained `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. World Editor/game runtime evidence is still a manual gate, and GUI trigger/object/placement mutation remains disabled under ADR 0002. See `docs/compatibility/launch-behavior.md` for the launch contract.
-The planned expansion to make triggers/scripts, regions, objects, logic, teams,
-and forces MCP-changeable is defined in ADR 0003 and task packets
-`14-phase-5a` through `19-phase-5f`. Those packets are implementation work,
-not current capability claims.
+Current evidence: the source still has 17 classified archive members and its SHA-256 is `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`; typed War3Net codecs pass no-op/changed round-trip tests for map info, regions, placed units, and synthetic object-data members; MCP-native JASS composition is deterministic and statically parsed; the scenario harness is explicitly `static_only`; and the MCP transaction/build/evidence tools preserve source hashes, revisions, build hashes, and optional observation-session links. The checked-in example configuration remains read-only. The project-local writes configuration enables the reviewed mutation path and `mvp_2arena` profile. See `docs/compatibility/launch-behavior.md` for the launch contract.
 
 ## Agent entry point
 
@@ -18,7 +14,7 @@ Use `scripts/bootstrap.ps1`, `scripts/build.ps1`, and `scripts/test.ps1` from th
 
 The trusted-project Codex entry is `.codex/config.toml` at the Hero Team Wars root. Build first so `mcp-server/dist/index.js` exists, then restart/reload the Codex client to pick up a newly added project MCP server.
 
-## Planned components
+## Components
 
 - `mcp-server/`: TypeScript STDIO MCP server and orchestration layer.
 - `map-engine/`: .NET/War3Net map inspection, mutation, validation, and build engine.
@@ -30,6 +26,14 @@ The trusted-project Codex entry is `.codex/config.toml` at the Hero Team Wars ro
 - `artifacts/`: generated reports and build manifests; not source maps.
 - `logs/`: MCP-owned diagnostic logs.
 - `snapshots/`: MCP-owned recovery snapshots.
+- `scripts/mcp/`: deterministic MCP-native JASS modules and gameplay manifest.
+
+The Phase 5 gameplay tools are `wc3_compose_gameplay_source`,
+`wc3_validate_gameplay_source`, `wc3_prepare_gameplay_chunk`,
+`wc3_run_scenario_build`, and `wc3_record_chunk_result`. They are subject to
+the same inspect -> stage -> diff -> validate -> build -> observe workflow as
+the earlier map tools. Composer and scenario results never upgrade themselves
+to editor-open, game-loaded, smoke-test, or playtest evidence.
 
 The existing map remains at `../../map/HeroTeamWars_M0_2Arena.w3m`. Development outputs must go to configured staging/build locations and never overwrite it.
 

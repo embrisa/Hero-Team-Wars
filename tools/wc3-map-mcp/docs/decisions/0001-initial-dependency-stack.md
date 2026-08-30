@@ -33,7 +33,7 @@ The pinned package metadata reports MIT for `@modelcontextprotocol/server`, `@mo
 
 ## Consequences
 
-The worker boundary is deliberately small and versioned. It adds process startup cost, but gives the MCP layer a clear failure boundary and ensures diagnostic text cannot contaminate protocol stdout. Unsupported object, trigger, and opaque members remain read-only until a round-trip proof exists; the existing JASS entry point is now covered by ADR 0002's MCP-owned source path.
+The worker boundary is deliberately small and versioned. It adds process startup cost, but gives the MCP layer a clear failure boundary and ensures diagnostic text cannot contaminate protocol stdout. Typed object, placement, region, player, force, and MCP-native gameplay paths are enabled only where the codec and tests provide round-trip coverage; unsupported GUI and opaque members remain read-only. The existing JASS entry point is covered by ADR 0002's MCP-owned source path.
 
 ## Rollback
 

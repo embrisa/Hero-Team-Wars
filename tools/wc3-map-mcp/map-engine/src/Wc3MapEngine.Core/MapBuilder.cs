@@ -38,6 +38,8 @@ public static class MapBuilder
         var replacements = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         ApplyMetadataChanges(source, staged, sourcePath, replacements);
         ApplyRegionChanges(source, staged, sourcePath, replacements);
+        ApplyObjectDataChanges(source, staged, sourcePath, replacements);
+        ApplyPlacementChanges(source, staged, sourcePath, replacements);
         ApplyScriptChanges(source, staged, sourcePath, replacements);
 
         var outputDirectory = Path.GetDirectoryName(outputPath)
@@ -65,8 +67,7 @@ public static class MapBuilder
             }
 
             var archiveComparison = ArchiveComparison.Compare(MapArchive.Read(sourcePath), MapArchive.Read(temporaryPath), plan.ReplacementMembers);
-            if (archiveComparison["membership_equal"]?.GetValue<bool>() != true
-                || archiveComparison["opaque_members_preserved"]?.GetValue<bool>() != true
+            if (archiveComparison["opaque_members_preserved"]?.GetValue<bool>() != true
                 || archiveComparison["unexpected_content_changes"]?.AsArray().Count != 0)
             {
                 throw new EngineException("BUILD_REOPEN_MISMATCH", "Reopened build archive membership or opaque content does not match the build plan.");
@@ -106,47 +107,75 @@ public static class MapBuilder
         var stagedMetadata = Metadata(staged);
         var titleChanged = !JsonUtilities.Equal(sourceMetadata["title"], stagedMetadata["title"]);
         var suggestedChanged = !JsonUtilities.Equal(sourceMetadata["suggested_players"], stagedMetadata["suggested_players"]);
-        if (!titleChanged && !suggestedChanged) return;
+        var playersChanged = !JsonUtilities.Equal(source["players"], staged["players"]);
+        var forcesChanged = !JsonUtilities.Equal(source["forces"], staged["forces"]);
+        if (!titleChanged && !suggestedChanged && !playersChanged && !forcesChanged) return;
 
         var current = ReadMap(sourcePath, MapFiles.Info);
         if (current.Info is null) throw new EngineException("BUILD_UNSUPPORTED", "Map metadata could not be parsed for serialization.");
         if (titleChanged) current.Info.MapName = GetValueString(stagedMetadata["title"], "title");
         if (suggestedChanged) current.Info.RecommendedPlayers = GetValueString(stagedMetadata["suggested_players"], "suggested_players");
+        if (playersChanged || forcesChanged)
+        {
+            MapComponentCodec.BuildInfo(
+                current.Info,
+                staged["players"] as JsonArray ?? throw new EngineException("BUILD_UNSUPPORTED", "Staged player slots are missing."),
+                staged["forces"] as JsonArray ?? throw new EngineException("BUILD_UNSUPPORTED", "Staged forces are missing."));
+        }
         replacements["war3map.w3i"] = SerializeInfo(current.Info);
     }
 
     private static void ApplyRegionChanges(JsonObject source, JsonObject staged, string sourcePath, Dictionary<string, byte[]> replacements)
     {
-        var sourceRegions = Regions(source);
-        var stagedRegions = Regions(staged);
-        if (sourceRegions.Count != stagedRegions.Count || !sourceRegions.Select(Name).SequenceEqual(stagedRegions.Select(Name), StringComparer.Ordinal))
-        {
-            throw new EngineException("BUILD_UNSUPPORTED", "Creating, deleting, reordering, or renaming regions is not supported by the Phase 3 serializer.");
-        }
+        if (JsonUtilities.Equal(source["regions"], staged["regions"])) return;
 
         var current = ReadMap(sourcePath, MapFiles.Regions);
         if (current.Regions is null) throw new EngineException("BUILD_UNSUPPORTED", "Map regions could not be parsed for serialization.");
-        var changed = false;
-        foreach (var region in current.Regions.Regions)
-        {
-            var stagedRegion = stagedRegions.First(x => string.Equals(Name(x), region.Name, StringComparison.Ordinal));
-            foreach (var (field, assign) in new (string Field, Action<float> Assign)[]
-            {
-                ("min_x", value => region.Left = value),
-                ("min_y", value => region.Bottom = value),
-                ("max_x", value => region.Right = value),
-                ("max_y", value => region.Top = value)
-            })
-            {
-                var before = Coordinate(sourceRegions.First(x => string.Equals(Name(x), region.Name, StringComparison.Ordinal)), field);
-                var after = Coordinate(stagedRegion, field);
-                if (before.Equals(after)) continue;
-                assign(Convert.ToSingle(after, CultureInfo.InvariantCulture));
-                changed = true;
-            }
-        }
+        replacements["war3map.w3r"] = MapComponentCodec.SerializeRegions(
+            MapComponentCodec.BuildRegions(current.Regions, staged["regions"] as JsonArray ?? throw new EngineException("BUILD_UNSUPPORTED", "Staged regions are missing.")));
+    }
 
-        if (changed) replacements["war3map.w3r"] = SerializeRegions(current.Regions);
+    private static void ApplyObjectDataChanges(JsonObject source, JsonObject staged, string sourcePath, Dictionary<string, byte[]> replacements)
+    {
+        if (JsonUtilities.Equal(source["object_data"], staged["object_data"])) return;
+        var definitions = staged["object_data"] as JsonArray ?? throw new EngineException("BUILD_UNSUPPORTED", "Staged object definitions are missing.");
+        var members = definitions.OfType<JsonObject>().Select(item => item["archive_path"]?.GetValue<string>() ?? (item["category"]?.GetValue<string>() is { } category ? MapComponentCodec.ObjectMemberForCategory(category) : null))
+            .Where(path => path is not null).Select(path => path!)
+            .Concat((source["object_data_members"] as JsonArray ?? new JsonArray()).OfType<JsonObject>().Select(item => item["archive_path"]?.GetValue<string>()).Where(path => path is not null).Select(path => path!))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (var memberName in members)
+        {
+            var memberDefinitions = ObjectDefinitions(staged, memberName);
+            var sourceDefinitions = ObjectDefinitions(source, memberName);
+            if (JsonUtilities.Equal(sourceDefinitions, memberDefinitions)) continue;
+            var member = MapArchive.Read(sourcePath).Find(memberName);
+            replacements[memberName] = member is null
+                ? MapComponentCodec.SerializeObjectMember(memberName, memberDefinitions)
+                : MapComponentCodec.SerializeObjectMember(memberName, member.Bytes, memberDefinitions);
+        }
+    }
+
+    private static void ApplyPlacementChanges(JsonObject source, JsonObject staged, string sourcePath, Dictionary<string, byte[]> replacements)
+    {
+        if (JsonUtilities.Equal(source["placed_objects"], staged["placed_objects"])) return;
+        var placements = staged["placed_objects"] as JsonArray ?? throw new EngineException("BUILD_UNSUPPORTED", "Staged placements are missing.");
+        var archive = MapArchive.Read(sourcePath);
+        var unitMember = archive.Find("war3mapUnits.doo");
+        var doodadMember = archive.Find("war3map.doo");
+        if (!JsonUtilities.Equal(Placements(source, "war3mapUnits.doo"), Placements(staged, "war3mapUnits.doo")))
+        {
+            var units = unitMember is null
+                ? new War3Net.Build.Widget.MapUnits(War3Net.Build.Widget.MapWidgetsFormatVersion.v8, War3Net.Build.Widget.MapWidgetsSubVersion.v9, true)
+                : ReadMap(sourcePath, MapFiles.Units).Units;
+            replacements["war3mapUnits.doo"] = MapComponentCodec.SerializeUnits(MapComponentCodec.BuildUnits(units!, placements));
+        }
+        if (!JsonUtilities.Equal(Placements(source, "war3map.doo"), Placements(staged, "war3map.doo")))
+        {
+            var doodads = doodadMember is null
+                ? new War3Net.Build.Widget.MapDoodads(War3Net.Build.Widget.MapWidgetsFormatVersion.v8, War3Net.Build.Widget.MapWidgetsSubVersion.v9, true)
+                : ReadMap(sourcePath, MapFiles.Doodads).Doodads;
+            replacements["war3map.doo"] = MapComponentCodec.SerializeDoodads(MapComponentCodec.BuildDoodads(doodads!, placements));
+        }
     }
 
     private static void ApplyScriptChanges(JsonObject source, JsonObject staged, string sourcePath, Dictionary<string, byte[]> replacements)
@@ -174,19 +203,7 @@ public static class MapBuilder
         return Map.Open(archive, files);
     }
 
-    private static byte[] SerializeInfo(War3Net.Build.Info.MapInfo info)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true)) writer.Write(info);
-        return stream.ToArray();
-    }
-
-    private static byte[] SerializeRegions(War3Net.Build.Environment.MapRegions regions)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true)) writer.Write(regions);
-        return stream.ToArray();
-    }
+    private static byte[] SerializeInfo(War3Net.Build.Info.MapInfo info) => MapComponentCodec.SerializeInfo(info);
 
     private static Dictionary<string, JsonNode?> Metadata(JsonObject root)
         => root["metadata"] is JsonArray values
@@ -198,6 +215,16 @@ public static class MapBuilder
 
     private static List<JsonObject> Scripts(JsonObject root)
         => root["scripts"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
+
+    private static JsonArray ObjectDefinitions(JsonObject root, string member)
+        => new((root["object_data"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Where(item => string.Equals(item["archive_path"]?.GetValue<string>() ?? (item["category"]?.GetValue<string>() is { } category ? MapComponentCodec.ObjectMemberForCategory(category) : null), member, StringComparison.OrdinalIgnoreCase))
+            .Select(item => (JsonNode?)item.DeepClone()).ToArray());
+
+    private static JsonArray Placements(JsonObject root, string member)
+        => new((root["placed_objects"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Where(item => string.Equals(item["member"]?.GetValue<string>(), member, StringComparison.OrdinalIgnoreCase))
+            .Select(item => (JsonNode?)item.DeepClone()).ToArray());
 
     private static string Name(JsonObject region) => region["name"]?.GetValue<string>() ?? string.Empty;
 

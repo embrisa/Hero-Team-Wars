@@ -26,26 +26,41 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
 
         var regions = Regions(source);
         var stagedRegions = Regions(staged);
-        if (regions.Count != stagedRegions.Count || !regions.Select(Name).SequenceEqual(stagedRegions.Select(Name), StringComparer.Ordinal))
+        if (!JsonUtilities.Equal(source["regions"], staged["regions"]))
         {
-            throw new EngineException("BUILD_UNSUPPORTED", "Creating, deleting, reordering, or renaming regions is not supported by the Phase 3 serializer.");
+            foreach (var region in regions.Concat(stagedRegions))
+            {
+                foreach (var field in region.Select(x => x.Key))
+                {
+                    if (field is not ("id" or "name" or "min_x" or "min_y" or "max_x" or "max_y" or "creation_number" or "weather" or "ambient_sound" or "color_argb" or "provenance" or "capability"))
+                    {
+                        throw new EngineException("BUILD_UNSUPPORTED", $"Region field '{field}' has no proven typed serializer.");
+                    }
+                }
+            }
+            replacements.Add("war3map.w3r");
         }
 
-        for (var index = 0; index < regions.Count; index++)
+        if (!JsonUtilities.Equal(source["players"], staged["players"]) || !JsonUtilities.Equal(source["forces"], staged["forces"]))
         {
-            var before = regions[index];
-            var after = stagedRegions[index];
-            foreach (var field in before.Select(x => x.Key).Union(after.Select(x => x.Key), StringComparer.Ordinal))
-            {
-                before.TryGetPropertyValue(field, out var left);
-                after.TryGetPropertyValue(field, out var right);
-                if (JsonUtilities.Equal(left, right)) continue;
-                if (field is not ("min_x" or "min_y" or "max_x" or "max_y"))
-                {
-                    throw new EngineException("BUILD_UNSUPPORTED", $"Region field '{field}' has no proven Phase 3 serializer.");
-                }
+            ValidatePlayerFields(staged["players"] as JsonArray);
+            ValidateForceFields(staged["forces"] as JsonArray);
+            replacements.Add("war3map.w3i");
+        }
 
-                replacements.Add("war3map.w3r");
+        if (!JsonUtilities.Equal(source["object_data"], staged["object_data"]))
+        {
+            foreach (var member in ObjectMembers(source).Concat(ObjectMembers(staged)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (!JsonUtilities.Equal(ObjectDefinitions(source, member), ObjectDefinitions(staged, member))) replacements.Add(member);
+            }
+        }
+
+        if (!JsonUtilities.Equal(source["placed_objects"], staged["placed_objects"]))
+        {
+            foreach (var member in new[] { "war3mapUnits.doo", "war3map.doo" })
+            {
+                if (!JsonUtilities.Equal(Placements(source, member), Placements(staged, member))) replacements.Add(member);
             }
         }
 
@@ -54,9 +69,16 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
             replacements.Add(scriptMember);
         }
 
+        var sourceMembers = (source["archive_members"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Select(item => item["path"]?.GetValue<string>())
+            .Where(path => path is not null)
+            .Select(path => path!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (replacements.Any(member => !sourceMembers.Contains(member))) replacements.Add("(listfile)");
+
         var sourceClone = source.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Could not clone source canonical map.");
         var stagedClone = staged.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Could not clone staged canonical map.");
-        foreach (var property in new[] { "source", "metadata", "regions", "scripts", "archive_members", "capabilities", "component_status", "opaque_members", "parse_warnings" })
+        foreach (var property in new[] { "source", "metadata", "regions", "players", "forces", "object_data", "object_data_members", "placed_objects", "scripts", "archive_members", "capabilities", "component_status", "opaque_members", "parse_warnings", "profile", "profiles", "teams", "team_registry", "region_roles", "gameplay_source", "gameplay_triggers", "gameplay_variables", "gameplay_modules", "trigger_mode" })
         {
             sourceClone.Remove(property);
             stagedClone.Remove(property);
@@ -152,4 +174,50 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
         => root["scripts"] is JsonArray values ? values.OfType<JsonObject>().ToList() : new List<JsonObject>();
 
     private static string Name(JsonObject region) => region["name"]?.GetValue<string>() ?? string.Empty;
+
+    private static IEnumerable<string> ObjectMembers(JsonObject root)
+        => (root["object_data"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Select(item => item["archive_path"]?.GetValue<string>() ?? (item["category"]?.GetValue<string>() is { } category ? MapComponentCodec.ObjectMemberForCategory(category) : null))
+            .Where(path => path is not null)
+            .Select(path => path!)
+            .Concat((root["object_data_members"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                .Select(item => item["archive_path"]?.GetValue<string>()).Where(path => path is not null).Select(path => path!));
+
+    private static JsonArray ObjectDefinitions(JsonObject root, string member)
+        => new((root["object_data"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Where(item => string.Equals(item["archive_path"]?.GetValue<string>() ?? (item["category"]?.GetValue<string>() is { } category ? MapComponentCodec.ObjectMemberForCategory(category) : null), member, StringComparison.OrdinalIgnoreCase))
+            .Select(item => (JsonNode?)item.DeepClone()).ToArray());
+
+    private static JsonArray Placements(JsonObject root, string member)
+        => new((root["placed_objects"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Where(item => string.Equals(item["member"]?.GetValue<string>(), member, StringComparison.OrdinalIgnoreCase))
+            .Select(item => (JsonNode?)item.DeepClone()).ToArray());
+
+    private static void ValidatePlayerFields(JsonArray? players)
+    {
+        foreach (var player in players?.OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
+        {
+            foreach (var field in player.Select(item => item.Key))
+            {
+                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "provenance" or "capability"))
+                {
+                    throw new EngineException("BUILD_UNSUPPORTED", $"Player field '{field}' has no proven typed serializer.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateForceFields(JsonArray? forces)
+    {
+        foreach (var force in forces?.OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
+        {
+            foreach (var field in force.Select(item => item.Key))
+            {
+                if (field is not ("index" or "name" or "stored_name" or "flags" or "player_ids" or "player_mask" or "provenance" or "capability"))
+                {
+                    throw new EngineException("BUILD_UNSUPPORTED", $"Force field '{field}' has no proven typed serializer.");
+                }
+            }
+        }
+    }
 }

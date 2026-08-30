@@ -1,0 +1,2 @@
+function HTW_Regions_Initialize takes nothing returns nothing
+endfunction

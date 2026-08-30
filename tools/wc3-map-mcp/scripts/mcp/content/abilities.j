@@ -1,0 +1,2 @@
+function HTW_Content_Abilities takes nothing returns nothing
+endfunction

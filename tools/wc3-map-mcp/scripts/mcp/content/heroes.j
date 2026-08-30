@@ -1,0 +1,2 @@
+function HTW_Content_Heroes takes nothing returns nothing
+endfunction

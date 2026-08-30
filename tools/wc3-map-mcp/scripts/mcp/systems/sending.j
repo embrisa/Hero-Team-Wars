@@ -1,0 +1,2 @@
+function HTW_Sending_Queue takes nothing returns nothing
+endfunction

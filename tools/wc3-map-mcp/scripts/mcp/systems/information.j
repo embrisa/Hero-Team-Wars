@@ -1,0 +1,2 @@
+function HTW_Information_Display takes nothing returns nothing
+endfunction

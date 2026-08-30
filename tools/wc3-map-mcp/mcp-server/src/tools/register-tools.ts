@@ -15,6 +15,8 @@ import { registerCompareMaps } from "./compare-maps.js";
 import { registerTransactionTools } from "./transactions.js";
 import { registerBuildTools } from "./builds.js";
 import { registerLaunchTools } from "./launches.js";
+import { registerGameplayTools } from "./gameplay.js";
+import { GameplayService } from "../services/gameplay-service.js";
 
 export interface ToolServices {
   config: Wc3Config;
@@ -23,10 +25,11 @@ export interface ToolServices {
   transactions: TransactionService;
   builds: BuildService;
   launches: LaunchService;
+  gameplay: GameplayService;
 }
 
 export function registerTools(server: McpServer, services: ToolServices): void {
-  const phaseOneReadOnly = new Set(["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps"]);
+  const phaseOneReadOnly = new Set(["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps", "wc3_compose_gameplay_source", "wc3_validate_gameplay_source"]);
   const enabled = (name: string): boolean => Object.values(services.config.projects).some(project => {
     if (project.write_policy === "read_only" && !phaseOneReadOnly.has(name)) return false;
     return project.enabled_tools.length === 0 || project.enabled_tools.includes(name);
@@ -46,4 +49,5 @@ export function registerTools(server: McpServer, services: ToolServices): void {
   registerTransactionTools(server, services.transactions, enabled);
   registerBuildTools(register, services.builds);
   registerLaunchTools(register, services.launches);
+  registerGameplayTools(services.gameplay, register);
 }

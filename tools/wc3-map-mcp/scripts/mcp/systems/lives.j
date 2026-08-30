@@ -1,0 +1,2 @@
+function HTW_Lives_AccountDeath takes nothing returns nothing
+endfunction

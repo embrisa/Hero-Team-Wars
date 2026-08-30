@@ -46,6 +46,8 @@ function requestProcess(): Promise<{ lines: string[]; stderr: string }> {
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 17, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: "map" } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 18, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: "design/07-editor-state.yaml" } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 19, method: "tools/call", params: { name: "wc3_get_script_source", arguments: { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", archive_path: "war3map.j" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 20, method: "tools/call", params: { name: "wc3_compose_gameplay_source", arguments: { project_id: "hero-team-wars", manifest_path: "tools/wc3-map-mcp/scripts/mcp/manifest.json", profile: "mvp_2arena" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 21, method: "tools/call", params: { name: "wc3_validate_gameplay_source", arguments: { project_id: "hero-team-wars", manifest_path: "tools/wc3-map-mcp/scripts/mcp/manifest.json", profile: "mvp_2arena" } } })}\n`);
     child.stdin.end();
   });
 }
@@ -84,7 +86,9 @@ describe("MCP STDIO", () => {
       "wc3_get_component",
       "wc3_get_script_source",
       "wc3_validate_map",
-      "wc3_compare_maps"
+      "wc3_compare_maps",
+      "wc3_compose_gameplay_source",
+      "wc3_validate_gameplay_source"
     ]);
     expect(list.result.tools.every((tool: any) => tool.annotations?.readOnlyHint === true && tool.annotations?.destructiveHint === false)).toBe(true);
     expect(toolNames.some((name: string) => /begin|apply|transaction|build|launch|promote|discard/i.test(name))).toBe(false);
@@ -138,5 +142,12 @@ describe("MCP STDIO", () => {
     expect(script.result.structuredContent.ok).toBe(true);
     expect(script.result.structuredContent.data.language).toBe("jass");
     expect(script.result.structuredContent.data.source).toMatch(/function main takes nothing returns nothing/);
+    const composition = response(result.lines, 20);
+    expect(composition.result.structuredContent.ok).toBe(true);
+    expect(composition.result.structuredContent.data.static_validation.evidence_level).toBe("static_only");
+    expect(composition.result.structuredContent.data.source_artifact.path).toMatch(/^tools\/wc3-map-mcp\/artifacts\/gameplay\/source\//);
+    const validationReport = response(result.lines, 21);
+    expect(validationReport.result.structuredContent.ok).toBe(true);
+    expect(validationReport.result.structuredContent.data.static_validation.evidence_level).toBe("static_only");
   });
 });

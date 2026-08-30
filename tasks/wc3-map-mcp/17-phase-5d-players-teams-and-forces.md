@@ -1,7 +1,6 @@
 # Phase 5D Work Packet - Players, Teams, and Forces
 
-Status: planned; current staged player/force edits do not yet have a proven
-binary build serializer.
+Status: Player/force map-info serialization, logical team operations, profile metadata, and MVP round-trip coverage are implemented; the full six-team map fixture and exact runtime acceptance remain gated.
 
 ## Goal
 

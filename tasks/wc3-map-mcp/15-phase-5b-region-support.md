@@ -1,6 +1,6 @@
 # Phase 5B Work Packet - Typed Region Support
 
-Status: planned; current writer supports only proven region-bound changes.
+Status: Typed region inspection, create/update/rename/delete operations, reference rewrites, and build round-trip coverage are implemented; exact editor/game acceptance remains gated.
 
 ## Goal
 

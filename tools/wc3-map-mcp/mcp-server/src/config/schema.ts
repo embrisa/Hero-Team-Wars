@@ -12,12 +12,14 @@ export const projectConfigSchema = z.object({
   build_root: rootRelativePath,
   log_root: rootRelativePath,
   test_output_root: rootRelativePath.default("tools/wc3-map-mcp/artifacts/tests"),
+  gameplay_source_roots: z.array(rootRelativePath).default(["scripts/mcp"]),
   world_editor: z.string().min(1).optional(),
   warcraft: z.string().min(1).optional(),
   test_map_root: z.string().min(1).optional(),
   enabled_tools: z.array(z.string().min(1)).default([]),
   write_policy: z.enum(["read_only", "writes", "all"]).default("writes"),
   script_policy: z.enum(["disabled", "mcp_owned_jass"]).default("disabled"),
+  profile: z.enum(["mvp_2arena", "full_6team", "gui_compatible"]).default("mvp_2arena"),
   max_map_bytes: z.number().int().positive().default(512 * 1024 * 1024),
   max_operation_count: z.number().int().positive().max(1000).default(100)
 }).strict();

@@ -1,0 +1,2 @@
+function HTW_Events_Register takes nothing returns nothing
+endfunction

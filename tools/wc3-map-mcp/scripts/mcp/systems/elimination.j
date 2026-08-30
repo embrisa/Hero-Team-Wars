@@ -1,0 +1,2 @@
+function HTW_Elimination_Recalculate takes nothing returns nothing
+endfunction

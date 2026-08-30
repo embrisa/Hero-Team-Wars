@@ -1,6 +1,6 @@
 # ADR 0003: Full MCP gameplay and map-component ownership
 
-Status: planned; implementation is defined by task packets `14` through `19`.
+Status: MCP-native/static implementation accepted; GUI compatibility and exact editor/game acceptance remain gated by the task packets `14` through `19`.
 
 ## Context
 

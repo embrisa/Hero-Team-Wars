@@ -14,11 +14,15 @@ export const workerOperationSchema = z.enum([
   "list_archive_members",
   "probe_map",
   "inspect_map",
+  "read_script_source",
   "validate_map",
   "validate_canonical",
   "apply_operations",
   "build_map",
-  "compare_maps"
+  "compare_maps",
+  "compose_gameplay_source",
+  "validate_gameplay_source",
+  "run_scenario"
 ]);
 
 export const workerErrorSchema = z.object({

@@ -19,7 +19,7 @@ public static class ArchiveComparison
             if (left is null || right is null)
             {
                 contentChanges.Add(Change(path, left?.Sha256, right?.Sha256, left?.Size, right?.Size, "membership"));
-                unexpectedChanges.Add(JsonValue.Create(path));
+                if (!expectedChangedMembers.Contains(path)) unexpectedChanges.Add(JsonValue.Create(path));
                 continue;
             }
 
@@ -69,7 +69,8 @@ public static class ArchiveComparison
             ["content_changes"] = contentChanges,
             ["compression_metadata_changes"] = compressionChanges,
             ["unexpected_content_changes"] = unexpectedChanges,
-            ["opaque_members_preserved"] = membershipEqual && opaqueEqual,
+            ["planned_membership_changes"] = new JsonArray(contentChanges.OfType<JsonObject>().Where(item => item["kind"]?.GetValue<string>() == "membership").Select(item => item["path"]?.DeepClone()).ToArray()),
+            ["opaque_members_preserved"] = opaqueEqual,
             ["special_member_checks"] = special
         };
     }

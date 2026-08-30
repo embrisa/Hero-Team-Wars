@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Wc3MapEngine.Contracts;
 using Wc3MapEngine.Core;
+using Wc3MapEngine.Core.Gameplay;
 using Wc3MapEngine.Core.Scripts;
 
 namespace Wc3MapEngine.Cli;
@@ -90,6 +91,9 @@ internal static class Program
                 "apply_operations" => ApplyOperations(request.Payload),
                 "build_map" => BuildMap(request.Payload),
                 "compare_maps" => CompareMaps(request.Payload),
+                "compose_gameplay_source" => ComposeGameplaySource(request.Payload),
+                "validate_gameplay_source" => ComposeGameplaySource(request.Payload),
+                "run_scenario" => ScenarioRunner.Run(request.Payload),
                 _ => throw new EngineException("INVALID_ARGUMENT", $"Unknown engine operation '{request.Operation}'.")
             };
             return new EngineResponse { RequestId = request.RequestId, Ok = true, Result = result };
@@ -268,6 +272,21 @@ internal static class Program
         RequiredPath(payload, "output_path"),
         payload["profile"]?.GetValue<string>() ?? "debug",
         payload["validation_context"] as JsonObject);
+
+    private static JsonObject ComposeGameplaySource(JsonObject payload)
+    {
+        var manifestPath = RequiredPath(payload, "manifest_path");
+        var result = GameplaySourceComposer.Compose(manifestPath, payload["profile"]?.GetValue<string>());
+        if (payload["output_source_path"]?.GetValue<string>() is { Length: > 0 } outputPath)
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? throw new EngineException("INVALID_ARGUMENT", "Gameplay source output must have a parent directory.");
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(outputPath, result["source"]!.GetValue<string>(), new UTF8Encoding(false));
+            result["output_source_path"] = Path.GetFullPath(outputPath);
+        }
+
+        return result;
+    }
 
     private static JsonObject CompareMaps(JsonObject payload)
     {

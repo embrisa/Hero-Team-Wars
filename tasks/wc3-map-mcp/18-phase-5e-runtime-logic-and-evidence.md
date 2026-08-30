@@ -1,7 +1,6 @@
 # Phase 5E Work Packet - Runtime Logic, Scenarios, and Evidence
 
-Status: planned; the current MCP can launch exact builds and record explicit
-observations, but it does not simulate Warcraft III gameplay headlessly.
+Status: Deterministic source modules, static scenario harness, and hash-linked evidence tools are implemented; the harness does not simulate Warcraft III headlessly and exact runtime acceptance remains gated.
 
 ## Goal
 

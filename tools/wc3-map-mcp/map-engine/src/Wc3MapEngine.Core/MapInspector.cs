@@ -5,6 +5,7 @@ using War3Net.Build.Common;
 using War3Net.Build.Environment;
 using War3Net.Build.Extensions;
 using War3Net.Build.Info;
+using War3Net.Build.Widget;
 using War3Net.IO.Mpq;
 using Wc3MapEngine.Core.Scripts;
 
@@ -28,6 +29,9 @@ public static class MapInspector
             ResolveTriggerStrings(info, archive.Find("war3map.wts"));
         }
         var regions = TryReadRegions(path, out var regionError);
+        var units = TryReadUnits(archive.Find("war3mapUnits.doo"), out var unitsError);
+        var doodads = TryReadDoodads(archive.Find("war3map.doo"), out var doodadsError);
+        var objectData = TryReadObjectData(archive, out var objectDataErrors);
 
         var root = new JsonObject
         {
@@ -49,8 +53,13 @@ public static class MapInspector
             ["triggers"] = BuildComponentMembers(archive, new[] { "war3map.wtg", "war3map.wct", "war3map.j", "war3map.lua" }, "triggers"),
             ["scripts"] = BuildScripts(archive, info),
             ["variables"] = UnknownComponent("variables", "Trigger variable details are not exposed until the trigger format is proven for this map."),
-            ["object_data"] = BuildObjectData(archive),
-            ["placed_objects"] = BuildComponentMembers(archive, new[] { "war3mapUnits.doo", "war3map.doo" }, "placed_objects"),
+            ["gameplay_triggers"] = new JsonArray(),
+            ["gameplay_variables"] = new JsonArray(),
+            ["gameplay_modules"] = new JsonArray(),
+            ["trigger_mode"] = "mcp_native_jass",
+            ["object_data"] = objectData,
+            ["object_data_members"] = BuildObjectDataMembers(archive, parseResults),
+            ["placed_objects"] = BuildPlacedObjects(archive, units, doodads),
             ["terrain_summary"] = BuildTerrainSummary(archive),
             ["imports"] = BuildComponentMembers(archive, new[] { "war3map.imp" }, "imports"),
             ["opaque_members"] = new JsonArray(archive.Members
@@ -66,6 +75,9 @@ public static class MapInspector
             ["parse_warnings"] = new JsonArray(
                 (infoError is null ? Array.Empty<JsonNode>() : new JsonNode[] { new JsonObject { ["component"] = "metadata", ["message"] = infoError } })
                 .Concat(regionError is null ? Array.Empty<JsonNode>() : new JsonNode[] { new JsonObject { ["component"] = "regions", ["message"] = regionError } })
+                .Concat(unitsError is null ? Array.Empty<JsonNode>() : new JsonNode[] { new JsonObject { ["component"] = "placed_objects", ["member"] = "war3mapUnits.doo", ["message"] = unitsError } })
+                .Concat(doodadsError is null ? Array.Empty<JsonNode>() : new JsonNode[] { new JsonObject { ["component"] = "placed_objects", ["member"] = "war3map.doo", ["message"] = doodadsError } })
+                .Concat(objectDataErrors.Select(item => (JsonNode)new JsonObject { ["component"] = "object_data", ["member"] = item.Key, ["message"] = item.Value }))
                 .ToArray())
         };
 
@@ -89,6 +101,10 @@ public static class MapInspector
             root["opaque_members"] as JsonArray,
             archive.Find("war3map.w3e") is not null,
             root["parse_warnings"] as JsonArray);
+
+        if (units is not null) SetTypedStatus(root, "placed_objects", "war3mapUnits.doo", "roundtrip_verified", "War3Net MapUnits was parsed and has a typed serializer.");
+        if (doodads is not null) SetTypedStatus(root, "placed_objects", "war3map.doo", "roundtrip_verified", "War3Net MapDoodads was parsed and has a typed serializer.");
+        if (archive.Members.Any(item => ObjectMembers.Contains(item.Path)) && objectDataErrors.Count == 0) SetTypedStatus(root, "object_data", "object-data", "roundtrip_verified", "War3Net object-data records were parsed and have category-specific serializers.");
 
         return root;
     }
@@ -114,6 +130,27 @@ public static class MapInspector
                         _ = ReadRegions(member.Bytes);
                         status = "parsed_read_only";
                         parser = "War3Net.Build.Core: MapRegions";
+                        break;
+                    case "war3mapunits.doo":
+                        _ = ReadUnits(member.Bytes);
+                        status = "roundtrip_verified";
+                        parser = "War3Net.Build.Core: MapUnits";
+                        break;
+                    case "war3map.doo":
+                        _ = ReadDoodads(member.Bytes);
+                        status = "roundtrip_verified";
+                        parser = "War3Net.Build.Core: MapDoodads";
+                        break;
+                    case "war3map.w3a":
+                    case "war3map.w3b":
+                    case "war3map.w3d":
+                    case "war3map.w3h":
+                    case "war3map.w3q":
+                    case "war3map.w3t":
+                    case "war3map.w3u":
+                        _ = ReadObjectData(member.Path, member.Bytes);
+                        status = "roundtrip_verified";
+                        parser = "War3Net.Build.Core: ObjectData";
                         break;
                     case "war3map.wts":
                         _ = ParseTriggerStrings(member.Bytes);
@@ -192,6 +229,37 @@ public static class MapInspector
         return reader.ReadMapRegions();
     }
 
+    private static MapUnits ReadUnits(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes, writable: false);
+        using var reader = new BinaryReader(stream);
+        return reader.ReadMapUnits();
+    }
+
+    private static MapDoodads ReadDoodads(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes, writable: false);
+        using var reader = new BinaryReader(stream);
+        return reader.ReadMapDoodads();
+    }
+
+    private static object ReadObjectData(string archivePath, byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes, writable: false);
+        using var reader = new BinaryReader(stream);
+        return MapComponentCodec.ObjectCategory(archivePath) switch
+        {
+            "unit" => reader.ReadUnitObjectData(),
+            "ability" => reader.ReadAbilityObjectData(),
+            "item" => reader.ReadItemObjectData(),
+            "destructable" => reader.ReadDestructableObjectData(),
+            "doodad" => reader.ReadDoodadObjectData(),
+            "buff" => reader.ReadBuffObjectData(),
+            "upgrade" => reader.ReadUpgradeObjectData(),
+            _ => throw new EngineException("PARSE_FAILED", $"Unsupported object member '{archivePath}'.")
+        };
+    }
+
     private static JsonObject ToInfo(MapInfo info) => new()
     {
         ["format_version"] = (int)info.FormatVersion,
@@ -218,35 +286,8 @@ public static class MapInspector
             ["width"] = info.PlayableMapAreaWidth,
             ["height"] = info.PlayableMapAreaHeight
         },
-        ["players"] = new JsonArray(info.Players.OrderBy(x => x.Id).Select(player => (JsonNode)new JsonObject
-        {
-            ["id"] = player.Id + 1,
-            ["name"] = player.Name,
-            ["controller"] = player.Controller.ToString(),
-            ["race"] = player.Race.ToString(),
-            ["flags"] = (int)player.Flags,
-            ["start"] = new JsonObject
-            {
-                ["x"] = player.StartPosition.X,
-                ["y"] = player.StartPosition.Y
-            },
-            ["ally_low_priority_mask"] = (int)player.AllyLowPriorityFlags,
-            ["ally_high_priority_mask"] = (int)player.AllyHighPriorityFlags,
-            ["enemy_low_priority_mask"] = (int)player.EnemyLowPriorityFlags,
-            ["enemy_high_priority_mask"] = (int)player.EnemyHighPriorityFlags,
-            ["provenance"] = "observed_archive",
-            ["capability"] = "parsed_read_only"
-        }).ToArray()),
-        ["forces"] = new JsonArray(info.Forces.Select((force, index) => (JsonNode)new JsonObject
-        {
-            ["index"] = index,
-            ["name"] = force.Name,
-            ["flags"] = (int)force.Flags,
-            ["player_mask"] = (int)force.Players,
-            ["player_ids"] = new JsonArray(Enumerable.Range(0, info.Players.Count).Where(id => force.Players[id]).Select(id => (JsonNode)JsonValue.Create(id + 1)!).ToArray()),
-            ["provenance"] = "observed_archive",
-            ["capability"] = "parsed_read_only"
-        }).ToArray())
+        ["players"] = new JsonArray(info.Players.OrderBy(x => x.Id).Select(player => (JsonNode)MapComponentCodec.ToPlayer(player)).ToArray()),
+        ["forces"] = new JsonArray(info.Forces.Select((force, index) => (JsonNode)MapComponentCodec.ToForce(force, index, info.Players.Count)).ToArray())
     };
 
     private static JsonArray BuildMetadata(JsonObject? info)
@@ -287,32 +328,7 @@ public static class MapInspector
     private static JsonArray BuildRegions(JsonArray? regions) => regions ?? new JsonArray();
 
     private static JsonArray ToRegions(MapRegions regions)
-    {
-        var result = new JsonArray();
-        if (regions.Protected)
-        {
-            return result;
-        }
-
-        foreach (var region in regions.Regions.OrderBy(x => x.Name, StringComparer.Ordinal))
-        {
-            result.Add(new JsonObject
-            {
-                ["name"] = region.Name,
-                ["min_x"] = region.Left,
-                ["min_y"] = region.Bottom,
-                ["max_x"] = region.Right,
-                ["max_y"] = region.Top,
-                ["creation_number"] = region.CreationNumber,
-                ["weather"] = region.WeatherType.ToString(),
-                ["ambient_sound"] = region.AmbientSound,
-                ["provenance"] = "observed_archive",
-                ["capability"] = "parsed_read_only"
-            });
-        }
-
-        return result;
-    }
+        => MapComponentCodec.ToRegions(regions);
 
     private static JsonObject Value(object? value, string provenance, string capability) => new()
     {
@@ -375,6 +391,10 @@ public static class MapInspector
             ["scripts"] = OpaqueStatus("scripts", scripts),
             ["cameras"] = OpaqueStatus("cameras", cameras),
             ["variables"] = ComponentStatus("preserved_opaque", "unknown", "Trigger variable details are not exposed until the trigger format is proven for this map."),
+            ["gameplay_triggers"] = ComponentStatus("typed_write_enabled", "project_source", "MCP-native trigger manifests are owned by the configured gameplay source package."),
+            ["gameplay_variables"] = ComponentStatus("typed_write_enabled", "project_source", "MCP-native variable manifests are owned by the configured gameplay source package."),
+            ["gameplay_modules"] = ComponentStatus("typed_write_enabled", "project_source", "MCP-native script modules are composed from project-relative source files."),
+            ["trigger_mode"] = ComponentStatus("typed_write_enabled", "project_source", "MCP-native JASS is the selected gameplay source mode; GUI compatibility remains gated."),
             ["object_data"] = OpaqueStatus("object_data", objectData),
             ["placed_objects"] = OpaqueStatus("placed_objects", placedObjects),
             ["terrain_summary"] = hasTerrain
@@ -457,17 +477,107 @@ public static class MapInspector
             }).ToArray());
     }
 
-    private static JsonArray BuildObjectData(MapArchiveSnapshot archive)
-    {
-        return new JsonArray(archive.Members.Where(x => ObjectMembers.Contains(x.Path)).Select(x => (JsonNode)new JsonObject
+    private static JsonArray BuildObjectDataMembers(MapArchiveSnapshot archive, JsonArray parseResults)
+        => new(archive.Members.Where(x => ObjectMembers.Contains(x.Path)).Select(x => (JsonNode)new JsonObject
         {
             ["archive_path"] = x.Path,
-            ["category"] = Path.GetFileNameWithoutExtension(x.Path).Replace("war3map.", string.Empty, StringComparison.OrdinalIgnoreCase),
+            ["category"] = MapComponentCodec.ObjectCategory(x.Path),
             ["size_bytes"] = x.Size,
             ["sha256"] = x.Sha256,
-            ["capability"] = "preserved_opaque",
+            ["capability"] = parseResults.OfType<JsonObject>().First(item => string.Equals(item["path"]?.GetValue<string>(), x.Path, StringComparison.OrdinalIgnoreCase))["status"]?.DeepClone(),
             ["provenance"] = "observed_archive"
         }).ToArray());
+
+    private static JsonArray BuildPlacedObjects(MapArchiveSnapshot archive, MapUnits? units, MapDoodads? doodads)
+    {
+        if (units is null && doodads is null)
+        {
+            return BuildComponentMembers(archive, new[] { "war3mapUnits.doo", "war3map.doo" }, "placed_objects");
+        }
+
+        var values = new JsonArray();
+        if (units is not null)
+        {
+            foreach (var item in MapComponentCodec.ToUnits(units)) values.Add(item?.DeepClone());
+        }
+        if (doodads is not null)
+        {
+            foreach (var item in MapComponentCodec.ToDoodads(doodads)) values.Add(item?.DeepClone());
+        }
+        return values;
+    }
+
+    private static MapUnits? TryReadUnits(ArchiveMemberData? member, out string? error)
+    {
+        if (member is null)
+        {
+            error = null;
+            return null;
+        }
+        try
+        {
+            error = null;
+            return ReadUnits(member.Bytes);
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            return null;
+        }
+    }
+
+    private static MapDoodads? TryReadDoodads(ArchiveMemberData? member, out string? error)
+    {
+        if (member is null)
+        {
+            error = null;
+            return null;
+        }
+        try
+        {
+            error = null;
+            return ReadDoodads(member.Bytes);
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            return null;
+        }
+    }
+
+    private static JsonArray TryReadObjectData(MapArchiveSnapshot archive, out Dictionary<string, string> errors)
+    {
+        errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var result = new JsonArray();
+        foreach (var member in archive.Members.Where(item => ObjectMembers.Contains(item.Path)))
+        {
+            try
+            {
+                foreach (var definition in MapComponentCodec.ToObjectDefinitions(member.Path, member.Bytes)) result.Add(definition?.DeepClone());
+            }
+            catch (Exception exception)
+            {
+                errors[member.Path] = exception.Message;
+            }
+        }
+        return result;
+    }
+
+    private static void SetTypedStatus(JsonObject root, string component, string member, string capability, string reason)
+    {
+        if (root["component_status"] is not JsonObject statuses) return;
+        if (statuses[component] is not JsonObject status) return;
+        status["capability"] = capability;
+        status["provenance"] = "derived";
+        status["reason"] = reason;
+        if (root["capabilities"] is JsonArray capabilities)
+        {
+            foreach (var item in capabilities.OfType<JsonObject>().Where(item => string.Equals(item["path"]?.GetValue<string>(), member, StringComparison.OrdinalIgnoreCase)))
+            {
+                item["status"] = capability;
+                item["parser"] = item["parser"] ?? "War3Net.Build.Core typed codec";
+            }
+        }
     }
 
     private static JsonObject BuildTerrainSummary(MapArchiveSnapshot archive)

@@ -6,7 +6,7 @@ import { type ArtifactRef, writeJsonArtifact } from "./artifact-service.js";
 import { ProjectService } from "./project-service.js";
 import { WorkerClient } from "../transport/worker-client.js";
 
-export const componentNames = ["metadata", "players", "forces", "regions", "cameras", "triggers", "variables", "scripts", "object_data", "placed_objects", "terrain_summary", "imports", "archive_members", "capabilities", "opaque_members"] as const;
+export const componentNames = ["metadata", "players", "forces", "teams", "team_registry", "regions", "region_roles", "cameras", "triggers", "variables", "gameplay_triggers", "gameplay_variables", "gameplay_modules", "trigger_mode", "scripts", "object_data", "placed_objects", "terrain_summary", "imports", "archive_members", "capabilities", "component_status", "profiles", "profile", "opaque_members"] as const;
 export type ComponentName = typeof componentNames[number];
 
 export class InspectionService {
@@ -43,7 +43,7 @@ export class InspectionService {
       throw new AppError("UNSUPPORTED_COMPONENT", `Component '${component}' is not present in the canonical map.`);
     }
     const status = componentStatus(inspection, component, value);
-    if (!["parsed_read_only", "roundtrip_verified", "typed_write_enabled"].includes(String(status.capability)) && !["archive_members", "capabilities", "opaque_members"].includes(component)) {
+    if (!["parsed_read_only", "roundtrip_verified", "typed_write_enabled"].includes(String(status.capability)) && !["archive_members", "capabilities", "component_status", "profiles", "profile", "opaque_members"].includes(component)) {
       throw new AppError("UNSUPPORTED_COMPONENT", `Component '${component}' is not semantically decoded for this map.`, false, { component, capability: status.capability, reason: status.reason ?? "The Phase 0 parser classified this component as opaque or absent." });
     }
 

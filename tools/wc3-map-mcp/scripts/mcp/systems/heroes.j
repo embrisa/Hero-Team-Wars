@@ -1,0 +1,2 @@
+function HTW_Heroes_Initialize takes nothing returns nothing
+endfunction
