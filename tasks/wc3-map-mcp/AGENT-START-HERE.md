@@ -86,6 +86,19 @@ The first playable is four users, two teams of two, and two mirrored arenas. It 
 - `HTW-05`: information and repeatability;
 - `HTW-06`: six-team routing expansion only after the two-arena loop is stable.
 
+The feature-extension packets define the broader MCP ownership target:
+
+- `14-phase-5a-gameplay-source-and-trigger-support.md`: MCP-native gameplay
+  sources, runtime triggers, variables, and optional GUI-trigger compatibility;
+- `15-phase-5b-region-support.md`: complete typed `war3map.w3r` support;
+- `16-phase-5c-object-and-placement-support.md`: object definitions and placed
+  units/buildings/items/doodads;
+- `17-phase-5d-players-teams-and-forces.md`: `war3map.w3i`, player slots,
+  logical teams, forces, and six-team profiles;
+- `18-phase-5e-runtime-logic-and-evidence.md`: deterministic HTW source modules,
+  scenario builds, and chunk evidence;
+- `19-phase-5f-full-mcp-feature-rollout.md`: dependency order and release gates.
+
 The MCP implementation must first automate the inspection/build workflow. Do not jump directly to implementing gameplay in a binary map.
 
 ## The chosen technical architecture
@@ -127,6 +140,10 @@ This choice can change only if Phase 0 proves War3Net cannot safely support the 
 10. Do not infer team identity from player color.
 11. Preserve existing region names exactly.
 12. Do not update the editor-state ledger from intended design values.
+13. Do not enable a trigger, object, region, player, team, or force capability
+    until its exact member serializer and round-trip evidence pass.
+14. Keep MCP-native JASS source ownership separate from editor-compatible GUI
+    trigger ownership; do not silently mix the two modes.
 
 ## What an assigned agent must do first
 

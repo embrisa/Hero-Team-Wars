@@ -11,6 +11,14 @@
 - operation application and rollback;
 - error normalization.
 
+Feature-extension unit tests additionally cover:
+
+- deterministic gameplay source composition and trigger/variable identity;
+- typed region rename/reference handling;
+- object rawcode/category/field validation;
+- placement identity and owner/reference validation;
+- player/team/force consistency and profile constraints.
+
 ### Map-engine fixture tests
 
 - parse known `.w3m` and `.w3x` fixtures;
@@ -66,6 +74,11 @@
 | 3 | invalid fixture rejection, no-op/minimal rebuild/reinspect | editor opens and game loads exact build hashes |
 | 4 | fake runner, argument safety, persisted sessions/evidence rules | real editor/game launches and recorded observations |
 | 5 | script/static tests where possible, transaction/build validations | chunk-specific gameplay acceptance tests |
+| 5A | source composer, trigger/variable schemas, JASS symbol checks, mode isolation | exact generated source opens/loads and trigger scenario is observed |
+| 5B | region parser/serializer, rename/reference, stale-precondition tests | exact region changes are visible in editor/game |
+| 5C | object member and placement round-trips, rawcode/reference tests | exact object changes are visible and behave in game |
+| 5D | `war3map.w3i` player/force/team profile tests and six-team routing tests | four-player and six-team exact builds are loaded and exercised |
+| 5E | deterministic scenario builds, evidence-link and failure-retention tests | user/approved recorder observes each scenario on the exact build |
 
 ## Fixtures
 
@@ -80,6 +93,14 @@ Maintain at least:
 - out-of-bounds region/placement;
 - disconnected script/import case;
 - known canonical JSON expectations.
+
+Feature fixtures must also include:
+
+- a trigger/variable manifest with nested folders and typed actions;
+- a region rename with supported MCP-owned references;
+- one fixture for each enabled object-data member and placed-object member;
+- four-player/two-team and twelve-player/six-team `war3map.w3i` profiles;
+- invalid cross-component references and conflicting team/force assignments.
 
 Each fixture README states origin, licensing/distribution rule, expected capabilities, and hash.
 
@@ -106,3 +127,19 @@ Coverage percentage alone is not the gate. Critical policy/state/build paths req
 ## Completion report review
 
 Before accepting a phase, verify commands were actually run, outputs exist, hashes match, source remained unchanged, disabled/untested items are explicit, and the next agent can reproduce the result without chat history.
+
+## Full feature definition of done
+
+The MCP feature program is complete only when:
+
+- MCP-native JASS scripts, runtime triggers, variables, and HTW logic are
+  source-composed and transactionally changeable;
+- GUI trigger compatibility for the selected map/editor profile has exact-
+  version `war3map.wtg`, `war3map.wct`, and `war3map.wts` round-trip evidence;
+- regions support all enabled create/update/rename/delete operations;
+- every enabled object-data category and placed-object member has typed
+  inspection, mutation, validation, and round-trip evidence;
+- player slots, logical teams, and forces are consistent and serializable for
+  the selected profile;
+- every runtime result is tied to a transaction, build, test session, and
+  observed evidence level.

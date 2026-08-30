@@ -53,6 +53,17 @@ World Editor / Warcraft III test launch
 - Validate referential integrity, format limits, scripts, and build output.
 - Never decide whether an operation is authorized.
 
+The planned full-feature engine is a typed map compiler, not a generic MPQ
+patcher. Its component adapters are independently enabled for gameplay source
+and triggers, regions, object definitions, placements, `war3map.w3i` player/
+force data, and project team data. Each adapter owns parsing, canonicalization,
+typed operations, validation, serialization, and round-trip fixtures.
+
+MCP-native gameplay source is composed before the engine's script replacement
+operation. Optional editor-compatible GUI trigger support has its own adapter
+for the exact map/editor version and does not silently share the JASS-owned
+path.
+
 ### Launch adapter
 
 - Discover configured World Editor and Warcraft III paths.
@@ -131,3 +142,8 @@ Tool handlers should not perform path arithmetic, spawn processes, parse map mem
 - Test sessions: append/update records tied to a build hash.
 - Logs: structured per-correlation files.
 - No database is required initially. If filesystem persistence becomes inadequate, adopt a database through an ADR without changing public tool contracts.
+
+Feature source manifests, generated JASS, trigger/variable manifests, and
+capability profiles are persisted as transaction-linked artifacts. A generated
+source artifact is not accepted as a map change until the corresponding map
+transaction contains its input hashes and complete output hash.

@@ -29,6 +29,37 @@
 | `wc3_promote_build` | write-copy | Copy a validated build to an explicit output |
 | `wc3_discard_transaction` | delete-owned | Delete only one MCP-owned staging transaction |
 
+## Phase 5 feature-extension tools
+
+These tools extend the minimum surface without bypassing the existing
+transaction, hash, diff, validation, build, and evidence gates:
+
+| Tool | Class | Purpose |
+|---|---|---|
+| `wc3_compose_gameplay_source` | read-artifact | Compose approved JASS modules, trigger manifests, and variable manifests into deterministic source |
+| `wc3_validate_gameplay_source` | read | Check syntax, symbols, dependencies, references, and the selected HTW profile |
+| `wc3_prepare_gameplay_chunk` | write-stage | Stage generated gameplay source with all input hashes and chunk metadata |
+| `wc3_run_scenario_build` | write-build | Produce a uniquely named debug build for one deterministic runtime scenario |
+| `wc3_record_chunk_result` | write-metadata | Link a chunk, scenario, transaction, build, and exact test-session observation |
+
+`wc3_apply_operations` must also accept the typed feature operations defined in
+packets `14` through `17`. Composite tools return the underlying IDs and may
+not hide or skip a semantic diff, validation report, or exact-build hash.
+
+### Feature-tool contract minimums
+
+| Tool | Required inputs | Essential output |
+|---|---|---|
+| `wc3_compose_gameplay_source` | project, manifest path, expected module/manifest hashes, profile | generated source artifact, module hashes, symbol index, source hash |
+| `wc3_validate_gameplay_source` | project, source/manifest artifact, profile | syntax/symbol/reference findings and buildable result |
+| `wc3_prepare_gameplay_chunk` | project, map, expected source hash, chunk ID, manifest | transaction ID, revision, generated-source artifact, input hashes |
+| `wc3_run_scenario_build` | project, transaction, exact revision, scenario ID, expected source hash | build ID, output hash, scenario manifest, untested runtime status |
+| `wc3_record_chunk_result` | project, chunk/scenario IDs, transaction/build/session IDs, expected hashes, observed result | immutable chunk-evidence artifact and linked status |
+
+The feature tools must reject absolute paths, unapproved source roots, stale
+module/manifest hashes, unknown profiles, and attempts to mutate a map without
+an existing transaction.
+
 ## Error model
 
 Stable codes should include `INVALID_ARGUMENT`, `PATH_OUTSIDE_ROOT`, `SOURCE_CHANGED`, `UNSUPPORTED_COMPONENT`, `PARSE_FAILED`, `VALIDATION_FAILED`, `BUILD_FAILED`, `LAUNCH_FAILED`, `TRANSACTION_STATE`, and `INTERNAL_ERROR`.
@@ -141,3 +172,27 @@ Use opaque cursors tied to map hash, component, filter, and stable ordering. A c
 Descriptions should say when the tool is appropriate and what must be called before/after it. Example: “Build a new test artifact from an exact validated transaction revision. Call `wc3_transaction_diff` and `wc3_validate_transaction` first. This never overwrites the source map and returns runtime status untested.”
 
 Avoid vague descriptions such as “Edit a Warcraft map.”
+
+## Required typed operation families
+
+The public operation schema must grow by closed, typed families rather than a
+generic archive patch:
+
+- gameplay: script modules, triggers, variables, and source ownership/mode;
+- regions: create, update, rename, delete, and explicit role assignment;
+- objects: definitions, typed fields, references, placements, movement, and
+  removal;
+- map structure: player slots, starts, teams, forces, alliances, vision, and
+  control flags.
+
+Each family has its own capability and serializer version. An operation is
+rejected when the selected project profile does not enable that family.
+
+## Cross-feature validation order
+
+For a transaction containing multiple families, validate in this order:
+
+`map identity -> players/forces -> regions -> object definitions -> placements -> triggers/scripts -> generated logic`
+
+The diff reports generated reference rewrites separately from user-requested
+changes.

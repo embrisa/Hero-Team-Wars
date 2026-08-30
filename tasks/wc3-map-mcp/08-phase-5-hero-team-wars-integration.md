@@ -6,7 +6,7 @@ This uses the completed toolchain to build the game. It does not bypass safety g
 
 ## Required reading and inputs
 
-Read the mandatory context and all Hero Team Wars design files, especially `design/02` through `design/09`. Read all Phase 0-4 handoffs and the script-ownership ADR. Do not create a second build path.
+Read the mandatory context and all Hero Team Wars design files, especially `design/02` through `design/09`. Read all Phase 0-4 handoffs, the script-ownership ADR, and feature packets `14` through `19`. Do not create a second build path.
 
 ## Goal
 
@@ -21,15 +21,31 @@ complete map entry point from those modules before applying the operation:
 
 ```text
 scripts/mcp/
+  manifest.json
   main.j
-  config/{tuning,teams,regions}.j
+  config/{tuning,teams,regions,objects}.j
   core/{bootstrap,state,events,debug}.j
   systems/{phases,waves,heroes,lives,elimination,economy,sending,routing,information}.j
   content/{base-waves,send-units}.j
+  triggers/*.trigger.json
+  variables/*.variable.json
   tests/assertions.j
 ```
 
 Add modules only when their chunk starts. Centralize tuning. Use explicit teams and named regions, never color.
+
+The source composer and typed map-component work follow the feature packets:
+
+- gameplay source/triggers: `14-phase-5a`;
+- regions: `15-phase-5b`;
+- object data and placements: `16-phase-5c`;
+- players, teams, and forces: `17-phase-5d`;
+- runtime logic and scenario evidence: `18-phase-5e`;
+- cross-feature rollout: `19-phase-5f`.
+
+HTW-native runtime logic may be implemented before every binary component is
+write-enabled, but a chunk must declare whether it changes JASS source,
+structured map members, or both.
 
 ## Per-chunk protocol
 

@@ -19,6 +19,10 @@ The local configuration must declare:
 - optional World Editor and Warcraft III executable paths;
 - size/time limits;
 - enabled tools and write policy.
+- capability profile (`mvp_2arena`, `full_6team`, or `gui_compatible`);
+- approved gameplay source roots and module manifest path;
+- pinned JASS native/API catalogue;
+- enabled archive-member serializers and their evidence versions.
 
 Do not store secrets in the project configuration. This local server should not need an OpenAI API key because Codex is the MCP client, not a model call made by the server.
 
@@ -58,6 +62,16 @@ Runs the read-only engine/MCP flow against the configured baseline and writes re
 
 All scripts resolve their own root from script location and use native PowerShell process invocation/argument arrays.
 
+Add feature-aware helpers as they become implemented:
+
+- `scripts/compose-gameplay.ps1` or an equivalent deterministic composer;
+- `scripts/validate-gameplay.ps1` for source/profile checks;
+- `scripts/run-scenario.ps1` for an exact debug scenario build and launch;
+- `scripts/verify-feature-roundtrip.ps1` for one selected map-member fixture.
+
+These helpers are preparation/verification conveniences only. The authoritative
+mutation path remains the MCP transaction and build services.
+
 ## Development commands
 
 Exact commands depend on Phase 0 versions, but the resulting workflow should be equivalent to:
@@ -80,6 +94,8 @@ For MCP Inspector, use the installed/pinned Inspector and actual server entry. C
 5. Enable build tools after Phase 3 tests.
 6. Enable launch tools after Phase 4 tests.
 7. Keep promotion and discard under write/destructive approval policy.
+8. Enable feature serializers one member/category at a time after their fixture
+   and exact-build gates pass.
 
 ## Example project-scoped config
 
@@ -102,4 +118,4 @@ Do not write this config until the built entry point exists. After adding it, re
 
 ## Packaging contents
 
-The local package includes compiled server, published engine, schemas, example config, scripts, licenses/notices, compatibility report, and documentation. It excludes source maps, user imports/assets, snapshots, logs, builds, local config, and secrets.
+The local package includes compiled server, published engine, schemas, example config, scripts, licenses/notices, compatibility report, feature capability registry, and documentation. It includes project gameplay source manifests and source modules only when the project explicitly packages them. It excludes accepted source maps, user imports/assets, snapshots, logs, builds, local config, and secrets.

@@ -1,8 +1,12 @@
-# 6. Editor-Led Implementation Workflow
+# 6. Editor and MCP Implementation Workflow
 
 Status: Active
 
-This project uses a split source-of-truth model. The design documents describe what the game should do. The editor-state ledger describes what is actually configured in the current map. Source files describe the logic we intend to place into the map. The saved `.w3m` remains the final playable artifact.
+This project uses a split source-of-truth model. The design documents describe
+what the game should do. The editor-state ledger describes what is actually
+configured in the current map. MCP-owned source and typed component manifests
+describe the implementation to build. The saved `.w3m` remains the final
+playable artifact.
 
 ## The four layers
 
@@ -10,44 +14,55 @@ This project uses a split source-of-truth model. The design documents describe w
 |---|---|---|
 | Rules and design intent | `design/01` through `design/05` | What the game should mean and how it should behave |
 | Editor state | `design/07-editor-state.yaml` | What the current map is known to contain |
-| Logic source and handoff notes | `scripts/` and `design/08-implementation-chunks.md` | The implementation we are preparing or have applied |
+| Logic source and handoff notes | `scripts/`, MCP manifests, and `design/08-implementation-chunks.md` | The implementation we are preparing or have applied |
 | Playable map | `map/HeroTeamWars_M0_2Arena.w3m` plus saved test copies | What Warcraft III actually loads |
 
 If these layers disagree, we do not silently guess. We record the disagreement, decide which layer should win, and then update the other layer.
 
 ## Recommended implementation model
 
-Use the World Editor for the parts that are safest and most useful to inspect there:
+Use MCP for gameplay source, runtime triggers, deterministic logic, and every
+map component whose parser/serializer has passed its round-trip gate. Use the
+World Editor for the parts that are safest and most useful to inspect there:
 
 - terrain, camera boundaries, and regions;
 - player slots, forces, starting locations, and alliances;
 - units, shops, heroes, items, abilities, and their object-data values;
 - map metadata and imported assets;
-- a small amount of bootstrap or test-trigger glue.
+- compatibility inspection and manual runtime observation.
 
-Keep gameplay logic in named implementation chunks. I can write those chunks as exact JASS/custom-script text and give you the editor actions needed to place them. The editor then compiles the code when the map is saved.
+Keep gameplay logic in named MCP implementation chunks. The source composer
+generates a complete `war3map.j`, and the MCP stages/builds it without requiring
+World Editor to compile or connect pasted code.
 
-Important limitation: importing a `.j` file into the map does not, by itself, make Warcraft III execute it. The source must be connected to the map's generated script through a custom-text trigger, an editor-supported script system, or a separately verified compiler pipeline. We will not assume that an external compiler or map patcher is installed until it is checked.
+Important limitation: importing a `.j` file into the map does not, by itself,
+make Warcraft III execute it. The selected MCP-owned source pipeline must
+replace the verified `war3map.j` entry point, or an editor-compatible trigger
+pipeline must connect the source. The current MCP-owned JASS path is the
+verified compiler pipeline; we still require exact map-load and gameplay
+evidence.
 
 ## Automation options
 
-### Safe mode — editor plus generated code
+### Safe mode — MCP build plus editor observation
 
 This is the default workflow now:
 
-1. I write a small, self-contained code chunk and its prerequisites.
-2. You create or update the named trigger/custom-text block in World Editor.
-3. You save the map, launch it, and run the acceptance test.
-4. You report the observed result and any editor values that were different from the plan.
-5. I update the state ledger and change log before preparing the next chunk.
+1. MCP inspects the current source hash and editor-state prerequisites.
+2. A source/component transaction stages the smallest typed change and exposes a semantic diff.
+3. MCP validates and builds a uniquely named test map.
+4. World Editor or Warcraft III opens the exact build and the acceptance test is observed.
+5. MCP records the evidence; the ledger and change log are updated before the next chunk.
 
-This avoids trying to patch the binary `.w3m` directly and keeps each editor action reversible.
+This keeps the source map untouched and makes each generated build reversible.
 
-### Compiler mode — source files compiled into the map
+### MCP-owned source mode — selected gameplay path
 
-Later, we can test a JASS/vJASS/Wurst-style source pipeline if you want one. In that setup, `scripts/` becomes the primary logic source and a compiler or map tool injects the result into the map. Before adopting it, we must verify the exact Warcraft III/Reforged version, installed toolchain, map format support, and whether object-data changes are still expected to happen in the editor.
-
-Compiler mode can reduce copy/paste, but it does not remove the need to document editor-owned rawcodes, regions, object data, and map settings. It also adds a new build failure mode, so it is not the first dependency for proving the two-arena loop.
+The MCP owns the project source modules, trigger/variable manifests, and the
+generated JASS entry point. Typed regions, objects, placements, players, teams,
+and forces are added only after their individual serializer and fixture gates
+pass. This mode reduces copy/paste but does not remove exact editor/game
+compatibility testing.
 
 ### Avoid — direct binary patching as the normal workflow
 
@@ -62,12 +77,15 @@ Each chunk must state:
 - goal and scope;
 - exact prerequisites from the editor-state ledger;
 - files or code blocks involved;
-- exact editor actions;
+- exact MCP operations and any required editor actions;
 - acceptance test;
 - what the user must report back;
 - known limitations and the next chunk.
 
-Chunks should be small enough that a failed test identifies one likely cause. A chunk is not considered applied merely because the editor accepted a paste; it is applied only after a save and an observable test result.
+Chunks should be small enough that a failed test identifies one likely cause. A
+chunk is not considered applied merely because an MCP operation or build
+completed; it is applied only after the resulting exact build has the required
+observable test result.
 
 ## Naming contract
 
@@ -99,4 +117,9 @@ If a value is changed in the editor, update the ledger in the same work session.
 
 ## First action after this workflow is adopted
 
-Complete `HTW-00 — Baseline capture`. Open the current map, do not change it, and record the trigger tree, variables, regions, player/force setup, and every configured hero/unit/ability that matters to the next chunk. The current ledger contains only the previously verified baseline and explicitly marks the gaps that need reconfirmation.
+Complete `HTW-00 — Baseline capture`. Open the current map, do not change it,
+and record the trigger tree, variables, regions, player/force setup, and every
+configured hero/unit/ability that matters to the next chunk. Then follow the
+MCP feature packets `tasks/wc3-map-mcp/14` through `19`. The current ledger
+contains only the previously verified baseline and explicitly marks the gaps
+that need reconfirmation.

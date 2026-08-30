@@ -9,6 +9,12 @@
 - Promotion requires an explicit destination and expected hash.
 - Recursive deletion is restricted to a resolved transaction directory beneath the configured MCP staging root.
 - Unknown archive members are preserved unless an operation explicitly removes one.
+- A transaction spanning multiple serializers commits all changed members as
+  one staged revision or commits none of them.
+- Unknown fields inside a supported member are preserved and immutable unless a
+  field-specific serializer and fixture explicitly enables them.
+- Generated gameplay source is treated as a derived artifact with recorded
+  module/trigger/variable inputs, not as an untracked side effect.
 
 ## Recovery artifacts
 
@@ -23,6 +29,14 @@ Each transaction contains:
 - build hash and path;
 - launch/test evidence;
 - failure log if applicable.
+
+Feature transactions additionally retain:
+
+- source/module/trigger/variable manifests and hashes;
+- component serializer versions and capability profile;
+- cross-component reference graph before and after;
+- generated JASS source and hash, when gameplay source is involved;
+- per-member replacement hashes and preserved-opaque-member hashes.
 
 ## Concurrency
 
@@ -78,6 +92,9 @@ Map build files follow a similar temporary-directory/final-rename pattern.
 - Lock record includes PID, process start identity if available, operation, correlation ID, and creation UTC.
 - A stale lock is not deleted solely because it is old; verify owning process identity first.
 - Read inspection may run concurrently only against a captured immutable source hash.
+- A component serializer may not write directly to the accepted source or to a
+  sibling transaction. It writes a transaction-local member set that the
+  archive builder commits only after all enabled serializers succeed.
 
 ## Deletion checklist
 
@@ -92,6 +109,10 @@ Before `wc3_discard_transaction` deletes anything:
 - audit tombstone is safely stored outside the deleted directory;
 - deletion result is verified.
 
+For a multi-component transaction, discard must retain the complete manifest,
+source/module hashes, semantic diff, and failure/tombstone record outside the
+deleted transaction directory.
+
 ## Recovery procedure
 
 If a transaction/build crashes:
@@ -103,3 +124,8 @@ If a transaction/build crashes:
 5. do not auto-resume mutations;
 6. allow a read-only recovery report;
 7. create a new revision/transaction for retry unless exact idempotent replay is proven.
+
+If one member serializer succeeds and another fails, the transaction remains
+failed with its staged snapshot intact; no partial archive is promotable. The
+recovery report must identify the successful and failed member serializers and
+the exact revision that was last valid.

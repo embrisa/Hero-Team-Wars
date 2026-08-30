@@ -15,12 +15,14 @@ CanonicalMap
   metadata
   players[]
   forces[]
+  teams[]
   regions[]
   cameras[]
   variables[]
-  triggers
-  scripts
-  object_data
+  triggers[]
+  scripts[]
+  gameplay_source
+  object_data[]
   placed_objects
   terrain_summary
   imports[]
@@ -38,13 +40,24 @@ Every reported value should carry or inherit one provenance class:
 - `intended_design`: read from design documentation.
 - `unknown`: not inspected or unsupported.
 
+Capability records must be attached independently to trigger definitions,
+scripts, variables, region fields, object categories/fields, placements,
+players, teams, and forces. A parsed read-only member must not imply that its
+binary serializer is available.
+
 ## Identity rules
 
 - Archive members: normalized Warcraft archive path plus original path.
 - Warcraft objects: four-character rawcode plus object category.
+- Trigger/variable identities: stable MCP ID plus exact editor name/path where
+  present; generated JASS symbol identity is recorded separately.
 - Placed objects: stable generated ID stored in the canonical model; preserve native creation number where available.
 - Regions: exact case-sensitive name and coordinates.
 - Players: numeric slot ID.
+- Teams: stable logical team ID, member player IDs, force index, arena ID, and
+  living/routing state.
+- Forces: stable index, exact name, player IDs, mask, alliance, vision, and
+  control flags.
 - Transactions/builds/tests: generated UUID and content hash.
 
 ## Operation envelope
@@ -80,7 +93,15 @@ Version the MCP tool schema, engine protocol, canonical map schema, transaction 
   },
   "players": [],
   "forces": [],
+  "teams": [],
   "regions": [],
+  "triggers": [],
+  "scripts": [],
+  "gameplay_source": {
+    "mode": "unknown",
+    "manifest": null,
+    "source_sha256": null
+  },
   "components": {
     "triggers": {
       "capability": "preserved_opaque",
@@ -133,6 +154,11 @@ failure information
 ## Semantic diff record
 
 Each difference contains component, target identity, field/path, before, after, operation ID, change type, and provenance. Binary archive reordering is recorded in an archive diff, not semantic diff.
+
+Generated source changes must additionally record the source manifest hash,
+module hashes, trigger/variable IDs, generated symbol rewrites, and the final
+`war3map.j` hash. Object and placement diffs must include rawcode category and
+stable placement ID.
 
 ## Cross-process compatibility
 

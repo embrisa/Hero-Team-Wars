@@ -1,6 +1,6 @@
 # WC3 Map MCP - Agent Task Index
 
-Status: Phase 4 launch/evidence implementation complete; required runtimes are installed (Node.js 24.19.0/npm 11.17.0 and .NET SDK 10.0.400), and the manual World Editor/Warcraft III compatibility gate remains pending.
+Status: Phase 4 launch/evidence implementation complete; the full MCP feature-extension packets are now defined, while manual World Editor/Warcraft III compatibility gates and feature implementation remain pending.
 
 This directory is a self-contained implementation manual for agents that know nothing about the preceding conversation. The objective is a local Model Context Protocol server that allows Codex or another MCP-capable agent to inspect, safely modify, build, validate, and test Warcraft III custom maps.
 
@@ -30,6 +30,12 @@ An agent must then read the phase file it is assigned plus any documents listed 
 | 6 | `06-phase-3-build-and-validation.md` | Deterministic validated map builds |
 | 7 | `07-phase-4-test-runner.md` | Editor/game launch and evidence recording |
 | 8 | `08-phase-5-hero-team-wars-integration.md` | Implement HTW chunks through the verified pipeline |
+| 9 | `14-phase-5a-gameplay-source-and-trigger-support.md` | MCP-native scripts/triggers plus exact-map GUI-trigger compatibility |
+| 10 | `15-phase-5b-region-support.md` | Fully typed named-region inspection and mutation |
+| 11 | `16-phase-5c-object-and-placement-support.md` | Typed object definitions and placed map objects |
+| 12 | `17-phase-5d-players-teams-and-forces.md` | Player slots, logical teams, forces, and six-team profiles |
+| 13 | `18-phase-5e-runtime-logic-and-evidence.md` | Source-driven HTW logic, scenarios, and evidence |
+| 14 | `19-phase-5f-full-mcp-feature-rollout.md` | Cross-feature dependency order and release gate |
 | reference | `09-mcp-tool-contracts.md` | Exact public tools and schemas |
 | reference | `10-map-model-and-contracts.md` | Canonical model and worker protocol |
 | reference | `11-safety-recovery-and-audit.md` | Path, snapshot, locking, deletion, and audit algorithms |
@@ -45,9 +51,9 @@ No phase may be marked complete because source code exists or a command exited s
 - Opening it in World Editor does not prove Warcraft III can load it.
 - Loading it does not prove a gameplay chunk behaves correctly.
 
-The completion report must say which evidence level was actually reached and list anything not tested.
+The completion report must say which evidence level was actually reached and list anything not tested. The feature packets distinguish MCP-native JASS gameplay support from editor-compatible GUI trigger support; they are separate capabilities.
 
-Current implementation evidence: Phase 3 engine/MCP build-validation paths and Phase 4 launch/session paths are implemented, with 24 .NET tests and 35 MCP tests passing. The current source remains hash-stable at `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. Runtime launch is not marked passed: the existing World Editor session was left untouched, and the installed Warcraft III executable exited without exposing a game window during the controlled artifact-load attempt.
+Current implementation evidence: Phase 3 engine/MCP build-validation paths and Phase 4 launch/session paths are implemented, with 29 .NET tests and 37 MCP tests passing. The current source remains hash-stable at `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. Runtime launch is not marked passed until the exact build is observed in World Editor and Warcraft III.
 
 ## Existing Hero Team Wars authority layers
 

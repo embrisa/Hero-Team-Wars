@@ -48,7 +48,9 @@ observations remain required before promotion.
 
 Object data, placed units, GUI triggers, custom-text triggers, and generic MPQ
 patching remain outside this ADR and still require separate typed serializers
-or an explicit future decision.
+or an explicit future decision. The planned full-feature ownership model is
+recorded in ADR 0003; this ADR remains the current MCP implementation boundary
+until those packets are implemented and individually evidenced.
 
 ## Verification completed
 

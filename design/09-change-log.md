@@ -28,7 +28,7 @@ Status: applied / partially applied / reverted
 
 Goal:
 
-Editor actions completed:
+MCP/editor actions completed:
 
 Files or code blocks used:
 

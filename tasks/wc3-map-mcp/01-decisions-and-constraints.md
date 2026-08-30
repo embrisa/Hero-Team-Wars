@@ -10,6 +10,12 @@
 6. Make all writes transactional: inspect, plan, stage, diff, validate, build, test, promote.
 7. Keep World Editor ownership explicit. Terrain polishing, visual placement, and unsupported editor data remain editor-owned until round-trip support is proven.
 
+The planned extension of this boundary is recorded in
+`tools/wc3-map-mcp/docs/decisions/0003-full-mcp-gameplay-and-component-ownership.md`.
+It does not make any currently opaque component writable: each trigger, script,
+region, object, placement, player, team, and force capability must first pass
+its own typed serializer and round-trip gate.
+
 ## Why two processes
 
 The MCP protocol and agent contracts evolve independently from Warcraft III binary parsing. Separating them prevents map-format code from leaking into tool handlers and allows the map engine to be tested without starting an MCP client.

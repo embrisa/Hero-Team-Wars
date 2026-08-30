@@ -1,5 +1,10 @@
 # 8. Implementation Chunks
 
+Gameplay source and proven typed map-component changes are applied through the
+WC3 Map MCP. World Editor is used for the HTW-00 baseline, visual inspection,
+unsupported editor data, and exact runtime observations. The detailed MCP
+feature packets are in `tasks/wc3-map-mcp/14` through `19`.
+
 This is the active queue for editor work. A chunk moves from `planned` to `applied` only after the map has been saved and the stated acceptance test has been observed.
 
 ## HTW-00 — Baseline capture
