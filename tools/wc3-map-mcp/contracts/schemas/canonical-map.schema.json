@@ -2,23 +2,251 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.wc3-map-mcp/schemas/canonical-map.schema.json",
   "title": "WC3 canonical map model",
+  "description": "The stable read-only canonical representation emitted by the map engine. Collection shapes remain arrays; component_status carries section-level capability for empty and opaque sections.",
   "type": "object",
-  "required": ["schema_version", "source", "metadata", "players", "forces", "regions", "archive_members", "capabilities", "parse_warnings"],
+  "required": [
+    "schema_version",
+    "source",
+    "metadata",
+    "players",
+    "forces",
+    "regions",
+    "cameras",
+    "archive_members",
+    "capabilities",
+    "triggers",
+    "scripts",
+    "variables",
+    "object_data",
+    "placed_objects",
+    "terrain_summary",
+    "imports",
+    "opaque_members",
+    "parse_warnings",
+    "component_status"
+  ],
   "properties": {
     "schema_version": { "const": "1.0" },
     "source": { "$ref": "#/$defs/source" },
     "metadata": { "type": "array", "items": { "$ref": "#/$defs/field" } },
-    "players": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-    "forces": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "players": { "type": "array", "items": { "$ref": "#/$defs/player" } },
+    "forces": { "type": "array", "items": { "$ref": "#/$defs/force" } },
     "regions": { "type": "array", "items": { "$ref": "#/$defs/region" } },
-    "archive_members": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-    "capabilities": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-    "parse_warnings": { "type": "array", "items": { "type": "string" } }
+    "cameras": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
+    "archive_members": { "type": "array", "items": { "$ref": "#/$defs/archive_member" } },
+    "capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" } },
+    "triggers": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
+    "scripts": { "type": "array", "items": { "$ref": "#/$defs/script" } },
+    "variables": { "$ref": "#/$defs/component_value" },
+    "object_data": { "type": "array", "items": { "$ref": "#/$defs/object_data" } },
+    "placed_objects": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
+    "terrain_summary": { "$ref": "#/$defs/component_value" },
+    "imports": { "type": "array", "items": { "$ref": "#/$defs/component_member" } },
+    "opaque_members": { "type": "array", "items": { "$ref": "#/$defs/opaque_member" } },
+    "parse_warnings": { "type": "array", "items": { "$ref": "#/$defs/parse_warning" } },
+    "component_status": {
+      "type": "object",
+      "description": "Section-level capability/provenance/reason records. Keys identify canonical sections.",
+      "required": [
+        "source",
+        "metadata",
+        "players",
+        "forces",
+        "regions",
+        "cameras",
+        "archive_members",
+        "capabilities",
+        "triggers",
+        "scripts",
+        "variables",
+        "object_data",
+        "placed_objects",
+        "terrain_summary",
+        "imports",
+        "opaque_members",
+        "parse_warnings"
+      ],
+      "additionalProperties": { "$ref": "#/$defs/component_status" }
+    }
   },
   "additionalProperties": true,
   "$defs": {
-    "source": { "type": "object", "required": ["path", "size_bytes", "modified_utc", "sha256"], "properties": { "path": { "type": "string" }, "size_bytes": { "type": "integer", "minimum": 0 }, "modified_utc": { "type": "string", "format": "date-time" }, "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" } }, "additionalProperties": true },
-    "field": { "type": "object", "required": ["field", "value", "provenance", "capability"], "properties": { "field": { "type": "string" }, "value": {}, "stored_value": {}, "provenance": { "type": "string" }, "capability": { "type": "string" } }, "additionalProperties": true },
-    "region": { "type": "object", "required": ["id", "name", "min_x", "min_y", "max_x", "max_y", "provenance", "capability"], "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "min_x": { "type": "number" }, "min_y": { "type": "number" }, "max_x": { "type": "number" }, "max_y": { "type": "number" }, "provenance": { "type": "string" }, "capability": { "type": "string" } }, "additionalProperties": true }
+    "provenance": {
+      "type": "string",
+      "enum": ["observed_archive", "observed_editor", "observed_runtime", "derived", "intended_design", "unknown"]
+    },
+    "capability_name": {
+      "type": "string",
+      "enum": ["observed", "parsed_read_only", "roundtrip_verified", "typed_write_enabled", "staged_typed_write", "preserved_opaque", "unsupported_blocking", "mixed"]
+    },
+    "source": {
+      "type": "object",
+      "required": ["path", "size_bytes", "modified_utc", "sha256"],
+      "properties": {
+        "path": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "modified_utc": { "type": "string", "format": "date-time" },
+        "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" }
+      },
+      "additionalProperties": true
+    },
+    "field": {
+      "type": "object",
+      "required": ["field", "value", "provenance", "capability"],
+      "properties": {
+        "field": { "type": "string" },
+        "value": {},
+        "stored_value": {},
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability_name" }
+      },
+      "additionalProperties": true
+    },
+    "player": {
+      "type": "object",
+      "required": ["id", "provenance", "capability"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1, "maximum": 24 },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability_name" }
+      },
+      "additionalProperties": true
+    },
+    "force": {
+      "type": "object",
+      "required": ["index", "provenance", "capability"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability_name" }
+      },
+      "additionalProperties": true
+    },
+    "region": {
+      "type": "object",
+      "required": ["name", "min_x", "min_y", "max_x", "max_y", "provenance", "capability"],
+      "properties": {
+        "name": { "type": "string" },
+        "min_x": { "type": "number" },
+        "min_y": { "type": "number" },
+        "max_x": { "type": "number" },
+        "max_y": { "type": "number" },
+        "creation_number": { "type": "integer" },
+        "weather": { "type": "string" },
+        "ambient_sound": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability_name" }
+      },
+      "additionalProperties": true
+    },
+    "archive_member": {
+      "type": "object",
+      "required": ["path", "size_bytes", "compressed_size_bytes", "sha256", "named", "flags", "capability", "provenance"],
+      "properties": {
+        "path": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "compressed_size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+        "named": { "type": "boolean" },
+        "flags": { "type": "integer", "minimum": 0 },
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "additionalProperties": true
+    },
+    "capability": {
+      "type": "object",
+      "required": ["path", "status", "parser", "parser_version", "warnings", "error"],
+      "properties": {
+        "path": { "type": "string" },
+        "status": { "$ref": "#/$defs/capability_name" },
+        "parser": { "type": ["string", "null"] },
+        "parser_version": { "type": ["string", "null"] },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "error": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "component_status": {
+      "type": "object",
+      "required": ["capability", "provenance", "reason"],
+      "properties": {
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "component_value": {
+      "type": "object",
+      "required": ["capability", "provenance"],
+      "properties": {
+        "component": { "type": "string" },
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "component_member": {
+      "type": "object",
+      "required": ["capability", "provenance"],
+      "properties": {
+        "component": { "type": "string" },
+        "archive_path": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "additionalProperties": true
+    },
+    "script": {
+      "type": "object",
+      "required": ["archive_path", "language", "size_bytes", "sha256", "capability", "provenance"],
+      "properties": {
+        "archive_path": { "type": "string" },
+        "language": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "additionalProperties": true
+    },
+    "object_data": {
+      "type": "object",
+      "required": ["archive_path", "category", "size_bytes", "sha256", "capability", "provenance"],
+      "properties": {
+        "archive_path": { "type": "string" },
+        "category": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "additionalProperties": true
+    },
+    "opaque_member": {
+      "type": "object",
+      "required": ["path", "sha256", "size_bytes", "capability", "provenance"],
+      "properties": {
+        "path": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "additionalProperties": true
+    },
+    "parse_warning": {
+      "type": "object",
+      "required": ["component", "message"],
+      "properties": {
+        "component": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
   }
 }

@@ -1,13 +1,34 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { tmpdir } from "node:os";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const projectRoot = resolve(serverRoot, "../../..");
 const sourcePath = resolve(projectRoot, "map/HeroTeamWars_M0_2Arena.w3m");
+const configRoot = mkdtempSync(join(tmpdir(), "wc3-map-mcp-writes-test-"));
+const configPath = join(configRoot, "writes.json");
+writeFileSync(configPath, JSON.stringify({
+  schema_version: "1.0",
+  engine: { executable: resolve(projectRoot, "tools/wc3-map-mcp/map-engine/publish/Wc3MapEngine.Cli.exe"), arguments: [], request_timeout_ms: 120000 },
+  projects: {
+    "hero-team-wars": {
+      root: projectRoot,
+      source_maps: ["map/HeroTeamWars_M0_2Arena.w3m"],
+      baseline_sha256: "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+      read_roots: ["map", "builds", "tools/wc3-map-mcp/artifacts"],
+      staging_root: "tools/wc3-map-mcp/snapshots/transactions",
+      artifact_root: "tools/wc3-map-mcp/artifacts",
+      build_root: "builds/mcp",
+      log_root: "tools/wc3-map-mcp/logs",
+      test_output_root: "tools/wc3-map-mcp/artifacts/tests",
+      enabled_tools: [], write_policy: "writes", max_map_bytes: 536870912, max_operation_count: 100
+    }
+  }
+}, null, 2), "utf8");
 
 class McpClient {
   private readonly child: ChildProcessWithoutNullStreams;
@@ -16,7 +37,7 @@ class McpClient {
   private stdout = "";
 
   public constructor() {
-    this.child = spawn(process.execPath, [resolve(serverRoot, "dist/index.js")], { cwd: serverRoot, stdio: ["pipe", "pipe", "pipe"] });
+    this.child = spawn(process.execPath, [resolve(serverRoot, "dist/index.js")], { cwd: serverRoot, env: { ...process.env, WC3_MAP_MCP_CONFIG: configPath }, stdio: ["pipe", "pipe", "pipe"] });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", chunk => this.consume(String(chunk)));
     this.child.on("error", error => this.rejectAll(error));
@@ -138,3 +159,5 @@ describe("MCP transaction and build workflow", () => {
     expect(sourceHash()).toBe(before);
   }, 120_000);
 });
+
+afterAll(() => rmSync(configRoot, { recursive: true, force: true }));

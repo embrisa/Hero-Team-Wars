@@ -239,9 +239,61 @@ internal static class Program
             var rightMember = rightMembers.OfType<JsonObject>().FirstOrDefault(x => string.Equals(x["path"]?.GetValue<string>(), path, StringComparison.OrdinalIgnoreCase));
             var leftHash = leftMember?["sha256"]?.GetValue<string>();
             var rightHash = rightMember?["sha256"]?.GetValue<string>();
-            if (!string.Equals(leftHash, rightHash, StringComparison.OrdinalIgnoreCase))
+            var memberMetadataChanged = leftMember is null || rightMember is null
+                || !string.Equals(leftHash, rightHash, StringComparison.OrdinalIgnoreCase)
+                || !JsonUtilities.Equal(leftMember?["size_bytes"], rightMember?["size_bytes"])
+                || !JsonUtilities.Equal(leftMember?["compressed_size_bytes"], rightMember?["compressed_size_bytes"])
+                || !JsonUtilities.Equal(leftMember?["named"], rightMember?["named"])
+                || !JsonUtilities.Equal(leftMember?["flags"], rightMember?["flags"]);
+            if (memberMetadataChanged)
             {
-                memberChanges.Add(new JsonObject { ["path"] = path, ["left_sha256"] = leftHash, ["right_sha256"] = rightHash, ["change_type"] = leftMember is null ? "added" : rightMember is null ? "removed" : "updated" });
+                memberChanges.Add(new JsonObject
+                {
+                    ["path"] = path,
+                    ["left_sha256"] = leftHash,
+                    ["right_sha256"] = rightHash,
+                    ["left_size_bytes"] = leftMember?["size_bytes"]?.DeepClone(),
+                    ["right_size_bytes"] = rightMember?["size_bytes"]?.DeepClone(),
+                    ["left_compressed_size_bytes"] = leftMember?["compressed_size_bytes"]?.DeepClone(),
+                    ["right_compressed_size_bytes"] = rightMember?["compressed_size_bytes"]?.DeepClone(),
+                    ["change_type"] = leftMember is null ? "added" : rightMember is null ? "removed" : "updated"
+                });
+            }
+        }
+
+        var leftOrder = leftMembers.OfType<JsonObject>().Select(x => x["path"]?.GetValue<string>()).Where(x => x is not null).Select(x => x!).ToArray();
+        var rightOrder = rightMembers.OfType<JsonObject>().Select(x => x["path"]?.GetValue<string>()).Where(x => x is not null).Select(x => x!).ToArray();
+        var containerDifferences = new JsonArray();
+        if (!leftOrder.SequenceEqual(rightOrder, StringComparer.OrdinalIgnoreCase))
+        {
+            containerDifferences.Add(new JsonObject
+            {
+                ["kind"] = "member_order",
+                ["left"] = new JsonArray(leftOrder.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()),
+                ["right"] = new JsonArray(rightOrder.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray())
+            });
+        }
+
+        var leftSource = left?["source"] as JsonObject;
+        var rightSource = right?["source"] as JsonObject;
+        if (leftSource is not null || rightSource is not null)
+        {
+            var sourceIdentityChanged = !JsonUtilities.Equal(leftSource?["sha256"], rightSource?["sha256"])
+                || !JsonUtilities.Equal(leftSource?["size_bytes"], rightSource?["size_bytes"])
+                || !JsonUtilities.Equal(leftSource?["modified_utc"], rightSource?["modified_utc"])
+                || !JsonUtilities.Equal(leftSource?["path"], rightSource?["path"]);
+            if (sourceIdentityChanged)
+            {
+                containerDifferences.Add(new JsonObject
+                {
+                    ["kind"] = "source_identity",
+                    ["left_sha256"] = leftSource?["sha256"]?.DeepClone(),
+                    ["right_sha256"] = rightSource?["sha256"]?.DeepClone(),
+                    ["left_size_bytes"] = leftSource?["size_bytes"]?.DeepClone(),
+                    ["right_size_bytes"] = rightSource?["size_bytes"]?.DeepClone(),
+                    ["left_path"] = leftSource?["path"]?.DeepClone(),
+                    ["right_path"] = rightSource?["path"]?.DeepClone()
+                });
             }
         }
 
@@ -251,7 +303,8 @@ internal static class Program
             ["left_path"] = leftPath,
             ["right_path"] = rightPath,
             ["archive_differences"] = memberChanges,
-            ["semantic_differences"] = SemanticDiff.Compare(left, right, "compare")
+            ["container_differences"] = containerDifferences,
+            ["semantic_differences"] = SemanticDiff.CompareCanonical(left, right, "compare")
         };
     }
 

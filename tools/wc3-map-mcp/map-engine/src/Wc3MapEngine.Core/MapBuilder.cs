@@ -147,8 +147,12 @@ public static class MapBuilder
         stagedClone.Remove("archive_members");
         sourceClone.Remove("capabilities");
         stagedClone.Remove("capabilities");
+        sourceClone.Remove("component_status");
+        stagedClone.Remove("component_status");
         sourceClone.Remove("opaque_members");
         stagedClone.Remove("opaque_members");
+        sourceClone.Remove("cameras");
+        stagedClone.Remove("cameras");
         sourceClone.Remove("parse_warnings");
         stagedClone.Remove("parse_warnings");
         sourceClone.Remove("metadata");

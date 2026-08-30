@@ -8,7 +8,12 @@ import { BuildService } from "../services/build-service.js";
 import { LaunchService } from "../services/launch-service.js";
 import { safeCall } from "./response.js";
 import type { Wc3Config } from "../config/schema.js";
-import { AppError } from "../errors/app-error.js";
+import { registerProjectStatus } from "./project-status.js";
+import { registerInspectMap } from "./inspect-map.js";
+import { registerListArchiveFiles } from "./list-archive-files.js";
+import { registerGetComponent } from "./get-component.js";
+import { registerValidateMap } from "./validate-map.js";
+import { registerCompareMaps } from "./compare-maps.js";
 
 export interface ToolServices {
   config: Wc3Config;
@@ -26,19 +31,12 @@ export function registerTools(server: McpServer, services: ToolServices): void {
     if (enabled(name)) server.registerTool(name, config as never, handler as never);
   };
 
-  register("wc3_project_status", { description: "Read-only readiness and source-hash status for a configured WC3 project. Call this first.", inputSchema: schemas.projectStatusSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => safeCall(correlationId(), () => services.projects.status(input.project_id)));
-  register("wc3_inspect_map", { description: "Read-only canonical inventory of an allowed WC3 map. The source map is never changed; use before any transaction.", inputSchema: schemas.inspectMapSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => { const id = correlationId(); return safeCall(id, () => services.inspections.inspect(input.project_id, input.map, input.section, input.include_provenance, input.max_items_per_section, id)); });
-  register("wc3_list_archive_files", { description: "List MPQ archive members, sizes, hashes, and parser capability for an allowed map.", inputSchema: schemas.listArchiveFilesSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => safeCall(correlationId(), async () => {
-    const result = await services.inspections.listArchiveFiles(input.project_id, input.map, correlationId());
-    const members = Array.isArray(result.members) ? result.members.filter((item: any) => !input.prefix || String(item.path).toLowerCase().startsWith(input.prefix.toLowerCase())) : [];
-    const offset = decodeArchiveCursor(input.cursor, String(result.map_sha256 ?? ""), input.prefix ?? "");
-    result.members = members.slice(offset, offset + input.max_items);
-    if (offset + input.max_items < members.length) result.next_cursor = encodeArchiveCursor(String(result.map_sha256 ?? ""), input.prefix ?? "", offset + input.max_items);
-    return result;
-  }));
-  register("wc3_get_component", { description: "Read one typed or explicitly opaque map component. Opaque components return an actionable unsupported error.", inputSchema: schemas.getComponentSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => safeCall(correlationId(), () => services.inspections.getComponent(input.project_id, input.map, input.component, input.filter, input.max_items, correlationId())));
-  register("wc3_validate_map", { description: "Validate an allowed map without changing or building it; returns errors, warnings, and opaque-data limitations.", inputSchema: schemas.validateMapSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => safeCall(correlationId(), () => services.inspections.validateMap(input.project_id, input.map, correlationId())));
-  register("wc3_compare_maps", { description: "Compare two allowed map or artifact paths and separate archive differences from semantic differences.", inputSchema: schemas.compareMapsSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => safeCall(correlationId(), () => services.inspections.compareMaps(input.project_id, input.left, input.right, correlationId())));
+  if (enabled("wc3_project_status")) registerProjectStatus(server, services.projects);
+  if (enabled("wc3_inspect_map")) registerInspectMap(server, services.inspections);
+  if (enabled("wc3_list_archive_files")) registerListArchiveFiles(server, services.inspections);
+  if (enabled("wc3_get_component")) registerGetComponent(server, services.inspections);
+  if (enabled("wc3_validate_map")) registerValidateMap(server, services.inspections);
+  if (enabled("wc3_compare_maps")) registerCompareMaps(server, services.inspections);
 
   if (readOnly) return;
   register("wc3_begin_transaction", { description: "Stage an isolated transaction from an exact inspected source hash. Never overwrites the source map.", inputSchema: schemas.beginTransactionSchema, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, async input => safeCall(correlationId(), () => services.transactions.begin(input.project_id, input.map, input.expected_source_hash, correlationId())));
@@ -53,21 +51,4 @@ export function registerTools(server: McpServer, services: ToolServices): void {
   register("wc3_get_test_session", { description: "Read a persisted hash-linked test session and its current evidence level.", inputSchema: schemas.getTestSessionSchema, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true } }, async input => safeCall(correlationId(), async () => services.launches.get(input.project_id, input.session_id)));
   register("wc3_promote_build", { description: "Copy a selected hash-checked build to one configured explicit destination and verify the copy hash.", inputSchema: schemas.promoteSchema, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, async input => safeCall(correlationId(), async () => services.builds.promote(input.project_id, input.build_id, input.expected_build_hash, input.destination_id, input.destination_name)));
   register("wc3_discard_transaction", { description: "Destructively remove only one confirmed MCP-owned transaction directory after manifest/hash checks and write an audit tombstone.", inputSchema: schemas.discardSchema, annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false } }, async input => safeCall(correlationId(), async () => services.transactions.discard(input.project_id, input.transaction_id, input.expected_source_hash, input.confirmation)));
-}
-
-function encodeArchiveCursor(mapSha256: string, prefix: string, offset: number): string {
-  return Buffer.from(JSON.stringify({ schema_version: "1.0", map_sha256: mapSha256, prefix, offset }), "utf8").toString("base64url");
-}
-
-function decodeArchiveCursor(cursor: string | undefined, mapSha256: string, prefix: string): number {
-  if (!cursor) return 0;
-  try {
-    const value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as { schema_version?: string; map_sha256?: string; prefix?: string; offset?: number };
-    if (value.schema_version !== "1.0" || value.map_sha256?.toUpperCase() !== mapSha256.toUpperCase() || value.prefix !== prefix || !Number.isInteger(value.offset) || (value.offset ?? -1) < 0) {
-      throw new Error("cursor identity mismatch");
-    }
-    return value.offset ?? 0;
-  } catch (error) {
-    throw new AppError("CURSOR_STALE", "The archive cursor is invalid or belongs to a different map/filter.", false, { cause: error instanceof Error ? error.message : String(error) });
-  }
 }

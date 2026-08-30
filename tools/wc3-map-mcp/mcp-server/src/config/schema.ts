@@ -5,6 +5,7 @@ const rootRelativePath = z.string().min(1);
 export const projectConfigSchema = z.object({
   root: z.string().min(1),
   source_maps: z.array(rootRelativePath).min(1),
+  baseline_sha256: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
   read_roots: z.array(rootRelativePath).default([]),
   staging_root: rootRelativePath,
   artifact_root: rootRelativePath,

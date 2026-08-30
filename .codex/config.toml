@@ -1,0 +1,17 @@
+[mcp_servers.wc3_map]
+command = "C:\\Program Files\\nodejs\\node.exe"
+args = ["C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\mcp-server\\dist\\index.js"]
+cwd = "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\mcp-server"
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+enabled = true
+required = false
+enabled_tools = [
+  "wc3_project_status",
+  "wc3_inspect_map",
+  "wc3_list_archive_files",
+  "wc3_get_component",
+  "wc3_validate_map",
+  "wc3_compare_maps",
+]
+default_tools_approval_mode = "writes"

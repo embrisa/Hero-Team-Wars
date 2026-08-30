@@ -45,7 +45,11 @@ public static class MapValidator
             ValidateRegions(inspection["regions"] as JsonArray, findings);
         }
 
-        return Report(findings);
+        // MapInspector hashes the file before opening the archive. Echo that
+        // exact identity in the validation report so callers can bind the
+        // findings to the map they actually inspected.
+        var source = inspection?["source"] as JsonObject;
+        return Report(findings, source, path);
     }
 
     public static JsonObject ValidateCanonical(string path)
@@ -99,10 +103,10 @@ public static class MapValidator
         }
     }
 
-    private static JsonObject Report(JsonArray findings)
+    private static JsonObject Report(JsonArray findings, JsonObject? source = null, string? requestedPath = null)
     {
         var hasErrors = findings.OfType<JsonObject>().Any(x => string.Equals(x["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal));
-        return new JsonObject
+        var report = new JsonObject
         {
             ["schema_version"] = "1.0",
             ["buildable"] = !hasErrors,
@@ -114,6 +118,24 @@ public static class MapValidator
                 ["info"] = findings.OfType<JsonObject>().Count(x => x["severity"]?.GetValue<string>() == "info")
             }
         };
+
+        if (source is not null)
+        {
+            report["map_path"] = source["path"]?.DeepClone() ?? requestedPath;
+            report["map_sha256"] = source["sha256"]?.DeepClone();
+            // Keep the source_sha256/map_hash aliases for existing worker
+            // clients while map_sha256 is the canonical validation field.
+            report["source_sha256"] = source["sha256"]?.DeepClone();
+            report["map_hash"] = source["sha256"]?.DeepClone();
+            report["size_bytes"] = source["size_bytes"]?.DeepClone();
+            report["modified_utc"] = source["modified_utc"]?.DeepClone();
+        }
+        else if (!string.IsNullOrWhiteSpace(requestedPath))
+        {
+            report["map_path"] = requestedPath;
+        }
+
+        return report;
     }
 
     private static JsonObject Finding(string severity, string code, string component, string? target, string message, string remediation) => new()

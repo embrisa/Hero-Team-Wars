@@ -26,7 +26,7 @@ export function resolveProject(config: Wc3Config, projectId: string): ResolvedPr
     id: projectId,
     config: project,
     root,
-    sourceMaps: project.source_maps.map(value => resolveContained(root, value, "source map")),
+    sourceMaps: project.source_maps.map(value => resolveContained(root, value, "source map", { allowMissing: true })),
     stagingRoot: resolveConfiguredPath(root, project.staging_root),
     artifactRoot: resolveConfiguredPath(root, project.artifact_root),
     buildRoot: resolveConfiguredPath(root, project.build_root),

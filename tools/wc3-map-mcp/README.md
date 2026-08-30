@@ -2,7 +2,7 @@
 
 Project scaffold for the local Warcraft III map MCP described in `../../tasks/wc3-map-mcp/README.md`.
 
-Status: local implementation available. The map engine uses War3Net 6.0.3 for MPQ access and WC3 metadata/region parsing; the MCP server exposes hash-checked inspection, transactions, validation, builds, launch evidence, promotion, and discard controls.
+Status: Phase 1 read-only inspector implemented and verified. The map engine uses War3Net 6.0.3 for MPQ access and WC3 metadata/region parsing; the default MCP configuration exposes only project status, inspection, archive listing, component lookup, read-only validation, and comparison. Later transaction/build/launch code remains disabled and is not visible through the Phase 1 server.
 
 Current evidence: the local source has 17 classified archive members; `war3map.w3i`, `war3map.w3r`, and `war3map.wts` parse read-only; a no-op rebuild reopened successfully with all member content hashes preserved; and the original source hash remained `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. World Editor/game runtime evidence is still a manual gate, and script/object/trigger mutation remains disabled.
 
@@ -11,6 +11,8 @@ Current evidence: the local source has 17 classified archive members; `war3map.w
 Read `AGENTS.md` before working here. The task directory provides a complete no-chat-history orientation, live prerequisite snapshot, MCP SDK guidance, WC3 archive/member reference, implementation conventions, and detailed phase work packets.
 
 Use `scripts/bootstrap.ps1`, `scripts/build.ps1`, and `scripts/test.ps1` from this directory. The checked-in example configuration is safe to copy to `config/wc3-map-mcp.local.json`; it never replaces the source map.
+
+The trusted-project Codex entry is `.codex/config.toml` at the Hero Team Wars root. Build first so `mcp-server/dist/index.js` exists, then restart/reload the Codex client to pick up a newly added project MCP server.
 
 ## Planned components
 

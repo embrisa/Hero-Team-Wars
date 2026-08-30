@@ -269,6 +269,16 @@ Write-JsonAtomic $candidateJsonPath ([ordered]@{
     report_type = "HTW-00 STATE REPORT"
     generated_utc = $report.generated_utc
     source = $before
+    editor_version = $environment.configured_files.world_editor
+    map_copy = [ordered]@{ source = $before; no_op_output = $report.no_op_rebuild.output }
+    map_properties = $inspection.metadata
+    trigger_tree = $inspection.triggers
+    variables = $inspection.variables
+    regions = $inspection.regions
+    player_slots_and_forces = [ordered]@{ players = $inspection.players; forces = $inspection.forces }
+    heroes_units_abilities_items = [ordered]@{ object_data = $inspection.object_data; placed_objects = $inspection.placed_objects; capability = "unsupported_or_absent" }
+    test_result = [ordered]@{ engine_reopened = $report.no_op_rebuild.engine_result.reopened; world_editor_observed = $false; warcraft_observed = $false; evidence_level = "built_reopened_by_engine_only" }
+    unknown_or_unclear = @("trigger tree semantics", "trigger variables", "custom object data", "placed object details", "terrain grid details", "runtime behavior")
     archive_observations = $report.archive_members
     editor_verification_needed = @("open the separately named no-op build in World Editor", "confirm trigger tree, variables, custom object data, and placed content", "save only a copy if save-round-trip is tested")
     game_verification_needed = @("load the exact no-op build in Warcraft III", "record map-load result against the output SHA-256")
@@ -337,6 +347,47 @@ $markdown = @(
 $opaqueLines = @($inspection.opaque_members | ForEach-Object { "- ``$($_.path)`` ($($_.size_bytes) bytes, SHA-256 ``$($_.sha256)``)" })
 $candidateMarkdown = @(
     "# HTW-00 STATE REPORT"
+    ""
+    "## editor_version"
+    ""
+    "- World Editor: ``$($environment.configured_files.world_editor.product_version)`` at ``$($environment.configured_files.world_editor.path)`` (archive report only; no Phase 1 launch)."
+    ""
+    "## map_copy"
+    ""
+    "- Source: ``$($before.path)`` (SHA-256 ``$($before.sha256)``)."
+    "- Existing Phase 0 no-op copy: ``$($noopPath)`` (SHA-256 ``$($report.no_op_rebuild.output.sha256)``)."
+    ""
+    "## map_properties"
+    ""
+    "- Parsed read-only from ``war3map.w3i``; see the JSON candidate for stored values, resolved WTS text, capability, and provenance."
+    ""
+    "## trigger_tree"
+    ""
+    "- ``war3map.wtg``, ``war3map.wct``, and ``war3map.j`` are preserved opaque; semantic trigger-tree verification requires World Editor."
+    ""
+    "## variables"
+    ""
+    "- Unknown: trigger variable details are not semantically decoded by the Phase 0 parser."
+    ""
+    "## regions"
+    ""
+    "- $(@($inspection.regions).Count) regions parsed read-only from ``war3map.w3r``; exact names and bounds are in the JSON candidate."
+    ""
+    "## player_slots_and_forces"
+    ""
+    "- $(@($inspection.players).Count) player slots and $(@($inspection.forces).Count) forces parsed read-only from ``war3map.w3i``."
+    ""
+    "## heroes_units_abilities_items"
+    ""
+    "- Unsupported/absent semantically; opaque object and placement members are reported only by size and SHA-256."
+    ""
+    "## test_result"
+    ""
+    "- Phase 0 engine reopen passed; World Editor and Warcraft III were not observed. Evidence level: ``built_reopened_by_engine_only``."
+    ""
+    "## unknown_or_unclear"
+    ""
+    "- Trigger semantics, variables, custom object data, placed-object details, terrain details, imports, and gameplay behavior remain unknown or unsupported."
     ""
     "## Archive observations"
     ""

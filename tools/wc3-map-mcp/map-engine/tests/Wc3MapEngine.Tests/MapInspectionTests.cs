@@ -23,6 +23,47 @@ public sealed class MapInspectionTests
     }
 
     [Fact]
+    public async Task ReadOnlyValidationReturnsTheExactInspectedMapHash()
+    {
+        var source = FindSourceMap();
+        var expected = await Hashing.HashFileAsync(source);
+
+        var report = MapValidator.ValidateMap(source);
+
+        Assert.Equal(expected.Sha256, report["map_sha256"]!.GetValue<string>());
+        Assert.Equal(expected.Sha256, report["source_sha256"]!.GetValue<string>());
+        Assert.Equal(expected.Sha256, report["map_hash"]!.GetValue<string>());
+        Assert.Equal(expected.Size, report["size_bytes"]!.GetValue<long>());
+    }
+
+    [Fact]
+    public void CanonicalInspectionReportsSectionStatusForEverySection()
+    {
+        var inspection = MapInspector.Inspect(FindSourceMap());
+        var statuses = inspection["component_status"] as System.Text.Json.Nodes.JsonObject;
+
+        Assert.NotNull(statuses);
+        foreach (var section in new[]
+        {
+            "source", "metadata", "players", "forces", "regions", "cameras",
+            "archive_members", "capabilities", "triggers", "scripts", "variables",
+            "object_data", "placed_objects", "terrain_summary", "imports",
+            "opaque_members", "parse_warnings"
+        })
+        {
+            var status = statuses![section] as System.Text.Json.Nodes.JsonObject;
+            Assert.NotNull(status);
+            Assert.False(string.IsNullOrWhiteSpace(status!["capability"]?.GetValue<string>()));
+            Assert.False(string.IsNullOrWhiteSpace(status["provenance"]?.GetValue<string>()));
+            Assert.False(string.IsNullOrWhiteSpace(status["reason"]?.GetValue<string>()));
+        }
+
+        Assert.IsType<System.Text.Json.Nodes.JsonArray>(inspection["cameras"]);
+        Assert.IsType<System.Text.Json.Nodes.JsonArray>(inspection["parse_warnings"]);
+        Assert.Empty((System.Text.Json.Nodes.JsonArray)inspection["parse_warnings"]!);
+    }
+
+    [Fact]
     public void TruncatedArchiveIsRejectedWithoutWritingBesideSource()
     {
         var source = FindSourceMap();

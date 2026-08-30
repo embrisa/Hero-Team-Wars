@@ -9,6 +9,7 @@
     "hero-team-wars": {
       "root": "C:/Users/hp/Documents/Warcraft III/Hero Team Wars",
       "source_maps": ["map/HeroTeamWars_M0_2Arena.w3m"],
+      "baseline_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
       "read_roots": ["map", "builds", "tools/wc3-map-mcp/artifacts"],
       "staging_root": "tools/wc3-map-mcp/snapshots/transactions",
       "artifact_root": "tools/wc3-map-mcp/artifacts",
@@ -18,8 +19,15 @@
       "world_editor": "C:/Warcraft III/_retail_/x86_64/World Editor.exe",
       "warcraft": "C:/Warcraft III/_retail_/x86_64/Warcraft III.exe",
       "test_map_root": "C:/Users/hp/Documents/Warcraft III/Maps/Test",
-      "enabled_tools": [],
-      "write_policy": "writes",
+      "enabled_tools": [
+        "wc3_project_status",
+        "wc3_inspect_map",
+        "wc3_list_archive_files",
+        "wc3_get_component",
+        "wc3_validate_map",
+        "wc3_compare_maps"
+      ],
+      "write_policy": "read_only",
       "max_map_bytes": 536870912,
       "max_operation_count": 100
     }

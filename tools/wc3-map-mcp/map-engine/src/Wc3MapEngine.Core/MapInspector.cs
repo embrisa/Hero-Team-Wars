@@ -44,6 +44,7 @@ public static class MapInspector
             ["players"] = BuildPlayers(info),
             ["forces"] = BuildForces(info),
             ["regions"] = BuildRegions(regions),
+            ["cameras"] = BuildComponentMembers(archive, new[] { "war3map.w3c" }, "cameras"),
             ["archive_members"] = BuildArchiveMembers(archive, parseResults),
             ["capabilities"] = new JsonArray(parseResults.Select(ToJson).ToArray()),
             ["triggers"] = BuildComponentMembers(archive, new[] { "war3map.wtg", "war3map.wct", "war3map.j", "war3map.lua" }, "triggers"),
@@ -68,6 +69,27 @@ public static class MapInspector
                 .Concat(regionError is null ? Array.Empty<JsonNode>() : new JsonNode[] { new JsonObject { ["component"] = "regions", ["message"] = regionError } })
                 .ToArray())
         };
+
+        // Keep the data sections in their established array/object shapes while
+        // making the capability and provenance of every section explicit. This
+        // is intentionally separate from per-item provenance because empty and
+        // unsupported sections have no item from which a caller could infer it.
+        root["component_status"] = BuildComponentStatus(
+            info,
+            infoError,
+            regions,
+            regionError,
+            archive,
+            parseResults,
+            root["triggers"] as JsonArray,
+            root["scripts"] as JsonArray,
+            root["cameras"] as JsonArray,
+            root["object_data"] as JsonArray,
+            root["placed_objects"] as JsonArray,
+            root["imports"] as JsonArray,
+            root["opaque_members"] as JsonArray,
+            archive.Find("war3map.w3e") is not null,
+            root["parse_warnings"] as JsonArray);
 
         return root;
     }
@@ -313,6 +335,74 @@ public static class MapInspector
         ["component"] = component,
         ["capability"] = "preserved_opaque",
         ["provenance"] = "unknown",
+        ["reason"] = reason
+    };
+
+    private static JsonObject BuildComponentStatus(
+        JsonObject? info,
+        string? infoError,
+        JsonArray? regions,
+        string? regionError,
+        MapArchiveSnapshot archive,
+        JsonArray parseResults,
+        JsonArray? triggers,
+        JsonArray? scripts,
+        JsonArray? cameras,
+        JsonArray? objectData,
+        JsonArray? placedObjects,
+        JsonArray? imports,
+        JsonArray? opaqueMembers,
+        bool hasTerrain,
+        JsonArray? parseWarnings)
+    {
+        var statuses = new JsonObject
+        {
+            ["source"] = ComponentStatus("observed", "observed_archive", "Map file identity, size, timestamp, and SHA-256 were observed before parsing."),
+            ["metadata"] = info is null
+                ? ComponentStatus("unsupported_blocking", "unknown", infoError ?? "war3map.w3i was not available for read-only parsing.")
+                : ComponentStatus("parsed_read_only", "observed_archive", "war3map.w3i was parsed read-only; metadata values are observed archive data."),
+            ["players"] = info is null
+                ? ComponentStatus("unsupported_blocking", "unknown", infoError ?? "Player data is unavailable because war3map.w3i was not parsed.")
+                : ComponentStatus("parsed_read_only", "observed_archive", "Player slots were parsed read-only from war3map.w3i."),
+            ["forces"] = info is null
+                ? ComponentStatus("unsupported_blocking", "unknown", infoError ?? "Force data is unavailable because war3map.w3i was not parsed.")
+                : ComponentStatus("parsed_read_only", "observed_archive", "Forces were parsed read-only from war3map.w3i."),
+            ["regions"] = regions is null
+                ? ComponentStatus("unsupported_blocking", "unknown", regionError ?? "war3map.w3r was not available for read-only parsing.")
+                : ComponentStatus("parsed_read_only", "observed_archive", "Regions were parsed read-only from war3map.w3r."),
+            ["archive_members"] = ComponentStatus("mixed", "observed_archive", "Archive membership and per-member hashes are observed; parser/preservation capability is reported per member."),
+            ["capabilities"] = ComponentStatus("parsed_read_only", "derived", "Per-member parser results were derived from a read-only archive probe."),
+            ["triggers"] = OpaqueStatus("triggers", triggers),
+            ["scripts"] = OpaqueStatus("scripts", scripts),
+            ["cameras"] = OpaqueStatus("cameras", cameras),
+            ["variables"] = ComponentStatus("preserved_opaque", "unknown", "Trigger variable details are not exposed until the trigger format is proven for this map."),
+            ["object_data"] = OpaqueStatus("object_data", objectData),
+            ["placed_objects"] = OpaqueStatus("placed_objects", placedObjects),
+            ["terrain_summary"] = hasTerrain
+                ? ComponentStatus("preserved_opaque", "observed_archive", "Terrain bytes are preserved but are not semantically decoded by this release.")
+                : ComponentStatus("preserved_opaque", "unknown", "war3map.w3e is absent; no terrain bytes were available to decode or preserve."),
+            ["imports"] = OpaqueStatus("imports", imports),
+            ["opaque_members"] = opaqueMembers is { Count: > 0 }
+                ? ComponentStatus("preserved_opaque", "observed_archive", "Opaque archive members are preserved byte-for-byte and identified by content hash.")
+                : ComponentStatus("preserved_opaque", "observed_archive", "The archive probe found no opaque members."),
+            ["parse_warnings"] = parseWarnings is { Count: > 0 }
+                ? ComponentStatus("parsed_read_only", "derived", "Warnings were derived from read-only component parsing.")
+                : ComponentStatus("parsed_read_only", "derived", "No parse warnings were produced by the read-only inspection.")
+        };
+
+        _ = archive;
+        _ = parseResults;
+        return statuses;
+    }
+
+    private static JsonObject OpaqueStatus(string component, JsonArray? values) => values is { Count: > 0 }
+        ? ComponentStatus("preserved_opaque", "observed_archive", $"{component} archive members are preserved but not semantically decoded by this release.")
+        : ComponentStatus("preserved_opaque", "observed_archive", $"No {component} archive members are present in this map.");
+
+    private static JsonObject ComponentStatus(string capability, string provenance, string reason) => new()
+    {
+        ["capability"] = capability,
+        ["provenance"] = provenance,
         ["reason"] = reason
     };
 

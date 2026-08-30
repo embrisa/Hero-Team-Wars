@@ -6,7 +6,7 @@ import { type ArtifactRef, writeJsonArtifact } from "./artifact-service.js";
 import { ProjectService } from "./project-service.js";
 import { WorkerClient } from "../transport/worker-client.js";
 
-export const componentNames = ["metadata", "players", "forces", "regions", "triggers", "variables", "scripts", "object_data", "placed_objects", "terrain_summary", "imports", "archive_members", "capabilities", "opaque_members"] as const;
+export const componentNames = ["metadata", "players", "forces", "regions", "cameras", "triggers", "variables", "scripts", "object_data", "placed_objects", "terrain_summary", "imports", "archive_members", "capabilities", "opaque_members"] as const;
 export type ComponentName = typeof componentNames[number];
 
 export class InspectionService {
@@ -14,7 +14,7 @@ export class InspectionService {
 
   public async inspect(projectId: string, map: string, section: string | undefined, includeProvenance: boolean, maxItems: number, correlationId: string): Promise<Record<string, unknown>> {
     const project = this.projects.project(projectId);
-    const mapPath = this.projects.source(projectId, map);
+    const mapPath = this.projects.map(projectId, map);
     const full = await this.worker.request<Record<string, unknown>>("inspect_map", { map_path: mapPath }, correlationId);
     const artifact = this.writeArtifact(project, "inspect", full, correlationId);
     const data = section ? { schema_version: full.schema_version, source: full.source, [section]: limitSection(full[section], maxItems, includeProvenance) } : limitTopLevel(full, maxItems, includeProvenance);
@@ -22,27 +22,34 @@ export class InspectionService {
   }
 
   public async listArchiveFiles(projectId: string, map: string, correlationId: string): Promise<Record<string, unknown>> {
-    const mapPath = this.projects.source(projectId, map);
+    const mapPath = this.projects.map(projectId, map);
     return this.worker.request<Record<string, unknown>>("list_archive_members", { map_path: mapPath }, correlationId);
   }
 
-  public async getComponent(projectId: string, map: string, component: ComponentName, filter: string | undefined, maxItems: number, correlationId: string): Promise<Record<string, unknown>> {
-    const inspection = await this.worker.request<Record<string, unknown>>("inspect_map", { map_path: this.projects.source(projectId, map) }, correlationId);
+  public async getComponent(projectId: string, map: string, component: ComponentName, filter: string | undefined, cursor: string | undefined, maxItems: number, correlationId: string): Promise<Record<string, unknown>> {
+    const inspection = await this.worker.request<Record<string, unknown>>("inspect_map", { map_path: this.projects.map(projectId, map) }, correlationId);
     const value = inspection[component];
     if (value === undefined) {
       throw new AppError("UNSUPPORTED_COMPONENT", `Component '${component}' is not present in the canonical map.`);
     }
-    if (component === "variables" && typeof value === "object" && value !== null && (value as Record<string, unknown>).capability === "preserved_opaque") {
-      throw new AppError("UNSUPPORTED_COMPONENT", `Component '${component}' is opaque for this map.`, false, { component, reason: (value as Record<string, unknown>).reason });
+    const status = componentStatus(inspection, component, value);
+    if (!["parsed_read_only", "roundtrip_verified", "typed_write_enabled"].includes(String(status.capability)) && !["archive_members", "capabilities", "opaque_members"].includes(component)) {
+      throw new AppError("UNSUPPORTED_COMPONENT", `Component '${component}' is not semantically decoded for this map.`, false, { component, capability: status.capability, reason: status.reason ?? "The Phase 0 parser classified this component as opaque or absent." });
     }
 
     const filtered = filterValue(value, filter);
-    return { map_hash: (inspection.source as Record<string, unknown> | undefined)?.sha256, component, capability: capabilityOf(value), provenance: includeProvenance(value), values: limitSection(filtered, maxItems, true) };
+    const mapHash = String((inspection.source as Record<string, unknown> | undefined)?.sha256 ?? "");
+    const offset = decodeComponentCursor(cursor, mapHash, component, filter ?? "");
+    const values = Array.isArray(filtered) ? filtered.slice(offset, offset + maxItems) : filtered;
+    if (!Array.isArray(filtered) && cursor) throw new AppError("CURSOR_STALE", `Component '${component}' is not paginated.`);
+    const result: Record<string, unknown> = { map_hash: mapHash, component, capability: status.capability, provenance: status.provenance, values };
+    if (Array.isArray(filtered) && offset + maxItems < filtered.length) result.next_cursor = encodeComponentCursor(mapHash, component, filter ?? "", offset + maxItems);
+    return result;
   }
 
   public async validateMap(projectId: string, map: string, correlationId: string): Promise<Record<string, unknown>> {
     const project = this.projects.project(projectId);
-    const mapPath = this.projects.source(projectId, map);
+    const mapPath = this.projects.map(projectId, map);
     const report = await this.worker.request<Record<string, unknown>>("validate_map", { map_path: mapPath }, correlationId);
     const artifact = this.writeArtifact(project, "validation", report, correlationId);
     return { report, artifact, map_hash: shaFromReport(report) };
@@ -97,4 +104,28 @@ function includeProvenance(value: unknown): unknown {
 
 function shaFromReport(report: Record<string, unknown>): unknown {
   return report.map_hash ?? report.source_sha256 ?? undefined;
+}
+
+function componentStatus(inspection: Record<string, unknown>, component: ComponentName, value: unknown): Record<string, unknown> {
+  const statuses = inspection.component_status;
+  if (statuses && typeof statuses === "object" && component in (statuses as Record<string, unknown>)) {
+    const status = (statuses as Record<string, unknown>)[component];
+    if (status && typeof status === "object") return status as Record<string, unknown>;
+  }
+  return { capability: capabilityOf(value), provenance: includeProvenance(value) ?? "unknown" };
+}
+
+function encodeComponentCursor(mapSha256: string, component: ComponentName, filter: string, offset: number): string {
+  return Buffer.from(JSON.stringify({ schema_version: "1.0", map_sha256: mapSha256, component, filter, offset }), "utf8").toString("base64url");
+}
+
+function decodeComponentCursor(cursor: string | undefined, mapSha256: string, component: ComponentName, filter: string): number {
+  if (!cursor) return 0;
+  try {
+    const value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as { schema_version?: string; map_sha256?: string; component?: string; filter?: string; offset?: number };
+    if (value.schema_version !== "1.0" || value.map_sha256?.toUpperCase() !== mapSha256.toUpperCase() || value.component !== component || value.filter !== filter || !Number.isInteger(value.offset) || (value.offset ?? -1) < 0) throw new Error("cursor identity mismatch");
+    return value.offset ?? 0;
+  } catch (error) {
+    throw new AppError("CURSOR_STALE", "The component cursor is invalid or belongs to a different map/component/filter.", false, { cause: error instanceof Error ? error.message : String(error) });
+  }
 }

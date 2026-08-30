@@ -37,8 +37,30 @@ function requestProcess(): Promise<{ lines: string[]; stderr: string }> {
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "wc3_compare_maps", arguments: { project_id: "hero-team-wars", left: "map/HeroTeamWars_M0_2Arena.w3m", right: "map/HeroTeamWars_M0_2Arena.w3m" } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 10, method: "tools/call", params: { name: "wc3_list_archive_files", arguments: { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", max_items: 5 } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 11, method: "tools/call", params: { name: "wc3_list_archive_files", arguments: { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", cursor: "not-a-valid-cursor", max_items: 5 } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 12, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", section: "metadata" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 13, method: "tools/call", params: { name: "wc3_project_status", arguments: {} } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 14, method: "tools/call", params: { name: "wc3_project_status", arguments: { project_id: "not-a-project" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 15, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: "../map/HeroTeamWars_M0_2Arena.w3m" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 16, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: sourcePath } } } )}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 17, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: "map" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 18, method: "tools/call", params: { name: "wc3_inspect_map", arguments: { project_id: "hero-team-wars", map: "design/07-editor-state.yaml" } } })}\n`);
     child.stdin.end();
   });
+}
+
+function response(lines: string[], id: number): any {
+  const result = lines.find(line => (line as any).id === id) as any;
+  expect(result, `missing JSON-RPC response for id ${id}`).toBeDefined();
+  return result;
+}
+
+function expectDomainError(lines: string[], id: number, code: string): any {
+  const result = response(lines, id);
+  expect(result.result?.isError).toBe(true);
+  expect(result.result?.structuredContent?.ok).toBe(false);
+  expect(result.result?.structuredContent?.error?.code).toBe(code);
+  expect(result.result?.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "text" })]));
+  return result;
 }
 
 describe("MCP STDIO", () => {
@@ -49,33 +71,65 @@ describe("MCP STDIO", () => {
     const after = hashSource();
     expect(after).toBe(before);
     expect(result.lines.every(line => typeof line === "object")).toBe(true);
-    const list = result.lines.find(line => (line as any).id === 2) as any;
-    expect(list.result.tools.some((tool: any) => tool.name === "wc3_project_status")).toBe(true);
-    const call = result.lines.find(line => (line as any).id === 3) as any;
+    expect(result.stderr).toMatch(/wc3-map-mcp listening on stdio/);
+
+    const list = response(result.lines, 2);
+    const toolNames = list.result.tools.map((tool: any) => tool.name);
+    expect(toolNames).toEqual([
+      "wc3_project_status",
+      "wc3_inspect_map",
+      "wc3_list_archive_files",
+      "wc3_get_component",
+      "wc3_validate_map",
+      "wc3_compare_maps"
+    ]);
+    expect(list.result.tools.every((tool: any) => tool.annotations?.readOnlyHint === true && tool.annotations?.destructiveHint === false)).toBe(true);
+    expect(toolNames.some((name: string) => /begin|apply|transaction|build|launch|promote|discard/i.test(name))).toBe(false);
+
+    const call = response(result.lines, 3);
     expect(call.result.structuredContent.ok).toBe(true);
-    const inspection = result.lines.find(line => (line as any).id === 4) as any;
+    expect(call.result.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "text", text: expect.any(String) })]));
+    expect(call.result.structuredContent.correlation_id).toEqual(expect.any(String));
+
+    const inspection = response(result.lines, 4);
     expect(inspection.result.structuredContent.ok).toBe(true);
     expect(inspection.result.structuredContent.data.data.metadata.length).toBeGreaterThan(0);
-    const archive = result.lines.find(line => (line as any).id === 5) as any;
+    expect(inspection.result.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "text" })]));
+
+    const repeatedInspection = response(result.lines, 12);
+    expect(repeatedInspection.result.structuredContent.ok).toBe(true);
+    expect(repeatedInspection.result.structuredContent.data.data).toEqual(inspection.result.structuredContent.data.data);
+    const firstCanonical = JSON.parse(readFileSync(resolve(projectRoot, inspection.result.structuredContent.data.artifact.path), "utf8"));
+    const repeatedCanonical = JSON.parse(readFileSync(resolve(projectRoot, repeatedInspection.result.structuredContent.data.artifact.path), "utf8"));
+    expect(repeatedCanonical).toEqual(firstCanonical);
+
+    const archive = response(result.lines, 5);
     expect(archive.result.structuredContent.ok).toBe(true);
     expect(archive.result.structuredContent.data.members.length).toBe(17);
     expect(archive.result.structuredContent.data.members.some((member: any) => member.path === "war3map.w3i" && member.capability === "parsed_read_only")).toBe(true);
-    const regions = result.lines.find(line => (line as any).id === 6) as any;
+    const regions = response(result.lines, 6);
     expect(regions.result.structuredContent.ok).toBe(true);
     expect(regions.result.structuredContent.data.values.length).toBe(10);
-    const opaque = result.lines.find(line => (line as any).id === 7) as any;
-    expect(opaque.result.isError).toBe(true);
-    expect(opaque.result.structuredContent.error.code).toBe("UNSUPPORTED_COMPONENT");
-    const validation = result.lines.find(line => (line as any).id === 8) as any;
+    expectDomainError(result.lines, 7, "UNSUPPORTED_COMPONENT");
+    const validation = response(result.lines, 8);
     expect(validation.result.structuredContent.ok).toBe(true);
-    const comparison = result.lines.find(line => (line as any).id === 9) as any;
+    const comparison = response(result.lines, 9);
     expect(comparison.result.structuredContent.ok).toBe(true);
-    const paged = result.lines.find(line => (line as any).id === 10) as any;
+    const paged = response(result.lines, 10);
     expect(paged.result.structuredContent.ok).toBe(true);
     expect(paged.result.structuredContent.data.members.length).toBe(5);
     expect(typeof paged.result.structuredContent.data.next_cursor).toBe("string");
-    const staleCursor = result.lines.find(line => (line as any).id === 11) as any;
-    expect(staleCursor.result.isError).toBe(true);
-    expect(staleCursor.result.structuredContent.error.code).toBe("CURSOR_STALE");
+    expectDomainError(result.lines, 11, "CURSOR_STALE");
+
+    const invalidSchema = response(result.lines, 13);
+    const invalidSchemaPayload = invalidSchema.error ?? invalidSchema.result;
+    expect(invalidSchemaPayload).toBeDefined();
+    expect(JSON.stringify(invalidSchemaPayload)).toMatch(/project_id|invalid|required|argument/i);
+
+    expectDomainError(result.lines, 14, "INVALID_ARGUMENT");
+    expectDomainError(result.lines, 15, "PATH_OUTSIDE_ROOT");
+    expectDomainError(result.lines, 16, "PATH_OUTSIDE_ROOT");
+    expectDomainError(result.lines, 17, "INVALID_ARGUMENT");
+    expectDomainError(result.lines, 18, "PATH_OUTSIDE_ROOT");
   });
 });
