@@ -155,6 +155,37 @@ public sealed class Phase5BuildRoundTripTests
         finally { DeleteTemp(directory); }
     }
 
+    [Fact]
+    public void MapFlagsAndFixedStartPositionRoundTripThroughMapInfo()
+    {
+        var source = FindSourceMap();
+        var model = MapInspector.Inspect(source);
+        var mapFlags = model["metadata"]!.AsArray().OfType<JsonObject>().Single(item => item["field"]!.GetValue<string>() == "map_flags");
+        var operation = Operation(
+            "set_map_metadata",
+            new JsonObject { ["field"] = "map_flags" },
+            mapFlags["value"]!.DeepClone(),
+            mapFlags["value"]!.GetValue<int>() & ~32);
+        var staged = OperationApplier.Apply(model, new JsonArray(operation))["canonical_map"]!;
+
+        Assert.Equal(40024, staged["metadata"]!.AsArray().OfType<JsonObject>().Single(item => item["field"]!.GetValue<string>() == "map_flags")["value"]!.GetValue<int>());
+        Assert.True(staged["players"]!.AsArray()[0]!["fixed_start_position"]!.GetValue<bool>());
+
+        var directory = TempDirectory();
+        try
+        {
+            var canonical = Path.Combine(directory, "canonical.json");
+            var output = Path.Combine(directory, "map-flags.w3m");
+            JsonUtilities.WriteAtomic(canonical, staged);
+            var result = MapBuilder.Build(source, canonical, output, "debug");
+            Assert.True(result["reopened"]!.GetValue<bool>());
+            var reopened = MapInspector.Inspect(output);
+            Assert.Equal(40024, reopened["metadata"]!.AsArray().OfType<JsonObject>().Single(item => item["field"]!.GetValue<string>() == "map_flags")["value"]!.GetValue<int>());
+            Assert.True(reopened["players"]!.AsArray()[0]!["fixed_start_position"]!.GetValue<bool>());
+        }
+        finally { DeleteTemp(directory); }
+    }
+
     private static JsonObject Operation(string type, JsonObject target, JsonNode? expected, JsonNode? value)
     {
         var operation = new JsonObject { ["operation_id"] = Guid.NewGuid().ToString(), ["type"] = type, ["target"] = target, ["rationale"] = "Phase 5 binary round-trip test" };

@@ -23,7 +23,7 @@ public static class MapComponentCodec
 {
     public const string CodecVersion = "war3net-6.0.3-typed-components-1";
     public const int ProvenMapInfoFormatVersion = 33;
-    private const int FixedStartFlag = 1;
+    private const int FixedStartPositionFlag = (int)PlayerFlags.FixedStartPosition;
     private const int AlliedFlag = 1;
     private const int ShareVisionFlag = 8;
     private const int ShareUnitControlFlag = 16;
@@ -55,7 +55,7 @@ public static class MapComponentCodec
             ["enemy_low_priority_mask"] = player.EnemyLowPriorityFlags.ToInt32(),
             ["enemy_high_priority_mask"] = player.EnemyHighPriorityFlags.ToInt32(),
             ["observer"] = null,
-            ["locked"] = (((int)player.Flags) & FixedStartFlag) != 0,
+            ["fixed_start_position"] = (((int)player.Flags) & FixedStartPositionFlag) != 0,
             ["slot_status"] = player.Controller.ToString() switch
             {
                 "None" => "closed",
@@ -330,9 +330,9 @@ public static class MapComponentCodec
         var id = RequiredInt(value, "id", 1, 24) - 1;
         var start = RequiredPosition2(value["start"], "start");
         var flags = RequiredInt(value, "flags", 0, int.MaxValue);
-        if (value["locked"] is JsonValue locked && locked.TryGetValue<bool>(out var isLocked))
+        if (value["fixed_start_position"] is JsonValue fixedStart && fixedStart.TryGetValue<bool>(out var useFixedStart))
         {
-            flags = isLocked ? flags | FixedStartFlag : flags & ~FixedStartFlag;
+            flags = useFixedStart ? flags | FixedStartPositionFlag : flags & ~FixedStartPositionFlag;
         }
         if (value["observer"] is JsonValue observer && observer.TryGetValue<bool>(out var isObserver) && isObserver)
         {

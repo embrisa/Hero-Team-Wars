@@ -32,7 +32,7 @@ public static class OperationApplier
         // These are the metadata fields with a proven Phase 0/3 binary
         // representation. Other parsed fields remain read-only until their
         // serializer is proven.
-        "title", "suggested_players"
+        "title", "suggested_players", "map_flags"
     };
 
     public static JsonObject Apply(JsonNode canonical, JsonArray operations)
@@ -353,6 +353,10 @@ public static class OperationApplier
         {
             ValidateSuggestedPlayers(value);
         }
+        if (field == "map_flags")
+        {
+            _ = RequiredIntValue(value, "map_flags", 0, int.MaxValue);
+        }
 
         entry["value"] = value.DeepClone();
         entry["provenance"] = "intended_design";
@@ -544,26 +548,26 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_ARGUMENT", "set_player_slot requires an object value.");
         }
-        EnsureAllowed(update, "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "observer", "locked", "slot_status");
+        EnsureAllowed(update, "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "observer", "fixed_start_position", "slot_status");
         if (update["name"] is not null) RequireStringValue(update["name"]!, "name");
         if (update["controller"] is not null) RequireStringValue(update["controller"]!, "controller");
         if (update["race"] is not null) RequireStringValue(update["race"]!, "race");
         if (update["observer"] is not null) throw new EngineException("UNSUPPORTED_OPERATION", "war3map.w3i has no proven observer-slot representation.");
         if (update["slot_status"] is not null) throw new EngineException("UNSUPPORTED_OPERATION", "slot_status is derived from the native controller field and cannot be set directly.");
         if (update["flags"] is not null) _ = RequiredIntValue(update["flags"]!, "flags", 0, int.MaxValue);
-        if (update["locked"] is JsonValue lockedNode && !lockedNode.TryGetValue<bool>(out _)) throw new EngineException("INVALID_ARGUMENT", "Player locked must be a boolean.");
+        if (update["fixed_start_position"] is JsonValue fixedStartNode && !fixedStartNode.TryGetValue<bool>(out _)) throw new EngineException("INVALID_ARGUMENT", "Player fixed_start_position must be a boolean.");
         if (update["start"] is not null) ValidateStart(update["start"]!);
         foreach (var mask in new[] { "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask" })
         {
             if (update[mask] is not null) _ = RequiredIntValue(update[mask]!, mask, 0, int.MaxValue);
         }
-        if (update["locked"] is JsonValue locked && locked.TryGetValue<bool>(out var isLocked))
+        if (update["fixed_start_position"] is JsonValue fixedStart && fixedStart.TryGetValue<bool>(out var useFixedStart))
         {
             var currentFlags = RequiredIntValue(player["flags"] ?? JsonValue.Create(0), "flags", 0, int.MaxValue);
-            update["flags"] = isLocked ? currentFlags | 1 : currentFlags & ~1;
+            update["flags"] = useFixedStart ? currentFlags | 1 : currentFlags & ~1;
         }
 
-        foreach (var field in new[] { "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "locked" })
+        foreach (var field in new[] { "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "fixed_start_position" })
         {
             if (update[field] is not null)
             {
@@ -585,7 +589,7 @@ public static class OperationApplier
         var id = RequiredInt(target, "id", 1, 24);
         var players = RequiredArray(root, "players");
         if (players.OfType<JsonObject>().Any(item => IntValue(item["id"]) == id)) throw new EngineException("INVALID_ARGUMENT", $"Player {id} already exists.");
-        EnsureAllowed(player, "id", "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "observer", "locked", "slot_status");
+        EnsureAllowed(player, "id", "name", "controller", "race", "flags", "start", "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask", "observer", "fixed_start_position", "slot_status");
         if (player["observer"] is not null) throw new EngineException("UNSUPPORTED_OPERATION", "war3map.w3i has no proven observer-slot representation.");
         if (player["slot_status"] is not null) throw new EngineException("UNSUPPORTED_OPERATION", "slot_status is derived from the native controller field and cannot be set directly.");
         if (player["id"] is not null && RequiredIntValue(player["id"]!, "id", 1, 24) != id) throw new EngineException("INVALID_ARGUMENT", "Player target id and value id differ.");
@@ -596,7 +600,7 @@ public static class OperationApplier
         created["race"] = StringValue(created["race"]) ?? "Selectable";
         created["flags"] ??= 0;
         if (created["flags"] is not JsonValue flagsValue || !flagsValue.TryGetValue<int>(out var flags) || flags < 0) throw new EngineException("INVALID_ARGUMENT", "Player flags must be a non-negative integer.");
-        if (created["locked"] is JsonValue locked && locked.TryGetValue<bool>(out var isLocked)) created["flags"] = isLocked ? flags | 1 : flags & ~1;
+        if (created["fixed_start_position"] is JsonValue fixedStart && fixedStart.TryGetValue<bool>(out var useFixedStart)) created["flags"] = useFixedStart ? flags | 1 : flags & ~1;
         created["start"] = created["start"]?.DeepClone() ?? new JsonObject { ["x"] = 0, ["y"] = 0 };
         foreach (var mask in new[] { "ally_low_priority_mask", "ally_high_priority_mask", "enemy_low_priority_mask", "enemy_high_priority_mask" }) created[mask] ??= 0;
         ValidateStart(created["start"]!);
@@ -1685,7 +1689,7 @@ public static class OperationApplier
     {
         var flags = IntValue(player["flags"]);
         player["observer"] = null;
-        player["locked"] = flags != int.MinValue && (flags & 1) != 0;
+        player["fixed_start_position"] = flags != int.MinValue && (flags & 1) != 0;
         player["slot_status"] = StringValue(player["controller"]) switch
         {
             "None" => "closed",

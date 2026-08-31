@@ -195,9 +195,9 @@ public static class ValidationPipeline
             sourceMetadata.TryGetValue(field, out var before);
             stagedMetadata.TryGetValue(field, out var after);
             if (JsonUtilities.Equal(before, after)) continue;
-            if (field is not ("title" or "suggested_players"))
+            if (field is not ("title" or "suggested_players" or "map_flags"))
             {
-                Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "metadata", field, "This metadata field has no proven serializer in the Phase 3 writer.", "Use only title or suggested_players until a round-trip serializer is promoted.");
+                Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "metadata", field, "This metadata field has no proven serializer in the Phase 3 writer.", "Use only title, suggested_players, or map_flags until another round-trip serializer is promoted.");
             }
         }
 
@@ -448,6 +448,11 @@ public static class ValidationPipeline
             {
                 Add(findings, "error", "SUGGESTED_PLAYERS_INVALID", "metadata", field, "Suggested players must be a non-empty string or an integer from 1 through 24.", "Set a valid suggested-player value through the typed metadata operation.");
             }
+
+            if (field == "map_flags" && IntegerValue(entry["value"]) is not >= 0)
+            {
+                Add(findings, "error", "MAP_FLAGS_INVALID", "metadata", field, "Map flags must be a non-negative integer.", "Set the native map flags value through the typed metadata operation.");
+            }
         }
     }
 
@@ -519,7 +524,7 @@ public static class ValidationPipeline
             {
                 if (IntegerValue(player[mask]) is < 0) Add(findings, "error", "PLAYER_MASK_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), $"Player {mask} must be a non-negative integer.", "Use a 32-bit player mask.");
             }
-            if (!IsNullOrBoolean(player["locked"])) Add(findings, "error", "PLAYER_LOCKED_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), "Player locked must be a boolean when present.", "Use the derived locked value from the map-info codec.");
+            if (!IsNullOrBoolean(player["fixed_start_position"])) Add(findings, "error", "PLAYER_FIXED_START_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), "Player fixed_start_position must be a boolean when present.", "Use the derived fixed_start_position value from the map-info codec.");
             if (!IsNullOrBoolean(player["observer"])) Add(findings, "error", "PLAYER_OBSERVER_INVALID", "players", id?.ToString(CultureInfo.InvariantCulture), "Player observer must be null or a boolean.", "Keep observer null until a native observer representation is proven.");
 
             foreach (var field in new[] { "controller", "race" })
@@ -1129,7 +1134,7 @@ public static class ValidationPipeline
         {
             foreach (var field in player.Select(item => item.Key))
             {
-                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "observer" or "locked" or "slot_status" or "codec_version" or "provenance" or "capability")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "players", IntegerValue(player["id"])?.ToString(CultureInfo.InvariantCulture), $"Player field '{field}' has no proven typed serializer.", "Use only fields supported by the map-info codec.");
+                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "observer" or "fixed_start_position" or "slot_status" or "codec_version" or "provenance" or "capability")) Add(findings, "error", "BUILD_COMPONENT_UNSUPPORTED", "players", IntegerValue(player["id"])?.ToString(CultureInfo.InvariantCulture), $"Player field '{field}' has no proven typed serializer.", "Use only fields supported by the map-info codec.");
             }
         }
     }

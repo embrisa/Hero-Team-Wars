@@ -5,6 +5,7 @@ using Wc3MapEngine.Core.Build;
 using Wc3MapEngine.Core.Scripts;
 using War3Net.Build;
 using War3Net.Build.Extensions;
+using War3Net.Build.Info;
 using War3Net.IO.Mpq;
 
 namespace Wc3MapEngine.Core;
@@ -177,14 +178,16 @@ public static class MapBuilder
         var stagedMetadata = Metadata(staged);
         var titleChanged = !JsonUtilities.Equal(sourceMetadata["title"], stagedMetadata["title"]);
         var suggestedChanged = !JsonUtilities.Equal(sourceMetadata["suggested_players"], stagedMetadata["suggested_players"]);
+        var mapFlagsChanged = !JsonUtilities.Equal(sourceMetadata["map_flags"], stagedMetadata["map_flags"]);
         var playersChanged = !JsonUtilities.Equal(source["players"], staged["players"]);
         var forcesChanged = !JsonUtilities.Equal(source["forces"], staged["forces"]);
-        if (!titleChanged && !suggestedChanged && !playersChanged && !forcesChanged) return;
+        if (!titleChanged && !suggestedChanged && !mapFlagsChanged && !playersChanged && !forcesChanged) return;
 
         var current = ReadMap(sourcePath, MapFiles.Info);
         if (current.Info is null) throw new EngineException("BUILD_UNSUPPORTED", "Map metadata could not be parsed for serialization.");
         if (titleChanged) current.Info.MapName = GetValueString(stagedMetadata["title"], "title");
         if (suggestedChanged) current.Info.RecommendedPlayers = GetValueString(stagedMetadata["suggested_players"], "suggested_players");
+        if (mapFlagsChanged) current.Info.MapFlags = (MapFlags)GetIntValue(stagedMetadata["map_flags"], "map_flags");
         if (playersChanged || forcesChanged)
         {
             MapComponentCodec.BuildInfo(
@@ -323,6 +326,12 @@ public static class MapBuilder
         JsonValue value when value.TryGetValue<int>(out var integer) => integer.ToString(CultureInfo.InvariantCulture),
         _ => throw new EngineException("INVALID_ARGUMENT", $"Metadata field '{field}' must be a non-empty string or integer.")
     };
+
+    private static int GetIntValue(JsonNode? node, string field)
+    {
+        if (node is JsonValue value && value.TryGetValue<int>(out var integer) && integer >= 0) return integer;
+        throw new EngineException("INVALID_ARGUMENT", $"Metadata field '{field}' must be a non-negative integer.");
+    }
 
     private static void TryDelete(string path)
     {

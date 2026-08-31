@@ -16,7 +16,7 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
             metadata.TryGetValue(field, out var before);
             stagedMetadata.TryGetValue(field, out var after);
             if (JsonUtilities.Equal(before, after)) continue;
-            if (field is not ("title" or "suggested_players"))
+            if (field is not ("title" or "suggested_players" or "map_flags"))
             {
                 throw new EngineException("BUILD_UNSUPPORTED", $"Metadata field '{field}' has no proven Phase 3 serializer.");
             }
@@ -202,7 +202,7 @@ public sealed record BuildPlan(IReadOnlySet<string> ReplacementMembers, JsonArra
         {
             foreach (var field in player.Select(item => item.Key))
             {
-                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "observer" or "locked" or "slot_status" or "codec_version" or "provenance" or "capability"))
+                if (field is not ("id" or "name" or "stored_name" or "controller" or "race" or "flags" or "start" or "ally_low_priority_mask" or "ally_high_priority_mask" or "enemy_low_priority_mask" or "enemy_high_priority_mask" or "observer" or "fixed_start_position" or "slot_status" or "codec_version" or "provenance" or "capability"))
                 {
                     throw new EngineException("BUILD_UNSUPPORTED", $"Player field '{field}' has no proven typed serializer.");
                 }

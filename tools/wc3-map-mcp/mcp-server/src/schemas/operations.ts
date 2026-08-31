@@ -127,7 +127,7 @@ const playerSlotSchema = z.object({
   race: z.enum(["Human", "Orc", "NightElf", "Undead", "Random", "Selectable"]), flags: z.number().int().nonnegative(), start: playerStartSchema,
   ally_low_priority_mask: z.number().int().nonnegative(), ally_high_priority_mask: z.number().int().nonnegative(),
   enemy_low_priority_mask: z.number().int().nonnegative(), enemy_high_priority_mask: z.number().int().nonnegative(),
-  observer: z.boolean().nullable().optional(), locked: z.boolean().optional(), slot_status: z.string().optional()
+  observer: z.boolean().nullable().optional(), fixed_start_position: z.boolean().optional(), slot_status: z.string().optional()
 }).strict();
 const playerSlotUpdateSchema = playerSlotSchema.partial().omit({ id: true }).refine(value => Object.keys(value).length > 0, "Player slot update requires at least one field.");
 const forceIndex = z.number().int().min(0).max(23);

@@ -144,7 +144,7 @@ public sealed class Phase5dPlayersTeamsForcesTests
         };
         var createdPlayer = player.DeepClone()!.AsObject();
         createdPlayer["observer"] = null;
-        createdPlayer["locked"] = true;
+        createdPlayer["fixed_start_position"] = true;
         createdPlayer["slot_status"] = "active";
         createdPlayer["provenance"] = "intended_design";
         createdPlayer["capability"] = "typed_write_enabled";
@@ -177,7 +177,7 @@ public sealed class Phase5dPlayersTeamsForcesTests
         membersChangedTeam["member_player_ids"] = new JsonArray(5);
         var unlockedPlayer = createdPlayer.DeepClone()!.AsObject();
         unlockedPlayer["flags"] = 0;
-        unlockedPlayer["locked"] = false;
+        unlockedPlayer["fixed_start_position"] = false;
         var sharedControlForce = createdForce.DeepClone()!.AsObject();
         sharedControlForce["flags"] = 25;
         sharedControlForce["shared_unit_control"] = true;
@@ -186,7 +186,7 @@ public sealed class Phase5dPlayersTeamsForcesTests
             Operation("create_player_slot", new JsonObject { ["id"] = 5 }, null, player),
             Operation("create_force", new JsonObject { ["index"] = 2 }, null, force),
             Operation("create_team", new JsonObject { ["id"] = "team_3" }, null, team),
-            Operation("set_player_slot", new JsonObject { ["id"] = 5 }, createdPlayer, new JsonObject { ["locked"] = false }),
+            Operation("set_player_slot", new JsonObject { ["id"] = 5 }, createdPlayer, new JsonObject { ["fixed_start_position"] = false }),
             Operation("set_force", new JsonObject { ["index"] = 2 }, createdForce, new JsonObject { ["shared_unit_control"] = true }),
             Operation("set_team_arena", new JsonObject { ["id"] = "team_3" }, createdTeam, new JsonObject { ["arena_id"] = "arena_3_alt" }),
             Operation("set_team_members", new JsonObject { ["id"] = "team_3" }, arenaChangedTeam, new JsonObject { ["member_player_ids"] = new JsonArray(5) }),

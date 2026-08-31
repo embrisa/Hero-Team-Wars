@@ -122,7 +122,7 @@
         "start": { "type": "object", "required": ["x", "y"], "properties": { "x": { "type": "number" }, "y": { "type": "number" } }, "additionalProperties": false },
         "ally_low_priority_mask": { "type": "integer", "minimum": 0 }, "ally_high_priority_mask": { "type": "integer", "minimum": 0 },
         "enemy_low_priority_mask": { "type": "integer", "minimum": 0 }, "enemy_high_priority_mask": { "type": "integer", "minimum": 0 },
-        "observer": { "type": ["boolean", "null"] }, "locked": { "type": "boolean" }, "slot_status": { "type": "string" }, "codec_version": { "type": "string" },
+        "observer": { "type": ["boolean", "null"] }, "fixed_start_position": { "type": "boolean" }, "slot_status": { "type": "string" }, "codec_version": { "type": "string" },
         "provenance": { "$ref": "#/$defs/provenance" },
         "capability": { "$ref": "#/$defs/capability_name" }
       },
