@@ -75,7 +75,7 @@ It must not expose a tool simply because another profile supports it.
 
 Captured 2026-08-31 in the working tree:
 
-- 67 .NET engine tests pass, including cross-feature dependency ordering,
+- 68 .NET engine tests pass, including cross-feature dependency ordering,
   native-catalogue rejection, waygate reference protection, special-doodad
   preservation, MVP invariants, and the static six-team scenario harness.
 - 43 MCP server tests pass, including MCP-wire capability reporting, the

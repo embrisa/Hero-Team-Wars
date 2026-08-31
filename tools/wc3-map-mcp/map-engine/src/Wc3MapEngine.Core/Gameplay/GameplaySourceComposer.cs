@@ -15,10 +15,16 @@ namespace Wc3MapEngine.Core.Gameplay;
 /// </summary>
 public static class GameplaySourceComposer
 {
-    public const string ComposerVersion = "mcp-jass-composer-2.0";
+    public const string ComposerVersion = "mcp-jass-composer-2.1";
     private const int MaxManifestBytes = 2 * 1024 * 1024;
     private const int MaxModuleBytes = 2 * 1024 * 1024;
     private static readonly Regex Function = new("(?im)^\\s*function\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+takes\\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex FunctionBlock = new(
+        "^[ \\t]*function[ \\t]+(?<name>[A-Za-z_][A-Za-z0-9_]*)[ \\t]+takes\\b.*?^[ \\t]*endfunction[ \\t]*(?:\\r?\\n|$)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+    private static readonly Regex FunctionReference = new(
+        "\\bfunction[ \\t]+(?<callback>[A-Za-z_][A-Za-z0-9_]*)\\b|(?<![A-Za-z0-9_])(?<call>[A-Za-z_][A-Za-z0-9_]*)[ \\t]*\\(",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static JsonObject Compose(string manifestPath, string? requestedProfile = null)
     {
@@ -108,7 +114,9 @@ public static class GameplaySourceComposer
         }
 
         var regionBindings = BuildRegionBindings(regions);
-        var source = ComposeSource(profile, modules, variables, triggers, handlers, regions, regionBindings, teams);
+        var orderedFunctions = OrderFunctions(modules);
+        var source = ComposeSource(profile, orderedFunctions, variables, triggers, handlers, regions, regionBindings, teams);
+        ValidateFunctionDeclarationOrder(source);
         try { ScriptOwnership.ValidateMcpOwnedJass("war3map.j", source); }
         catch (InvalidDataException exception) { throw new EngineException("PARSE_FAILED", exception.Message, false, exception); }
 
@@ -147,6 +155,12 @@ public static class GameplaySourceComposer
             ["teams"] = teams.DeepClone(),
             ["team_registry"] = teamRegistry.DeepClone(),
             ["module_order"] = new JsonArray(modules.Select(x => (JsonNode?)JsonValue.Create(GameplayModelValidator.RequiredString(x, "id"))).ToArray()),
+            ["function_order"] = new JsonArray(orderedFunctions.Select(x => (JsonNode?)new JsonObject
+            {
+                ["name"] = x.Name,
+                ["module_id"] = x.ModuleId,
+                ["path"] = x.ModulePath
+            }).ToArray()),
             ["symbols"] = new JsonArray(symbols.Select(x => (JsonNode?)x.DeepClone()).ToArray())
         };
         return new JsonObject
@@ -170,13 +184,14 @@ public static class GameplaySourceComposer
             ["team_registry"] = teamRegistry.DeepClone(),
             ["region_handles"] = new JsonObject(regionBindings.Keys.OrderBy(x => x, StringComparer.Ordinal).ToDictionary(id => id, id => (JsonNode?)RegionHandle(id))),
             ["symbols"] = new JsonArray(symbols.Select(x => (JsonNode?)x.DeepClone()).ToArray()),
+            ["function_order"] = sourceManifest["function_order"]!.DeepClone(),
             ["trigger_manifest_sha256"] = GameplayModelValidator.Hash(triggerManifest),
             ["variable_manifest_sha256"] = GameplayModelValidator.Hash(variableManifest),
             ["function_count"] = Function.Matches(source).Count,
             ["main_count"] = Regex.Matches(source, "(?im)^\\s*function\\s+main\\s+takes\\s+nothing\\s+returns\\s+nothing\\b").Count,
             ["source_bytes"] = Encoding.UTF8.GetByteCount(source),
             ["source_sha256"] = Hashing.Sha256(Encoding.UTF8.GetBytes(source)),
-            ["static_validation"] = new JsonObject { ["status"] = "passed", ["evidence_level"] = "static_only", ["validation_scope"] = "syntax_symbols_and_native_catalogue", ["parser"] = "War3Net.CodeAnalysis.Jass", ["native_catalogue_version"] = JassNativeCatalogue.Version, ["runtime_verified"] = false },
+            ["static_validation"] = new JsonObject { ["status"] = "passed", ["evidence_level"] = "static_only", ["validation_scope"] = "syntax_symbols_native_catalogue_and_declaration_order", ["parser"] = "War3Net.CodeAnalysis.Jass", ["native_catalogue_version"] = JassNativeCatalogue.Version, ["runtime_verified"] = false },
             ["source_manifest"] = sourceManifest,
             ["canonical_model"] = new JsonObject
             {
@@ -404,7 +419,97 @@ public static class GameplaySourceComposer
         return output;
     }
 
-    private static string ComposeSource(string profile, IReadOnlyList<JsonObject> modules, IReadOnlyList<JsonObject> variables, IReadOnlyList<JsonObject> triggers, IReadOnlyDictionary<string, string> handlers, IReadOnlyList<JsonObject> regions, IReadOnlyDictionary<string, JsonObject> regionBindings, JsonArray teams)
+    private static List<ComposedFunction> OrderFunctions(IReadOnlyList<JsonObject> modules)
+    {
+        var functions = new List<ComposedFunction>();
+        foreach (var module in modules)
+        {
+            var moduleId = GameplayModelValidator.RequiredString(module, "id");
+            var modulePath = StringValue(module, "path") ?? "<inline>";
+            var moduleSource = GameplayModelValidator.RequiredString(module, "source");
+            var matches = FunctionBlock.Matches(moduleSource);
+            if (matches.Count == 0) throw new EngineException("INVALID_ARGUMENT", $"Gameplay module '{moduleId}' contains no complete JASS function blocks.");
+            foreach (Match match in matches)
+            {
+                functions.Add(new ComposedFunction(
+                    match.Groups["name"].Value,
+                    moduleId,
+                    modulePath,
+                    match.Value.Trim()));
+            }
+        }
+
+        var byName = functions.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+        var originalIndex = functions.Select((function, index) => (function.Name, index)).ToDictionary(x => x.Name, x => x.index, StringComparer.OrdinalIgnoreCase);
+        var dependencies = functions.ToDictionary(x => x.Name, _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        var dependents = functions.ToDictionary(x => x.Name, _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        foreach (var function in functions)
+        {
+            var code = Regex.Replace(function.Source, "(?m)^[ \\t]*//.*$", string.Empty);
+            foreach (Match reference in FunctionReference.Matches(code))
+            {
+                var dependency = reference.Groups["callback"].Success
+                    ? reference.Groups["callback"].Value
+                    : reference.Groups["call"].Value;
+                if (!byName.ContainsKey(dependency) || string.Equals(dependency, function.Name, StringComparison.OrdinalIgnoreCase)) continue;
+                if (dependencies[function.Name].Add(dependency)) dependents[dependency].Add(function.Name);
+            }
+        }
+
+        var indegree = dependencies.ToDictionary(x => x.Key, x => x.Value.Count, StringComparer.OrdinalIgnoreCase);
+        var ready = new SortedSet<int>();
+        foreach (var function in functions.Where(x => indegree[x.Name] == 0)) ready.Add(originalIndex[function.Name]);
+
+        var ordered = new List<ComposedFunction>(functions.Count);
+        while (ready.Count > 0)
+        {
+            var index = ready.Min;
+            ready.Remove(index);
+            var function = functions[index];
+            ordered.Add(function);
+            foreach (var dependent in dependents[function.Name].OrderBy(name => originalIndex[name]))
+            {
+                indegree[dependent]--;
+                if (indegree[dependent] == 0) ready.Add(originalIndex[dependent]);
+            }
+        }
+
+        if (ordered.Count != functions.Count)
+        {
+            var cycle = functions.Where(function => indegree[function.Name] > 0).Select(function => function.Name);
+            throw new EngineException("INVALID_ARGUMENT", $"Gameplay JASS function dependency cycle includes: {string.Join(", ", cycle)}.");
+        }
+
+        return ordered;
+    }
+
+    private static void ValidateFunctionDeclarationOrder(string source)
+    {
+        var lines = source.Split('\n');
+        var declarations = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var match = Function.Match(lines[index]);
+            if (match.Success) declarations[match.Groups["name"].Value] = index + 1;
+        }
+
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var code = Regex.Replace(lines[index], "//.*$", string.Empty);
+            foreach (Match reference in FunctionReference.Matches(code))
+            {
+                var name = reference.Groups["callback"].Success
+                    ? reference.Groups["callback"].Value
+                    : reference.Groups["call"].Value;
+                if (declarations.TryGetValue(name, out var declarationLine) && index + 1 < declarationLine)
+                {
+                    throw new EngineException("INVALID_ARGUMENT", $"Generated JASS uses function '{name}' on line {index + 1} before its declaration on line {declarationLine}.");
+                }
+            }
+        }
+    }
+
+    private static string ComposeSource(string profile, IReadOnlyList<ComposedFunction> functions, IReadOnlyList<JsonObject> variables, IReadOnlyList<JsonObject> triggers, IReadOnlyDictionary<string, string> handlers, IReadOnlyList<JsonObject> regions, IReadOnlyDictionary<string, JsonObject> regionBindings, JsonArray teams)
     {
         var builder = new StringBuilder();
         builder.AppendLine("// Generated by wc3-map-mcp; do not edit in World Editor.");
@@ -497,10 +602,10 @@ public static class GameplaySourceComposer
         }
         builder.AppendLine("endfunction");
         builder.AppendLine();
-        foreach (var module in modules)
+        foreach (var function in functions)
         {
-            builder.AppendLine($"// MCP module: {GameplayModelValidator.RequiredString(module, "id")} ({StringValue(module, "path") ?? "<inline>"})");
-            builder.AppendLine(GameplayModelValidator.RequiredString(module, "source").TrimEnd());
+            builder.AppendLine($"// MCP function: {function.Name} (module: {function.ModuleId}; {function.ModulePath})");
+            builder.AppendLine(function.Source);
             builder.AppendLine();
         }
         builder.AppendLine("function HTW_MCP_InitializeVariables takes nothing returns nothing");
@@ -699,4 +804,6 @@ public static class GameplaySourceComposer
         return Path.GetFullPath(Path.Combine(root, relative));
     }
     private static string NormalizeSource(string source) => source.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd() + "\n";
+
+    private sealed record ComposedFunction(string Name, string ModuleId, string ModulePath, string Source);
 }

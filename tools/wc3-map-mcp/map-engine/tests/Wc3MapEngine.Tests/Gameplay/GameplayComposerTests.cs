@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
 using Wc3MapEngine.Core;
 using Wc3MapEngine.Core.Gameplay;
@@ -20,6 +21,42 @@ public sealed class GameplayComposerTests
         Assert.Equal("static_only", first["static_validation"]!["evidence_level"]!.GetValue<string>());
         Assert.Equal(1, first["main_count"]!.GetValue<int>());
         Assert.Equal(25, first["module_order"]!.AsArray().Count);
+    }
+
+    [Fact]
+    public void ComposerOrdersEveryMcpFunctionBeforeItsUses()
+    {
+        var composed = GameplaySourceComposer.Compose(FindManifest());
+        var source = composed["source"]!.GetValue<string>();
+        var lines = source.Split('\n');
+        var declarations = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var declaration = Regex.Match(lines[index], @"^\s*function\s+(HTW_[A-Za-z0-9_]+)\s+takes\b", RegexOptions.IgnoreCase);
+            if (declaration.Success) declarations[declaration.Groups[1].Value] = index + 1;
+        }
+
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var code = Regex.Replace(lines[index], "//.*$", string.Empty);
+            foreach (Match reference in Regex.Matches(code, @"\bfunction\s+(?<callback>[A-Za-z_][A-Za-z0-9_]*)\b|(?<![A-Za-z0-9_])(?<call>[A-Za-z_][A-Za-z0-9_]*)\s*\(", RegexOptions.IgnoreCase))
+            {
+                var name = reference.Groups["callback"].Success ? reference.Groups["callback"].Value : reference.Groups["call"].Value;
+                if (declarations.TryGetValue(name, out var declarationLine))
+                {
+                    Assert.True(declarationLine <= index + 1, $"{name} is used on line {index + 1} before its declaration on line {declarationLine}.");
+                }
+            }
+        }
+
+        var functionOrder = composed["function_order"]!.AsArray().OfType<JsonObject>().Select(item => item["name"]!.GetValue<string>()).ToArray();
+        Assert.Equal(functionOrder.Length, functionOrder.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        for (var index = 1; index < functionOrder.Length; index++)
+        {
+            Assert.True(
+                declarations[functionOrder[index - 1]] < declarations[functionOrder[index]],
+                $"function_order is not reflected in emitted source at '{functionOrder[index - 1]}' -> '{functionOrder[index]}'.");
+        }
     }
 
     [Fact]
