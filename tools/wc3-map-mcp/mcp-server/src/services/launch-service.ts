@@ -76,7 +76,10 @@ export class LaunchService {
     const sessionId = this.idFactory();
     assertUuid(sessionId, "Session ID");
     const buildPath = buildPathFor(loaded.project, loaded.manifest);
-    const argumentsArray = ["-loadfile", buildPath];
+    // Reforged's retail editor exits back to Battle.net unless it receives the
+    // explicit offline handoff flag. Keep the map path as a separate argument
+    // so the native process boundary never needs a shell command string.
+    const argumentsArray = ["-launch", "-loadfile", buildPath];
     const started = this.runner.start({ executable: executable.path, arguments: argumentsArray, working_directory: dirname(executable.path) });
     const session = this.createSession(loaded.project, loaded.manifest, sessionId, correlationId, executable, argumentsArray, started, "editor", buildPath);
     return this.persistSession(session);
@@ -286,7 +289,10 @@ function verifySessionReferences(project: ResolvedProject, session: TestSession,
   const buildPath = buildPathFor(project, manifest);
   if (session.build_path !== relativeProjectPath(project, buildPath)) throw new AppError("SOURCE_CHANGED", "The test session build path does not match the build manifest.");
   const expectedLoadPath = session.target === "editor" ? buildPath : session.test_copy_path;
-  if (session.arguments.length !== 2 || session.arguments[0] !== "-loadfile" || session.arguments[1] !== expectedLoadPath) {
+  const expectedArguments = session.target === "editor"
+    ? ["-launch", "-loadfile", expectedLoadPath]
+    : ["-loadfile", expectedLoadPath];
+  if (session.arguments.length !== expectedArguments.length || session.arguments.some((argument, index) => argument !== expectedArguments[index])) {
     throw new AppError("INTERNAL_ERROR", "The test session argument array does not match its target and exact build path.");
   }
   if (session.target === "game") {

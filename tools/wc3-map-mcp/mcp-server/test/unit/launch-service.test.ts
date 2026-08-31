@@ -34,7 +34,7 @@ describe("LaunchService", () => {
     const request = runner.start.mock.calls[0]?.[0] as ProcessStartRequest;
 
     expect(request.executable).toBe(fixture.editorPath);
-    expect(request.arguments).toEqual(["-loadfile", fixture.buildPath]);
+    expect(request.arguments).toEqual(["-launch", "-loadfile", fixture.buildPath]);
     expect(request.arguments).not.toContain("--");
     expect(session).toEqual(expect.objectContaining({
       session_id: editorSessionId,

@@ -33,7 +33,7 @@ Record session UUID, project/transaction/revision/build/hash, target, executable
 
 ### `wc3_launch_editor`
 
-Verify editor path/version and build manifest/hash; create session; launch `World Editor.exe` using the Phase 0-proven argument array such as `-loadfile <map>`; avoid shell command strings; record PID/start; return only `process_started`. A later observation upgrades to `editor_opened`.
+Verify editor path/version and build manifest/hash; create session; launch `World Editor.exe` using the retail Reforged argument array `-launch -loadfile <map>`; avoid shell command strings; record PID/start; return only `process_started`. A later observation upgrades to `editor_opened`.
 
 ### `wc3_launch_test_map`
 

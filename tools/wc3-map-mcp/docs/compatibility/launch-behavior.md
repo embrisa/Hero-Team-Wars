@@ -9,8 +9,12 @@ The launch service accepts only a build loaded through `BuildService`. Loading a
 World Editor is started with this exact argument array:
 
 ```text
-["-loadfile", "<absolute-build-path>"]
+["-launch", "-loadfile", "<absolute-build-path>"]
 ```
+
+The retail Reforged editor requires `-launch` when started outside the Battle.net
+editor button; without it, `World Editor.exe` can hand focus back to Battle.net
+and exit cleanly without opening a window.
 
 Warcraft III is started with a unique MCP-owned copy under the configured `test_map_root`:
 
