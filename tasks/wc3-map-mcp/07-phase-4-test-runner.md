@@ -37,7 +37,7 @@ Verify editor path/version and build manifest/hash; create session; launch `Worl
 
 ### `wc3_launch_test_map`
 
-Verify build and test root, copy to unique test name when required, verify copy hash, launch game with tested argument array, and return `process_started`. Initial existing-process policy is `fail_if_running`; do not terminate anything.
+Verify build and test root, copy to unique test name when required, verify copy hash, launch the retail Reforged game with `-launch -loadfile <test-copy>`, and return `process_started`. Initial existing-process policy is `fail_if_running`; do not terminate anything.
 
 ### `wc3_record_test_result`
 

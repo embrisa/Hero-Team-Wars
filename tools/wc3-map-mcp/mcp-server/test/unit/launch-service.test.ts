@@ -73,7 +73,7 @@ describe("LaunchService", () => {
     const request = runner.start.mock.calls[0]?.[0] as ProcessStartRequest;
     const copyPath = session.test_copy_path as string;
 
-    expect(request.arguments).toEqual(["-loadfile", copyPath]);
+    expect(request.arguments).toEqual(["-launch", "-loadfile", copyPath]);
     expect(copyPath.startsWith(fixture.testMapRoot)).toBe(true);
     expect(existsSync(copyPath)).toBe(true);
     expect(session.test_copy_sha256).toBe(fixture.hash);

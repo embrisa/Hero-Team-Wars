@@ -19,8 +19,12 @@ and exit cleanly without opening a window.
 Warcraft III is started with a unique MCP-owned copy under the configured `test_map_root`:
 
 ```text
-["-loadfile", "<absolute-test-copy-path>"]
+["-launch", "-loadfile", "<absolute-test-copy-path>"]
 ```
+
+The `-launch` flag is required for direct retail Reforged game startup outside
+the Battle.net Play button; the MCP still keeps the test copy unique and
+hash-linked before starting it.
 
 The process runner uses the native executable-plus-argument-array API with `shell: false`, detached standard handles, and a visible application window. It has no terminate operation. The initial process policy is `fail_if_running`; the Windows adapter checks the target image with `tasklist.exe` and returns a conflict when an instance is already present. If process-state inspection fails, launch is refused rather than risking a duplicate.
 

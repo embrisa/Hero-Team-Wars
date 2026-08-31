@@ -96,7 +96,10 @@ export class LaunchService {
     const buildPath = buildPathFor(loaded.project, loaded.manifest);
     const copyPath = this.paths.testCopyPath(testRoot, loaded.manifest.build_id, sessionId, extname(buildPath).toLowerCase());
     const copyHash = copyBuildForTest(loaded.manifest.output_sha256, buildPath, copyPath);
-    const argumentsArray = ["-loadfile", copyPath];
+    // Retail Reforged uses the same explicit offline handoff for the game as
+    // it does for World Editor. Keep the test copy as its own argument so the
+    // native process boundary quotes paths containing spaces correctly.
+    const argumentsArray = ["-launch", "-loadfile", copyPath];
     const started = this.runner.start({ executable: executable.path, arguments: argumentsArray, working_directory: dirname(executable.path) });
     const session = this.createSession(loaded.project, loaded.manifest, sessionId, correlationId, executable, argumentsArray, started, "game", buildPath, copyPath, copyHash);
     return this.persistSession(session);
@@ -291,7 +294,7 @@ function verifySessionReferences(project: ResolvedProject, session: TestSession,
   const expectedLoadPath = session.target === "editor" ? buildPath : session.test_copy_path;
   const expectedArguments = session.target === "editor"
     ? ["-launch", "-loadfile", expectedLoadPath]
-    : ["-loadfile", expectedLoadPath];
+    : ["-launch", "-loadfile", expectedLoadPath];
   if (session.arguments.length !== expectedArguments.length || session.arguments.some((argument, index) => argument !== expectedArguments[index])) {
     throw new AppError("INTERNAL_ERROR", "The test session argument array does not match its target and exact build path.");
   }
