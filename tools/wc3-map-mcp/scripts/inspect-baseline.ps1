@@ -38,8 +38,8 @@ function Write-JsonAtomic([string] $Path, [object] $Value) {
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
     $temporary = "$Path.$([guid]::NewGuid().ToString()).tmp"
     try {
-        $Value | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $temporary -Encoding utf8NoBOM
-        Get-Content -LiteralPath $temporary -Raw | ConvertFrom-Json -Depth 100 | Out-Null
+        $Value | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $temporary -Encoding UTF8
+        Get-Content -LiteralPath $temporary -Raw | ConvertFrom-Json | Out-Null
         Move-Item -LiteralPath $temporary -Destination $Path -Force
     }
     finally {
@@ -67,7 +67,7 @@ function Invoke-Engine([hashtable] $Request) {
     if ($process.ExitCode -ne 0) { throw "Map engine failed ($($process.ExitCode)): $stderr" }
     $lines = @($stdout -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 })
     if ($lines.Count -ne 1) { throw "Map engine returned $($lines.Count) protocol lines. stderr: $stderr" }
-    $response = $lines[0] | ConvertFrom-Json -Depth 100
+    $response = $lines[0] | ConvertFrom-Json
     if ($response.ok -ne $true) {
         $errorText = $response.error | ConvertTo-Json -Depth 20 -Compress
         throw "Map engine operation '$($Request.operation)' failed: $errorText"
@@ -86,7 +86,7 @@ function Get-ToolEvidence([string] $Command, [string[]] $Arguments) {
 }
 
 $exampleConfigPath = Join-Path $mcpRoot "config/wc3-map-mcp.example.json"
-$exampleConfig = Get-Content -LiteralPath $exampleConfigPath -Raw | ConvertFrom-Json -Depth 20
+$exampleConfig = Get-Content -LiteralPath $exampleConfigPath -Raw | ConvertFrom-Json
 $heroTeamWarsConfig = $exampleConfig.projects.'hero-team-wars'
 $worldEditorPath = [string]$heroTeamWarsConfig.world_editor
 $warcraftPath = [string]$heroTeamWarsConfig.warcraft

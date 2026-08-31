@@ -43,7 +43,7 @@ function Invoke-Wc3Engine {
 
     $lines = @($stdout -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 })
     if ($lines.Count -ne 1) { throw "Map engine returned $($lines.Count) responses. stderr: $stderr" }
-    $response = $lines[0] | ConvertFrom-Json -Depth 100
+    $response = $lines[0] | ConvertFrom-Json
     if (-not $response.ok) { throw "$($response.error.code): $($response.error.message)" }
     return $response.result
 }
