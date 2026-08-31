@@ -1,5 +1,5 @@
 function Get-Wc3ProjectRoot {
-    return (Resolve-Path (Join-Path $PSScriptRoot "..\..\")).Path
+    return (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\")).Path
 }
 
 function Resolve-Wc3ProjectPath {
