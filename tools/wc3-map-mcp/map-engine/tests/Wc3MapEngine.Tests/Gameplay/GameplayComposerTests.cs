@@ -60,6 +60,22 @@ public sealed class GameplayComposerTests
     }
 
     [Fact]
+    public void ComposerRejectsMcpFunctionCallArityMismatch()
+    {
+        var composed = GameplaySourceComposer.Compose(FindManifest());
+        var canonical = composed["canonical_model"]!.AsObject().DeepClone()!.AsObject();
+        var heroes = canonical["gameplay_modules"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "systems.heroes");
+        heroes["source"] = heroes["source"]!.GetValue<string>().Replace("call HTW_Lives_AccountDeath()", "call HTW_Lives_AccountDeath(1)", StringComparison.Ordinal);
+        heroes["source_sha256"] = Hashing.Sha256(System.Text.Encoding.UTF8.GetBytes(heroes["source"]!.GetValue<string>()));
+
+        var exception = Assert.Throws<EngineException>(() => GameplaySourceComposer.ComposeCanonical(canonical));
+
+        Assert.Equal("INVALID_ARGUMENT", exception.Code);
+        Assert.Contains("HTW_Lives_AccountDeath", exception.Message);
+        Assert.Contains("takes 0", exception.Message);
+    }
+
+    [Fact]
     public void ComposerBindsStableRegionIdsToGeneratedRectHandles()
     {
         var composed = GameplaySourceComposer.Compose(FindManifest());

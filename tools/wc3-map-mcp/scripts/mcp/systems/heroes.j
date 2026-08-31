@@ -49,7 +49,7 @@ function HTW_Heroes_OnDeath takes nothing returns nothing
     local unit deadHero
     set deadHero = GetTriggerUnit()
     if HTW_Heroes_IsTracked(deadHero) then
-        call HTW_Lives_AccountDeath(deadHero)
+        call HTW_Lives_AccountDeath()
     endif
     set deadHero = null
 endfunction

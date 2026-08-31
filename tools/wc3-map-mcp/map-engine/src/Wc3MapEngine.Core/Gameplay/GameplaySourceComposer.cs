@@ -15,10 +15,13 @@ namespace Wc3MapEngine.Core.Gameplay;
 /// </summary>
 public static class GameplaySourceComposer
 {
-    public const string ComposerVersion = "mcp-jass-composer-2.1";
+    public const string ComposerVersion = "mcp-jass-composer-2.2";
     private const int MaxManifestBytes = 2 * 1024 * 1024;
     private const int MaxModuleBytes = 2 * 1024 * 1024;
     private static readonly Regex Function = new("(?im)^\\s*function\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+takes\\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex FunctionSignature = new(
+        "(?im)^\\s*function\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+takes\\s+(?<parameters>.*?)\\s+returns\\b",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex FunctionBlock = new(
         "^[ \\t]*function[ \\t]+(?<name>[A-Za-z_][A-Za-z0-9_]*)[ \\t]+takes\\b.*?^[ \\t]*endfunction[ \\t]*(?:\\r?\\n|$)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.CultureInvariant);
@@ -191,7 +194,7 @@ public static class GameplaySourceComposer
             ["main_count"] = Regex.Matches(source, "(?im)^\\s*function\\s+main\\s+takes\\s+nothing\\s+returns\\s+nothing\\b").Count,
             ["source_bytes"] = Encoding.UTF8.GetByteCount(source),
             ["source_sha256"] = Hashing.Sha256(Encoding.UTF8.GetBytes(source)),
-            ["static_validation"] = new JsonObject { ["status"] = "passed", ["evidence_level"] = "static_only", ["validation_scope"] = "syntax_symbols_native_catalogue_and_declaration_order", ["parser"] = "War3Net.CodeAnalysis.Jass", ["native_catalogue_version"] = JassNativeCatalogue.Version, ["runtime_verified"] = false },
+            ["static_validation"] = new JsonObject { ["status"] = "passed", ["evidence_level"] = "static_only", ["validation_scope"] = "syntax_symbols_native_catalogue_declaration_order_and_mcp_call_arity", ["parser"] = "War3Net.CodeAnalysis.Jass", ["native_catalogue_version"] = JassNativeCatalogue.Version, ["runtime_verified"] = false },
             ["source_manifest"] = sourceManifest,
             ["canonical_model"] = new JsonObject
             {
@@ -507,7 +510,96 @@ public static class GameplaySourceComposer
                 }
             }
         }
+
+        ValidateFunctionCallArity(source);
     }
+
+    private static void ValidateFunctionCallArity(string source)
+    {
+        // Function markers are comments and may contain parenthesized module
+        // metadata, so remove whole-line comments before scanning calls while
+        // preserving newlines for accurate diagnostics.
+        var code = Regex.Replace(source, "(?m)^[ \\t]*//[^\\r\\n]*", string.Empty);
+        var signatures = FunctionSignature.Matches(code)
+            .Cast<Match>()
+            .ToDictionary(
+                match => match.Groups["name"].Value,
+                match => ParameterCount(match.Groups["parameters"].Value),
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach (Match reference in FunctionReference.Matches(code))
+        {
+            if (!reference.Groups["call"].Success) continue;
+            var name = reference.Groups["call"].Value;
+            if (!signatures.TryGetValue(name, out var expected)) continue;
+
+            var openParen = reference.Index + reference.Length - 1;
+            var closeParen = FindMatchingParenthesis(code, openParen);
+            if (closeParen < 0) throw new EngineException("INVALID_ARGUMENT", $"Generated JASS has an unterminated call to function '{name}' on line {LineNumber(source, reference.Index)}.");
+
+            var actual = ArgumentCount(code.AsSpan(openParen + 1, closeParen - openParen - 1));
+            if (actual != expected)
+            {
+                throw new EngineException("INVALID_ARGUMENT", $"Generated JASS calls function '{name}' with {actual} argument(s) on line {LineNumber(source, reference.Index)}, but its declaration takes {expected}.");
+            }
+        }
+    }
+
+    private static int ParameterCount(string parameters)
+    {
+        var trimmed = parameters.Trim();
+        if (trimmed.Equals("nothing", StringComparison.OrdinalIgnoreCase)) return 0;
+        return trimmed.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length;
+    }
+
+    private static int ArgumentCount(ReadOnlySpan<char> arguments)
+    {
+        if (arguments.Trim().IsEmpty) return 0;
+
+        var count = 1;
+        var depth = 0;
+        var inString = false;
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            var character = arguments[index];
+            if (character == '"' && (index == 0 || arguments[index - 1] != '\\'))
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (inString) continue;
+            if (character == '(') depth++;
+            else if (character == ')' && depth > 0) depth--;
+            else if (character == ',' && depth == 0) count++;
+        }
+
+        return count;
+    }
+
+    private static int FindMatchingParenthesis(string source, int openParen)
+    {
+        var depth = 0;
+        var inString = false;
+        for (var index = openParen; index < source.Length; index++)
+        {
+            var character = source[index];
+            if (character == '"' && (index == 0 || source[index - 1] != '\\'))
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (inString) continue;
+            if (character == '(') depth++;
+            else if (character == ')' && --depth == 0) return index;
+        }
+
+        return -1;
+    }
+
+    private static int LineNumber(string source, int index)
+        => 1 + source[..index].Count(character => character == '\n');
 
     private static string ComposeSource(string profile, IReadOnlyList<ComposedFunction> functions, IReadOnlyList<JsonObject> variables, IReadOnlyList<JsonObject> triggers, IReadOnlyDictionary<string, string> handlers, IReadOnlyList<JsonObject> regions, IReadOnlyDictionary<string, JsonObject> regionBindings, JsonArray teams)
     {
