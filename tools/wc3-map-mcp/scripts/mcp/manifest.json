@@ -15,7 +15,7 @@
     { "id": "region:9", "name": "Camp_B_Player4", "min_x": 2176, "min_y": -480, "max_x": 3072, "max_y": -160, "creation_number": 9 }
   ],
   "modules": [
-    { "id": "main", "path": "main.j", "dependencies": ["config.tuning", "core.bootstrap", "core.state", "core.debug", "systems.phases", "systems.waves", "systems.routing", "systems.economy", "systems.sending", "systems.information", "content.base-waves", "content.send-units", "content.heroes", "content.items", "content.abilities", "tests.assertions", "tests.scenarios"] },
+    { "id": "main", "path": "main.j", "dependencies": ["config.tuning", "core.bootstrap", "core.state", "core.debug", "systems.phases", "systems.waves", "systems.routing", "systems.economy", "systems.sending", "systems.information", "systems.heroes", "systems.hero-selection", "content.base-waves", "content.send-units", "content.heroes", "content.items", "content.abilities", "tests.assertions", "tests.scenarios"] },
     { "id": "config.tuning", "path": "config/tuning.j" },
     { "id": "core.bootstrap", "path": "core/bootstrap.j", "dependencies": ["config.tuning", "config.teams", "config.regions", "config.objects"] },
     { "id": "core.state", "path": "core/state.j", "dependencies": ["config.tuning"] },
@@ -27,6 +27,7 @@
     { "id": "systems.phases", "path": "systems/phases.j", "dependencies": ["core.state"] },
     { "id": "systems.waves", "path": "systems/waves.j", "dependencies": ["systems.phases", "systems.routing", "content.base-waves"] },
     { "id": "systems.heroes", "path": "systems/heroes.j", "dependencies": ["core.state", "config.regions", "content.heroes"] },
+    { "id": "systems.hero-selection", "path": "systems/hero-selection.j", "dependencies": ["core.state", "core.debug", "config.regions", "config.teams", "systems.heroes", "systems.waves", "content.heroes"] },
     { "id": "systems.lives", "path": "systems/lives.j", "dependencies": ["systems.heroes"] },
     { "id": "systems.elimination", "path": "systems/elimination.j", "dependencies": ["systems.lives"] },
     { "id": "systems.economy", "path": "systems/economy.j", "dependencies": ["core.state"] },

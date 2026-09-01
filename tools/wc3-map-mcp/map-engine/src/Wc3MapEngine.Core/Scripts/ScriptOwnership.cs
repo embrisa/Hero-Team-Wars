@@ -89,6 +89,13 @@ public static class ScriptOwnership
             {
                 throw new InvalidDataException($"MCP-owned JASS source must declare exactly one main function; found {mainFunctions.Count}.");
             }
+
+            // Warcraft III 2.0.4 War3Log: "encountered undeclared identifier 'SetUnitStock'".
+            // common.j exposes AddUnitToStock/RemoveUnitFromStock, not SetUnitStock.
+            if (Regex.IsMatch(source, @"\bSetUnitStock\s*\(", RegexOptions.CultureInvariant))
+            {
+                throw new InvalidDataException("MCP-owned JASS source must not call SetUnitStock; Warcraft III cannot compile that identifier. Use AddUnitToStock/RemoveUnitFromStock.");
+            }
         }
         catch (InvalidDataException)
         {

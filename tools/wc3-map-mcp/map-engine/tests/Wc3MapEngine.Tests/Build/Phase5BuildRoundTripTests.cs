@@ -66,6 +66,56 @@ public sealed class Phase5BuildRoundTripTests
     }
 
     [Fact]
+    public void V8HeroObjectsRoundTripPaladinParentAndSoldUnitsList()
+    {
+        var source = FindSourceMap();
+        var model = MapInspector.Inspect(source);
+        var guardian = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hpal:H001", ["category"] = "unit", ["rawcode"] = "H001" }, null, new JsonObject
+        {
+            ["object_kind"] = "custom",
+            ["category"] = "unit",
+            ["base_rawcode"] = "Hpal",
+            ["custom_rawcode"] = "H001",
+            ["rawcode"] = "H001",
+            ["display_name"] = "HTW Guardian",
+            ["unknown_ids"] = new JsonArray(),
+            ["modifications"] = new JsonArray(new JsonObject { ["id"] = "unam", ["type"] = "String", ["value"] = "HTW Guardian" })
+        });
+        var altar = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:ntav:H0AL", ["category"] = "unit", ["rawcode"] = "H0AL" }, null, new JsonObject
+        {
+            ["object_kind"] = "custom",
+            ["category"] = "unit",
+            ["base_rawcode"] = "ntav",
+            ["custom_rawcode"] = "H0AL",
+            ["rawcode"] = "H0AL",
+            ["display_name"] = "HTW Hero Altar",
+            ["unknown_ids"] = new JsonArray(),
+            ["modifications"] = new JsonArray(
+                new JsonObject { ["id"] = "unam", ["type"] = "String", ["value"] = "HTW Hero Altar" },
+                new JsonObject { ["id"] = "useu", ["type"] = "String", ["value"] = "H001,H002,H003,H004" })
+        });
+        var staged = OperationApplier.Apply(model, new JsonArray(guardian, altar))["canonical_map"]!;
+        var directory = TempDirectory();
+        try
+        {
+            var canonical = Path.Combine(directory, "canonical.json");
+            var output = Path.Combine(directory, "v8-hero-objects.w3m");
+            JsonUtilities.WriteAtomic(canonical, staged);
+            var result = MapBuilder.Build(source, canonical, output, "debug");
+            Assert.True(result["reopened"]!.GetValue<bool>());
+            var encoded = System.Text.Encoding.ASCII.GetString(MapArchive.Read(output).Find("war3map.w3u")!.Bytes);
+            Assert.DoesNotContain("hpal", encoded);
+            Assert.Contains("Hpal", encoded);
+            Assert.Contains("H001,H002,H003,H004", encoded);
+            var definitions = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().ToArray();
+            Assert.Equal("Hpal", definitions.Single(item => item["rawcode"]!.GetValue<string>() == "H001")["base_rawcode"]!.GetValue<string>());
+            var sold = definitions.Single(item => item["rawcode"]!.GetValue<string>() == "H0AL")["modifications"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "useu");
+            Assert.Equal("H001,H002,H003,H004", sold["value"]!.GetValue<string>());
+        }
+        finally { DeleteTemp(directory); }
+    }
+
+    [Fact]
     public void TypedObjectModificationRoundTripsItsValue()
     {
         var source = FindSourceMap();

@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0",
+  "profile": "v8_custom_heroes",
+  "description": "Four basic custom heroes and one shared neutral Hero Altar. Custom heroes inherit stock models and baseline abilities; custom spells are intentionally deferred.",
+  "objects": [
+    {
+      "category": "unit",
+      "object_kind": "custom",
+      "base_rawcode": "Hpal",
+      "custom_rawcode": "H001",
+      "rawcode": "H001",
+      "display_name": "HTW Guardian",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        { "id": "unam", "type": "String", "value": "HTW Guardian" },
+        { "id": "utip", "type": "String", "value": "A durable frontline hero for the Hero Team Wars MVP." },
+        { "id": "ustr", "type": "Int", "value": 25 },
+        { "id": "uagi", "type": "Int", "value": 16 },
+        { "id": "uint", "type": "Int", "value": 14 },
+        { "id": "uhpm", "type": "Int", "value": 700 },
+        { "id": "ugol", "type": "Int", "value": 0 },
+        { "id": "ulum", "type": "Int", "value": 0 }
+      ],
+      "codec_version": "wc3-object-data-v1",
+      "provenance": "source_of_truth",
+      "capability": "mcp_native_object_data"
+    },
+    {
+      "category": "unit",
+      "object_kind": "custom",
+      "base_rawcode": "Hmkg",
+      "custom_rawcode": "H002",
+      "rawcode": "H002",
+      "display_name": "HTW Striker",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        { "id": "unam", "type": "String", "value": "HTW Striker" },
+        { "id": "utip", "type": "String", "value": "A quick melee damage hero for the Hero Team Wars MVP." },
+        { "id": "ustr", "type": "Int", "value": 18 },
+        { "id": "uagi", "type": "Int", "value": 25 },
+        { "id": "uint", "type": "Int", "value": 12 },
+        { "id": "uhpm", "type": "Int", "value": 560 },
+        { "id": "ugol", "type": "Int", "value": 0 },
+        { "id": "ulum", "type": "Int", "value": 0 }
+      ],
+      "codec_version": "wc3-object-data-v1",
+      "provenance": "source_of_truth",
+      "capability": "mcp_native_object_data"
+    },
+    {
+      "category": "unit",
+      "object_kind": "custom",
+      "base_rawcode": "Hamg",
+      "custom_rawcode": "H003",
+      "rawcode": "H003",
+      "display_name": "HTW Controller",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        { "id": "unam", "type": "String", "value": "HTW Controller" },
+        { "id": "utip", "type": "String", "value": "A high-intelligence control hero for the Hero Team Wars MVP." },
+        { "id": "ustr", "type": "Int", "value": 14 },
+        { "id": "uagi", "type": "Int", "value": 16 },
+        { "id": "uint", "type": "Int", "value": 25 },
+        { "id": "uhpm", "type": "Int", "value": 480 },
+        { "id": "ugol", "type": "Int", "value": 0 },
+        { "id": "ulum", "type": "Int", "value": 0 }
+      ],
+      "codec_version": "wc3-object-data-v1",
+      "provenance": "source_of_truth",
+      "capability": "mcp_native_object_data"
+    },
+    {
+      "category": "unit",
+      "object_kind": "custom",
+      "base_rawcode": "Hblm",
+      "custom_rawcode": "H004",
+      "rawcode": "H004",
+      "display_name": "HTW Support",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        { "id": "unam", "type": "String", "value": "HTW Support" },
+        { "id": "utip", "type": "String", "value": "A flexible support hero for the Hero Team Wars MVP." },
+        { "id": "ustr", "type": "Int", "value": 16 },
+        { "id": "uagi", "type": "Int", "value": 18 },
+        { "id": "uint", "type": "Int", "value": 23 },
+        { "id": "uhpm", "type": "Int", "value": 520 },
+        { "id": "ugol", "type": "Int", "value": 0 },
+        { "id": "ulum", "type": "Int", "value": 0 }
+      ],
+      "codec_version": "wc3-object-data-v1",
+      "provenance": "source_of_truth",
+      "capability": "mcp_native_object_data"
+    },
+    {
+      "category": "unit",
+      "object_kind": "custom",
+      "base_rawcode": "ntav",
+      "custom_rawcode": "H0AL",
+      "rawcode": "H0AL",
+      "display_name": "HTW Hero Altar",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        { "id": "unam", "type": "String", "value": "HTW Hero Altar" },
+        { "id": "utip", "type": "String", "value": "A shared altar where every player selects one hero." },
+        { "id": "useu", "type": "String", "value": "H001,H002,H003,H004" }
+      ],
+      "codec_version": "wc3-object-data-v1",
+      "provenance": "source_of_truth",
+      "capability": "mcp_native_object_data"
+    }
+  ]
+}

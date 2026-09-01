@@ -9,4 +9,5 @@ function HTW_Tuning_Load takes nothing returns nothing
     set HTW_CombatSeconds = 90
     set HTW_WaveReward = 50
     set HTW_InterestGold = 10
+    set HTW_HeroSelectionSeconds = 60
 endfunction

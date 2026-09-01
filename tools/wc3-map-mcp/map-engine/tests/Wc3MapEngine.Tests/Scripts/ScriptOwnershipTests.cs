@@ -28,6 +28,14 @@ public sealed class ScriptOwnershipTests
     }
 
     [Fact]
+    public void SetUnitStockIsRejectedBecauseWarcraftIIICannotCompileIt()
+    {
+        var exception = Assert.Throws<InvalidDataException>(() => ScriptOwnership.ValidateMcpOwnedJass("war3map.j", "function main takes nothing returns nothing\n    call SetUnitStock(null, 'H001', 1)\nendfunction\n"));
+        Assert.Contains("SetUnitStock", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("AddUnitToStock", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void InvalidJassSourceIsRejectedBeforeBuild()
     {
         var exception = Assert.Throws<InvalidDataException>(() => ScriptOwnership.ValidateMcpOwnedJass("war3map.j", "function main takes nothing returns nothing\n    call BJDebugMsg(\"missing endfunction\")\n"));

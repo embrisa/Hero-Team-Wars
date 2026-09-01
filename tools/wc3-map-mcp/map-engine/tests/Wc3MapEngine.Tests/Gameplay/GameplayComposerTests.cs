@@ -20,7 +20,10 @@ public sealed class GameplayComposerTests
         Assert.Equal(first["source"]!.GetValue<string>(), second["source"]!.GetValue<string>());
         Assert.Equal("static_only", first["static_validation"]!["evidence_level"]!.GetValue<string>());
         Assert.Equal(1, first["main_count"]!.GetValue<int>());
-        Assert.Equal(25, first["module_order"]!.AsArray().Count);
+        Assert.Equal(26, first["module_order"]!.AsArray().Count);
+        Assert.DoesNotContain("SetUnitStock", first["source"]!.GetValue<string>());
+        Assert.Contains("AddUnitToStock", first["source"]!.GetValue<string>());
+        Assert.Contains("RemoveUnitFromStock", first["source"]!.GetValue<string>());
     }
 
     [Fact]

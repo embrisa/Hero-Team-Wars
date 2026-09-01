@@ -9,14 +9,15 @@ function HTW_Heroes_Initialize takes nothing returns nothing
         set teamIndex = HTW_Teams_FindByPlayer(playerId)
         set x = GetRectCenterX(HTW_ArenaRect[teamIndex])
         set y = GetRectCenterY(HTW_ArenaRect[teamIndex])
-        set HTW_HeroUnitByPlayer[playerId] = HTW_Content_CreateHero(playerId, x + I2R(playerId * 64), y + I2R(playerId * 48))
-        set HTW_HeroAliveByPlayer[playerId] = true
+        // Hero units are selected at the shared altar before the first wave.
+        // Keep the existing War Camp placement unchanged for the MVP shell.
+        set HTW_HeroUnitByPlayer[playerId] = null
+        set HTW_HeroAliveByPlayer[playerId] = false
         set HTW_HeroDeathAccountedByPlayer[playerId] = false
-        set HTW_AliveHeroCount = HTW_AliveHeroCount + 1
         set HTW_WarCampByPlayer[playerId] = CreateUnit(Player(playerId - 1), 'hhou', x + I2R(playerId * 96), y - I2R(playerId * 48), 270.)
         set playerId = playerId + 1
     endloop
-    call HTW_Debug_LogText("heroes and personal War Camps initialized")
+    call HTW_Debug_LogText("personal War Camps initialized; awaiting shared hero altar selections")
 endfunction
 
 function HTW_Heroes_IsTracked takes unit hero returns boolean
