@@ -1,0 +1,29 @@
+{
+  "build_id": "27afbfd8-5b70-42c4-92e4-257a75638a2d",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\27afbfd8-5b70-42c4-92e4-257a75638a2d\\HeroTeamWars_v8-n0al-load-fix_27afbfd8-5b70-42c4-92e4-257a75638a2d.w3m",
+  "output_sha256": "B7653732ADABCAAA3EB8225D948C98E39F53DBDAE7A14706C88E5647EBA2BB93",
+  "output_size_bytes": 48685,
+  "engine_sha256": "B7653732ADABCAAA3EB8225D948C98E39F53DBDAE7A14706C88E5647EBA2BB93",
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "2356E45479423422E1B43E387F9DEF3646D94043B23843B72E2D5E6A8B2247A5",
+    "size_bytes": 46950,
+    "contains_setunitstock": false,
+    "contains_addunittostock": true,
+    "contains_removeunitfromstock": true
+  },
+  "objects": {
+    "h001_base": "Hpal",
+    "n0al_useu": [
+      "H001,H002,H003,H004"
+    ],
+    "w3u_sha256": "4F21BE155269904464D428F84B0E407FDAEEA0A4EEDD5E9F7BDD5C43F21B1F41",
+    "w3u_size_bytes": 967
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v8-n0al-load-fix-27afbfd8-5b70-42c4-92e4-257a75638a2d"
+}

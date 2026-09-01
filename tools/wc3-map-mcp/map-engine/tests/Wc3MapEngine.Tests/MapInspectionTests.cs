@@ -1,4 +1,5 @@
 using Wc3MapEngine.Core;
+using War3Net.IO.Mpq;
 using Xunit;
 
 namespace Wc3MapEngine.Tests;
@@ -167,6 +168,136 @@ public sealed class MapInspectionTests
         {
             if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
         }
+    }
+
+    [Fact]
+    public void ChangedMemberPreservesSourceEncodingAndRegeneratesAttributes()
+    {
+        var source = FindSourceMap();
+        var sourceArchive = MapArchive.Read(source);
+        var sourceScript = sourceArchive.Find("war3map.j");
+        Assert.NotNull(sourceScript);
+        var updatedScript = sourceScript!.Bytes.Concat(new byte[] { 0x0A }).ToArray();
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "wc3-map-mcp-tests", Guid.NewGuid().ToString("N"));
+        var output = Path.Combine(outputDirectory, "changed.w3m");
+
+        try
+        {
+            Directory.CreateDirectory(outputDirectory);
+            MapArchive.Rebuild(source, output, new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["war3map.j"] = updatedScript
+            });
+
+            var rebuiltScript = MapArchive.Read(output).Find("war3map.j");
+            Assert.NotNull(rebuiltScript);
+            Assert.Equal(sourceScript.Flags, rebuiltScript!.Flags);
+            Assert.True((rebuiltScript.Flags & MpqFileFlags.Compressed) != 0);
+            Assert.True(rebuiltScript.CompressedSize < rebuiltScript.Size);
+
+            using var rebuiltArchive = MpqArchive.Open(output, loadListFile: true);
+            var entries = rebuiltArchive.ToArray();
+            var attributes = MapArchive.Read(output).Find("(attributes)");
+            Assert.NotNull(attributes);
+
+            using var attributesStream = new MemoryStream(attributes!.Bytes, writable: false);
+            using var attributesReader = new BinaryReader(attributesStream);
+            Assert.Equal(100, attributesReader.ReadInt32());
+            var attributeFlags = (AttributesFlags)attributesReader.ReadInt32();
+            Assert.True(attributeFlags.HasFlag(AttributesFlags.Crc32));
+            Assert.True(attributeFlags.HasFlag(AttributesFlags.DateTime));
+            var bytesPerFile = (attributeFlags.HasFlag(AttributesFlags.Crc32) ? 4 : 0)
+                + (attributeFlags.HasFlag(AttributesFlags.DateTime) ? 8 : 0)
+                + (attributeFlags.HasFlag(AttributesFlags.Unk0x04) ? 16 : 0);
+            Assert.NotEqual(0, bytesPerFile);
+            var remaining = attributesStream.Length - attributesStream.Position;
+            Assert.Equal(0, remaining % bytesPerFile);
+            var fileCount = checked((int)(remaining / bytesPerFile));
+            Assert.Equal(entries.Length, fileCount);
+
+            var crc32s = new uint[fileCount];
+            if (attributeFlags.HasFlag(AttributesFlags.Crc32))
+            {
+                for (var index = 0; index < fileCount; index++) crc32s[index] = attributesReader.ReadUInt32();
+            }
+
+            for (var index = 0; index < fileCount; index++)
+            {
+                if (attributeFlags.HasFlag(AttributesFlags.DateTime)) _ = attributesReader.ReadInt64();
+                if (attributeFlags.HasFlag(AttributesFlags.Unk0x04)) _ = attributesReader.ReadBytes(16);
+            }
+
+            for (var index = 0; index < entries.Length; index++)
+            {
+                if (string.Equals(entries[index].FileName, "(attributes)", StringComparison.OrdinalIgnoreCase))
+                {
+                    Assert.Equal(0u, crc32s[index]);
+                    continue;
+                }
+
+                using var memberStream = rebuiltArchive.OpenFile(entries[index]);
+                using var memberBytes = new MemoryStream();
+                memberStream.CopyTo(memberBytes);
+                Assert.Equal(ComputeCrc32(memberBytes.ToArray()), crc32s[index]);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ChangedKnownFileRetainsSourceLocaleCompressionAndTargetFlags()
+    {
+        var source = FindSourceMap();
+        const string memberName = "war3map.j";
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "wc3-map-mcp-tests", Guid.NewGuid().ToString("N"));
+        var output = Path.Combine(outputDirectory, "encoding.w3m");
+        try
+        {
+            Directory.CreateDirectory(outputDirectory);
+            var sourceBytes = MapArchive.Read(source).Find(memberName)!.Bytes;
+            MapArchive.Rebuild(source, output, new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                [memberName] = sourceBytes.Concat(new byte[] { 0x0A }).ToArray()
+            });
+
+            using var sourceMpq = MpqArchive.Open(source, loadListFile: true);
+            using var rebuiltMpq = MpqArchive.Open(output, loadListFile: true);
+            var sourceFile = sourceMpq.GetMpqFiles().OfType<MpqKnownFile>().Single(file => file.FileName.Equals(memberName, StringComparison.OrdinalIgnoreCase));
+            var rebuiltFile = rebuiltMpq.GetMpqFiles().OfType<MpqKnownFile>().Single(file => file.FileName.Equals(memberName, StringComparison.OrdinalIgnoreCase));
+            try
+            {
+                Assert.Equal(sourceFile.TargetFlags, rebuiltFile.TargetFlags);
+                Assert.Equal(sourceFile.CompressionType, rebuiltFile.CompressionType);
+                Assert.Equal(sourceFile.Locale, rebuiltFile.Locale);
+            }
+            finally
+            {
+                sourceFile.Dispose();
+                rebuiltFile.Dispose();
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true);
+        }
+    }
+
+    private static uint ComputeCrc32(byte[] bytes)
+    {
+        var crc = 0xFFFFFFFFu;
+        foreach (var value in bytes)
+        {
+            crc ^= value;
+            for (var bit = 0; bit < 8; bit++)
+            {
+                crc = (crc & 1) == 0 ? crc >> 1 : (crc >> 1) ^ 0xEDB88320u;
+            }
+        }
+
+        return ~crc;
     }
 
     private static string FindSourceMap()

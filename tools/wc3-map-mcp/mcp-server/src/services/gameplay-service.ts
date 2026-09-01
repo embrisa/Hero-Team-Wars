@@ -64,10 +64,26 @@ export class GameplayService {
     this.projects.assertProfile(projectId, profile, "wc3_prepare_gameplay_chunk");
     assertChunkProfile(projectId, chunkId, this.projects);
     this.projects.assertScriptMutationAllowed(projectId);
-    const composed = await this.compose(projectId, manifestPath, profile, correlationId);
-    const source = String(composed.source ?? "");
+    const manifestComposition = await this.compose(projectId, manifestPath, profile, correlationId);
     const loaded = this.transactions.get(projectId, transactionId);
-    const canonical = JSON.parse(readFileSync(loaded.loaded.paths.canonical, "utf8")) as { scripts?: Array<Record<string, unknown>> };
+    const canonical = JSON.parse(readFileSync(loaded.loaded.paths.canonical, "utf8")) as {
+      scripts?: Array<Record<string, unknown>>;
+      gameplay_source?: Record<string, unknown>;
+    };
+    const stagedManifestHash = String(canonical.gameplay_source?.manifest_sha256 ?? "").toUpperCase();
+    const currentManifestHash = String(manifestComposition.manifest_sha256 ?? "").toUpperCase();
+    if (!HASH.test(stagedManifestHash) || stagedManifestHash !== currentManifestHash) {
+      throw new AppError("SOURCE_CHANGED", "The gameplay manifest changed after this transaction was staged; begin a fresh transaction before preparing gameplay source.", false, {
+        staged_manifest_sha256: stagedManifestHash,
+        current_manifest_sha256: currentManifestHash
+      });
+    }
+    const boundResult = await this.worker.request<Record<string, unknown>>("compose_gameplay_source", {
+      canonical_model: canonical,
+      ...(profile ? { profile } : {})
+    }, correlationId);
+    const composed = this.persistComposition(this.projects.project(projectId), boundResult);
+    const source = String(composed.source ?? "");
     const script = canonical.scripts?.find(item => String(item.archive_path ?? "").toLowerCase() === "war3map.j");
     const expected = String(script?.source_sha256 ?? script?.sha256 ?? "").toUpperCase();
     if (!HASH.test(expected)) throw new AppError("PRECONDITION_REQUIRED", "The transaction canonical model has no hash for the existing war3map.j source.");

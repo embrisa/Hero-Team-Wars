@@ -21,9 +21,84 @@ public sealed class GameplayComposerTests
         Assert.Equal("static_only", first["static_validation"]!["evidence_level"]!.GetValue<string>());
         Assert.Equal(1, first["main_count"]!.GetValue<int>());
         Assert.Equal(26, first["module_order"]!.AsArray().Count);
+        Assert.Contains("function config takes nothing returns nothing", first["source"]!.GetValue<string>());
+        Assert.Contains("call SetPlayers(4)", first["source"]!.GetValue<string>());
         Assert.DoesNotContain("SetUnitStock", first["source"]!.GetValue<string>());
         Assert.Contains("AddUnitToStock", first["source"]!.GetValue<string>());
         Assert.Contains("RemoveUnitFromStock", first["source"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void CanonicalCompositionEmitsMapBoundLobbyConfig()
+    {
+        var composed = GameplaySourceComposer.Compose(FindManifest(), HtwProfileModel.MvpProfile);
+        var canonical = MapInspector.Inspect(FindSourceMap());
+        var gameplay = composed["canonical_model"]!.AsObject();
+        foreach (var field in new[] { "gameplay_modules", "gameplay_variables", "gameplay_triggers", "regions", "region_roles", "teams" })
+        {
+            canonical[field] = gameplay[field]!.DeepClone();
+        }
+        canonical["profile"] = HtwProfileModel.MvpProfile;
+
+        var rebound = GameplaySourceComposer.ComposeCanonical(canonical, HtwProfileModel.MvpProfile);
+        var source = rebound["source"]!.GetValue<string>();
+
+        Assert.Contains("function config takes nothing returns nothing", source);
+        Assert.Contains("call SetCameraBounds(-3328. + GetCameraMargin(CAMERA_MARGIN_LEFT), -3584. + GetCameraMargin(CAMERA_MARGIN_BOTTOM), 3328. - GetCameraMargin(CAMERA_MARGIN_RIGHT), 3072. - GetCameraMargin(CAMERA_MARGIN_TOP), -3328. + GetCameraMargin(CAMERA_MARGIN_LEFT), 3072. - GetCameraMargin(CAMERA_MARGIN_TOP), 3328. - GetCameraMargin(CAMERA_MARGIN_RIGHT), -3584. + GetCameraMargin(CAMERA_MARGIN_BOTTOM))", source);
+        Assert.Contains("call SetDayNightModels(\"Environment\\\\DNC\\\\DNCLordaeron\\\\DNCLordaeronTerrain\\\\DNCLordaeronTerrain.mdl\", \"Environment\\\\DNC\\\\DNCLordaeron\\\\DNCLordaeronUnit\\\\DNCLordaeronUnit.mdl\")", source);
+        Assert.Contains("call NewSoundEnvironment(\"Default\")", source);
+        Assert.Contains("call SetAmbientDaySound(\"IceCrownDay\")", source);
+        Assert.Contains("call SetAmbientNightSound(\"IceCrownNight\")", source);
+        Assert.Contains("call SetMapMusic(\"Music\", true, 0)", source);
+        Assert.Contains("call InitBlizzard()", source);
+        Assert.True(source.IndexOf("call SetCameraBounds(", StringComparison.Ordinal) < source.IndexOf("call HTW_MCP_InitializeVariables()", StringComparison.Ordinal));
+        Assert.True(source.IndexOf("call InitBlizzard()", StringComparison.Ordinal) < source.IndexOf("call HTW_MCP_InitializeVariables()", StringComparison.Ordinal));
+        Assert.Single(Regex.Matches(source, @"(?im)^\s*function\s+config\s+takes\s+nothing\s+returns\s+nothing\b").Cast<Match>());
+        Assert.Contains("call SetPlayers(4)", source);
+        Assert.Contains("call SetTeams(4)", source);
+        Assert.Equal(4, Regex.Matches(source, @"call DefineStartLocation\(").Count);
+        Assert.Contains("call DefineStartLocation(0, -1856., 1728.)", source);
+        Assert.Contains("call DefineStartLocation(1, -640., 1856.)", source);
+        Assert.Contains("call DefineStartLocation(2, 1664., -960.)", source);
+        Assert.Contains("call DefineStartLocation(3, 2240., -960.)", source);
+        Assert.Equal(4, Regex.Matches(source, @"call SetPlayerController\(Player\([0-3]\), MAP_CONTROL_USER\)").Count);
+        Assert.Equal(4, Regex.Matches(source, @"call SetPlayerColor\(Player\([0-3]\), ConvertPlayerColor\([0-3]\)\)").Count);
+        Assert.Equal(4, Regex.Matches(source, @"call ForcePlayerStartLocation\(Player\([0-3]\), [0-3]\)").Count);
+        Assert.Contains("call SetPlayerTeam(Player(0), 0)", source);
+        Assert.Contains("call SetPlayerTeam(Player(2), 1)", source);
+        Assert.Contains("call SetPlayerAllianceStateAllyBJ(Player(0), Player(1), true)", source);
+        Assert.Contains("call SetPlayerAllianceStateVisionBJ(Player(2), Player(3), true)", source);
+        Assert.Contains("call SetStartLocPrio(0, 0, 1, MAP_LOC_PRIO_HIGH)", source);
+        Assert.Contains("call SetStartLocPrio(2, 0, 3, MAP_LOC_PRIO_HIGH)", source);
+    }
+
+    [Fact]
+    public void CanonicalConfigEscapesTextAndMapsControllerRaceAndFixedStart()
+    {
+        var composed = GameplaySourceComposer.Compose(FindManifest(), HtwProfileModel.MvpProfile);
+        var canonical = MapInspector.Inspect(FindSourceMap());
+        var gameplay = composed["canonical_model"]!.AsObject();
+        foreach (var field in new[] { "gameplay_modules", "gameplay_variables", "gameplay_triggers", "regions", "region_roles", "teams" })
+        {
+            canonical[field] = gameplay[field]!.DeepClone();
+        }
+        canonical["metadata"]!.AsArray().OfType<JsonObject>().Single(item => item["field"]!.GetValue<string>() == "title")["value"] = "Map \"quoted\" \\ title\nnext";
+        canonical["metadata"]!.AsArray().OfType<JsonObject>().Single(item => item["field"]!.GetValue<string>() == "description")["value"] = "Description \"quoted\"";
+        var player = canonical["players"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<int>() == 1);
+        player["controller"] = "Computer";
+        player["race"] = "Human";
+        player["flags"] = 0;
+        player["fixed_start_position"] = false;
+
+        var source = GameplaySourceComposer.ComposeCanonical(canonical, HtwProfileModel.MvpProfile)["source"]!.GetValue<string>();
+
+        Assert.Contains("call SetMapName(\"Map \\\"quoted\\\" \\\\ title\\nnext\")", source);
+        Assert.Contains("call SetMapDescription(\"Description \\\"quoted\\\"\")", source);
+        Assert.Contains("call SetPlayerColor(Player(0), ConvertPlayerColor(0))", source);
+        Assert.Contains("call SetPlayerRacePreference(Player(0), RACE_PREF_HUMAN)", source);
+        Assert.Contains("call SetPlayerRaceSelectable(Player(0), false)", source);
+        Assert.Contains("call SetPlayerController(Player(0), MAP_CONTROL_COMPUTER)", source);
+        Assert.DoesNotContain("call ForcePlayerStartLocation(Player(0), 0)", source);
     }
 
     [Fact]
@@ -262,5 +337,18 @@ public sealed class GameplayComposerTests
         }
 
         throw new FileNotFoundException("The local gameplay source manifest was not found.");
+    }
+
+    private static string FindSourceMap()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        for (var depth = 0; depth < 12 && current is not null; depth++)
+        {
+            var candidate = Path.Combine(current.FullName, "map", "HeroTeamWars_M0_2Arena.w3m");
+            if (File.Exists(candidate)) return candidate;
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException("The local Hero Team Wars source map was not found.");
     }
 }

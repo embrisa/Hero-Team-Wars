@@ -63,7 +63,9 @@ public sealed class Phase5cObjectPlacementTests
             var result = MapBuilder.Build(fixture, canonical, output, "debug");
             var changed = result["archive_comparison"]!["content_changes"]!.AsArray().Select(item => item!["path"]!.GetValue<string>()).ToArray();
 
-            Assert.Equal(new[] { "war3map.w3a" }, changed);
+            Assert.Contains("war3map.w3a", changed);
+            Assert.Contains("(attributes)", changed);
+            Assert.Equal(2, changed.Length);
             Assert.Empty(result["archive_comparison"]!["unexpected_content_changes"]!.AsArray());
             var reopened = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().Single(item => item["category"]!.GetValue<string>() == "ability");
             Assert.Equal("Phase 5C Ability Changed", reopened["display_name"]!.GetValue<string>());

@@ -305,14 +305,31 @@ internal static class Program
 
     private static JsonObject ComposeGameplaySource(JsonObject payload, bool validationOnly)
     {
-        var manifestPath = RequiredPath(payload, "manifest_path");
-        var result = GameplaySourceComposer.Compose(manifestPath, payload["profile"]?.GetValue<string>());
+        var requestedProfile = payload["profile"]?.GetValue<string>();
+        var canonical = payload["canonical_model"] as JsonObject;
+        if (canonical is null && payload["canonical_path"]?.GetValue<string>() is { Length: > 0 } canonicalPath)
+        {
+            canonical = JsonUtilities.Read(canonicalPath) as JsonObject
+                ?? throw new EngineException("INVALID_JSON", $"Canonical gameplay model is not a JSON object: {canonicalPath}");
+        }
+
+        JsonObject result;
+        if (canonical is not null)
+        {
+            result = GameplaySourceComposer.ComposeCanonical(canonical, requestedProfile);
+        }
+        else
+        {
+            var manifestPath = RequiredPath(payload, "manifest_path");
+            result = GameplaySourceComposer.Compose(manifestPath, requestedProfile);
+        }
+
         var expectedManifestHash = payload["expected_manifest_sha256"]?.GetValue<string>();
-        if (expectedManifestHash is not null && !string.Equals(expectedManifestHash, result["manifest_sha256"]?.GetValue<string>(), StringComparison.OrdinalIgnoreCase))
+        if (canonical is null && expectedManifestHash is not null && !string.Equals(expectedManifestHash, result["manifest_sha256"]?.GetValue<string>(), StringComparison.OrdinalIgnoreCase))
         {
             throw new EngineException("PRECONDITION_FAILED", "The expected gameplay manifest SHA-256 does not match the manifest being composed.");
         }
-        if (payload["expected_module_hashes"] is JsonObject expectedModules)
+        if (canonical is null && payload["expected_module_hashes"] is JsonObject expectedModules)
         {
             var modules = result["modules"] as JsonArray ?? new JsonArray();
             foreach (var expected in expectedModules)

@@ -172,7 +172,10 @@ public sealed class Phase5BuildRoundTripTests
             JsonUtilities.WriteAtomic(canonical, staged);
             var result = MapBuilder.Build(source, canonical, output, "debug");
             Assert.True(result["reopened"]!.GetValue<bool>());
-            Assert.Equal(new[] { "war3map.w3r" }, result["archive_comparison"]!["content_changes"]!.AsArray().Select(item => item!["path"]!.GetValue<string>()));
+            var changed = result["archive_comparison"]!["content_changes"]!.AsArray().Select(item => item!["path"]!.GetValue<string>()).ToArray();
+            Assert.Contains("war3map.w3r", changed);
+            Assert.Contains("(attributes)", changed);
+            Assert.Equal(2, changed.Length);
             Assert.Empty(result["archive_comparison"]!["unexpected_content_changes"]!.AsArray());
             Assert.Contains(MapInspector.Inspect(output)["regions"]!.AsArray().OfType<JsonObject>(), item => item["name"]!.GetValue<string>() == "MCP_Test_Region_Renamed");
         }

@@ -24,13 +24,20 @@ public sealed class ScriptOwnershipTests
     [Fact]
     public void ValidJassSourcePassesTheStaticParser()
     {
-        ScriptOwnership.ValidateMcpOwnedJass("war3map.j", "function main takes nothing returns nothing\n    call BJDebugMsg(\"ok\")\nendfunction\n");
+        ScriptOwnership.ValidateMcpOwnedJass("war3map.j", "function main takes nothing returns nothing\n    call BJDebugMsg(\"ok\")\nendfunction\nfunction config takes nothing returns nothing\n    call SetPlayers(1)\nendfunction\n");
+    }
+
+    [Fact]
+    public void MissingLobbyConfigIsRejectedBeforeBuild()
+    {
+        var exception = Assert.Throws<InvalidDataException>(() => ScriptOwnership.ValidateMcpOwnedJass("war3map.j", "function main takes nothing returns nothing\nendfunction\n"));
+        Assert.Contains("config", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void SetUnitStockIsRejectedBecauseWarcraftIIICannotCompileIt()
     {
-        var exception = Assert.Throws<InvalidDataException>(() => ScriptOwnership.ValidateMcpOwnedJass("war3map.j", "function main takes nothing returns nothing\n    call SetUnitStock(null, 'H001', 1)\nendfunction\n"));
+        var exception = Assert.Throws<InvalidDataException>(() => ScriptOwnership.ValidateMcpOwnedJass("war3map.j", "function main takes nothing returns nothing\n    call SetUnitStock(null, 'H001', 1)\nendfunction\nfunction config takes nothing returns nothing\n    call SetPlayers(1)\nendfunction\n"));
         Assert.Contains("SetUnitStock", exception.Message, StringComparison.Ordinal);
         Assert.Contains("AddUnitToStock", exception.Message, StringComparison.Ordinal);
     }

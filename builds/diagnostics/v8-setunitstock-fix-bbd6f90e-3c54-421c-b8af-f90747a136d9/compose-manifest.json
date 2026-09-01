@@ -1,0 +1,41 @@
+{
+  "source_sha256": "E5538C092775FDCD13B4CF0EF60985E9F0E23722187E1997EF09875B6EC26663",
+  "manifest_sha256": "DDA2B29283FC29E4164E944B558C5F22691F2AC5AF3C244FD6C991BDB29EE40A",
+  "module_order": [
+    "config.tuning",
+    "config.objects",
+    "config.regions",
+    "config.teams",
+    "core.state",
+    "content.heroes",
+    "content.abilities",
+    "content.base-waves",
+    "systems.economy",
+    "content.items",
+    "content.send-units",
+    "core.bootstrap",
+    "core.debug",
+    "core.events",
+    "systems.heroes",
+    "systems.phases",
+    "systems.lives",
+    "systems.elimination",
+    "systems.routing",
+    "systems.waves",
+    "systems.hero-selection",
+    "systems.information",
+    "systems.sending",
+    "tests.assertions",
+    "tests.scenarios",
+    "main"
+  ],
+  "main_count": 1,
+  "static_validation": {
+    "status": "passed",
+    "evidence_level": "static_only",
+    "validation_scope": "syntax_symbols_native_catalogue_declaration_order_and_mcp_call_arity",
+    "parser": "War3Net.CodeAnalysis.Jass",
+    "native_catalogue_version": "war3-jass-native-catalogue-1.0",
+    "runtime_verified": false
+  }
+}

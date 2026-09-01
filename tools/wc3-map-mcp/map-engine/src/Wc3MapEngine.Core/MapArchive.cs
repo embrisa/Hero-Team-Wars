@@ -121,13 +121,27 @@ public static class MapArchive
                 }
             }
 
-            var outputFiles = new List<MpqFile>(sourceFiles.Count);
+            var addedMembers = replacements.Keys
+                .Where(path => !sourceNames.Contains(MapArchiveSnapshot.NormalizePath(path)))
+                .ToArray();
+            var outputFiles = new List<MpqFile>(sourceFiles.Count + addedMembers.Length);
+            var attributesNeedRegeneration = addedMembers.Length > 0;
             foreach (var file in sourceFiles)
             {
                 if (file is MpqKnownFile known && replacements.TryGetValue(MapArchiveSnapshot.NormalizePath(known.FileName), out var bytes))
                 {
+                    using (var sourceStream = archive.OpenFile(known.FileName, known.Locale))
+                    using (var sourceBytes = new MemoryStream())
+                    {
+                        sourceStream.CopyTo(sourceBytes);
+                        attributesNeedRegeneration |= !sourceBytes.ToArray().AsSpan().SequenceEqual(bytes);
+                    }
+
                     file.Dispose();
-                    outputFiles.Add(MpqFile.New(new MemoryStream(bytes, writable: false), known.FileName));
+                    var replacementFile = MpqFile.New(new MemoryStream(bytes, writable: false), known.FileName, known.Locale);
+                    replacementFile.TargetFlags = known.TargetFlags;
+                    replacementFile.CompressionType = known.CompressionType;
+                    outputFiles.Add(replacementFile);
                 }
                 else
                 {
@@ -135,7 +149,7 @@ public static class MapArchive
                 }
             }
 
-            foreach (var replacement in replacements.Where(item => !sourceNames.Contains(MapArchiveSnapshot.NormalizePath(item.Key))))
+            foreach (var replacement in replacements.Where(item => addedMembers.Contains(item.Key, StringComparer.OrdinalIgnoreCase)))
             {
                 outputFiles.Add(MpqFile.New(new MemoryStream(replacement.Value, writable: false), MapArchiveSnapshot.NormalizePath(replacement.Key)));
             }
@@ -144,10 +158,12 @@ public static class MapArchive
             {
                 BlockSize = MpqArchiveCreateOptions.DefaultBlockSize,
                 WriteArchiveFirst = true,
-                ListFileCreateMode = replacements.Keys.Any(path => !sourceNames.Contains(MapArchiveSnapshot.NormalizePath(path)))
+                ListFileCreateMode = addedMembers.Length > 0
                     ? MpqFileCreateMode.Overwrite
                     : MpqFileCreateMode.None,
-                AttributesCreateMode = MpqFileCreateMode.None,
+                AttributesCreateMode = attributesNeedRegeneration
+                    ? MpqFileCreateMode.Overwrite
+                    : MpqFileCreateMode.None,
                 SignatureCreateMode = MpqFileCreateMode.None
             };
             using var rebuilt = MpqArchive.Create(outputPath, outputFiles, options);

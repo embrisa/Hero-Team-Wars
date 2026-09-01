@@ -62,9 +62,3 @@ is a clear reason to do so.
 - Preserve the approved MVP scope: four users, two teams of two, and two mirrored arenas.
 - Keep design rules consistent across the design documents, especially the current round-robin routing and shared team-life rules.
 - Treat binary map files as valuable user work: make a recoverable copy before risky edits and report whether runtime testing was actually performed.
-
-## MCP rebuild and runtime debugging notes
-
-When rebuilding MCP-owned maps or diagnosing Warcraft III compile/load failures, read
-[tools/wc3-map-mcp/docs/troubleshooting/v8-custom-hero-runtime-lessons.md](tools/wc3-map-mcp/docs/troubleshooting/v8-custom-hero-runtime-lessons.md).
-Use jassdoc for native/API facts. That note records process lessons only; the v8 load crash remains unresolved.

@@ -73,7 +73,16 @@ public static class MapBuilder
                 throw new EngineException("BUILD_REOPEN_MISMATCH", "Reopened build semantics do not match the staged canonical model.", false, details: new JsonObject { ["semantic_differences"] = semanticDifferences });
             }
 
-            var archiveComparison = ArchiveComparison.Compare(MapArchive.Read(sourcePath), MapArchive.Read(temporaryPath), plan.ReplacementMembers);
+            var expectedArchiveChanges = plan.ReplacementMembers.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // MPQ attributes contain per-member CRCs and dates. Rebuilding a
+            // changed member therefore necessarily regenerates this container
+            // member along with the planned replacement.
+            if (expectedArchiveChanges.Count > 0)
+            {
+                expectedArchiveChanges.Add("(attributes)");
+            }
+
+            var archiveComparison = ArchiveComparison.Compare(MapArchive.Read(sourcePath), MapArchive.Read(temporaryPath), expectedArchiveChanges);
             if (archiveComparison["opaque_members_preserved"]?.GetValue<bool>() != true
                 || archiveComparison["unexpected_content_changes"]?.AsArray().Count != 0)
             {

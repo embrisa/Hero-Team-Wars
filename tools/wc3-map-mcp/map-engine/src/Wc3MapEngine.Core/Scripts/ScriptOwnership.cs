@@ -13,7 +13,7 @@ namespace Wc3MapEngine.Core.Scripts;
 public static class ScriptOwnership
 {
     public const string Strategy = "mcp_owned_jass";
-    public const string Version = "2.0";
+    public const string Version = "2.1";
     public const int MaxSourceBytes = 16 * 1024 * 1024;
 
     private static readonly Regex TriggerString = new(
@@ -22,6 +22,10 @@ public static class ScriptOwnership
 
     private static readonly Regex JassMain = new(
         @"\bfunction\s+main\s+takes\s+nothing\s+returns\s+nothing\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static readonly Regex JassConfig = new(
+        @"\bfunction\s+config\s+takes\s+nothing\s+returns\s+nothing\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly Regex LuaMain = new(
@@ -89,6 +93,12 @@ public static class ScriptOwnership
             if (mainFunctions.Count != 1)
             {
                 throw new InvalidDataException($"MCP-owned JASS source must declare exactly one main function; found {mainFunctions.Count}.");
+            }
+
+            var configFunctions = Regex.Matches(source, @"(?im)^\s*function\s+config\s+takes\s+nothing\s+returns\s+nothing\b");
+            if (configFunctions.Count != 1 || !JassConfig.IsMatch(source))
+            {
+                throw new InvalidDataException($"MCP-owned JASS source must declare exactly one config function for Warcraft III lobby setup; found {configFunctions.Count}.");
             }
 
             var apiValidation = new JassValidationService(JassApiRepository.Default).ValidateSource(source);

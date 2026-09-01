@@ -193,7 +193,7 @@ public sealed class OperationTests
     public void ScriptOperationStagesMcpOwnedJassWithHashPrecondition()
     {
         const string before = "function main takes nothing returns nothing\nendfunction\n";
-        const string after = "function main takes nothing returns nothing\n    call BJDebugMsg(\"phase changed\")\nendfunction\n";
+        const string after = "function main takes nothing returns nothing\n    call BJDebugMsg(\"phase changed\")\nendfunction\nfunction config takes nothing returns nothing\n    call SetPlayers(1)\nendfunction\n";
         var canonical = Canonical();
         canonical["scripts"] = new JsonArray(new JsonObject
         {

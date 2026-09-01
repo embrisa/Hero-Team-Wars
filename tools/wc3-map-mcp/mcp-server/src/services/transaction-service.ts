@@ -53,26 +53,32 @@ export class TransactionService {
           if (!model) throw new AppError("ENGINE_PROTOCOL_ERROR", "The gameplay composer returned no canonical source model.");
           Object.assign(canonical, model, {
             trigger_mode: "mcp_native_jass",
-            gameplay_source: {
-              schema_version: "1.0",
-              composer_version: composition.composer_version,
-              mode: composition.mode,
-              profile: composition.profile,
-              source_sha256: composition.source_sha256,
-              source_manifest_sha256: composition.source_manifest_sha256,
-              source_manifest: composition.source_manifest,
-              static_validation: composition.static_validation,
-              provenance: "intended_design",
-              capability: "staged_typed_write"
-            }
+            gameplay_source: {}
           });
+          const boundComposition = await this.worker.request<Record<string, unknown>>("compose_gameplay_source", {
+            canonical_model: canonical,
+            profile: project.config.profile
+          }, correlationId);
+          canonical.gameplay_source = {
+            schema_version: "1.0",
+            composer_version: boundComposition.composer_version,
+            mode: boundComposition.mode,
+            profile: boundComposition.profile,
+            source_sha256: boundComposition.source_sha256,
+            manifest_sha256: composition.manifest_sha256,
+            source_manifest_sha256: boundComposition.source_manifest_sha256,
+            source_manifest: boundComposition.source_manifest,
+            static_validation: boundComposition.static_validation,
+            provenance: "intended_design",
+            capability: "staged_typed_write"
+          };
           const scripts = canonical.scripts as Array<Record<string, unknown>> | undefined;
           const script = scripts?.find(item => String(item.archive_path ?? "").toLowerCase() === "war3map.j");
           if (script) {
-            script.source = composition.source;
-            script.source_sha256 = composition.source_sha256;
-            script.sha256 = composition.source_sha256;
-            script.size_bytes = Buffer.byteLength(String(composition.source ?? ""), "utf8");
+            script.source = boundComposition.source;
+            script.source_sha256 = boundComposition.source_sha256;
+            script.sha256 = boundComposition.source_sha256;
+            script.size_bytes = Buffer.byteLength(String(boundComposition.source ?? ""), "utf8");
             script.provenance = "intended_design";
             script.capability = "staged_typed_write";
           }
