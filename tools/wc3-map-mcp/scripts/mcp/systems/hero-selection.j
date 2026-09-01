@@ -148,7 +148,7 @@ endfunction
 
 function HTW_HeroSelection_Begin takes nothing returns nothing
     set HTW_HeroSelectionComplete = false
-    set HTW_HeroSelectionBuilding = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), 'H0AL', 216., -336., 270.)
+    set HTW_HeroSelectionBuilding = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), 'n0AL', 216., -336., 270.)
     set HTW_HeroSelectionTrigger = CreateTrigger()
     call TriggerRegisterUnitEvent(HTW_HeroSelectionTrigger, HTW_HeroSelectionBuilding, EVENT_UNIT_SELL)
     call TriggerAddAction(HTW_HeroSelectionTrigger, function HTW_HeroSelection_OnSell)

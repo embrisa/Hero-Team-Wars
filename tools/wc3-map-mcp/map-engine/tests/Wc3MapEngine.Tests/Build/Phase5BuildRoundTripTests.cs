@@ -81,13 +81,13 @@ public sealed class Phase5BuildRoundTripTests
             ["unknown_ids"] = new JsonArray(),
             ["modifications"] = new JsonArray(new JsonObject { ["id"] = "unam", ["type"] = "String", ["value"] = "HTW Guardian" })
         });
-        var altar = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:ntav:H0AL", ["category"] = "unit", ["rawcode"] = "H0AL" }, null, new JsonObject
+        var altar = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:ntav:n0AL", ["category"] = "unit", ["rawcode"] = "n0AL" }, null, new JsonObject
         {
             ["object_kind"] = "custom",
             ["category"] = "unit",
             ["base_rawcode"] = "ntav",
-            ["custom_rawcode"] = "H0AL",
-            ["rawcode"] = "H0AL",
+            ["custom_rawcode"] = "n0AL",
+            ["rawcode"] = "n0AL",
             ["display_name"] = "HTW Hero Altar",
             ["unknown_ids"] = new JsonArray(),
             ["modifications"] = new JsonArray(
@@ -109,7 +109,7 @@ public sealed class Phase5BuildRoundTripTests
             Assert.Contains("H001,H002,H003,H004", encoded);
             var definitions = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().ToArray();
             Assert.Equal("Hpal", definitions.Single(item => item["rawcode"]!.GetValue<string>() == "H001")["base_rawcode"]!.GetValue<string>());
-            var sold = definitions.Single(item => item["rawcode"]!.GetValue<string>() == "H0AL")["modifications"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "useu");
+            var sold = definitions.Single(item => item["rawcode"]!.GetValue<string>() == "n0AL")["modifications"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "useu");
             Assert.Equal("H001,H002,H003,H004", sold["value"]!.GetValue<string>());
         }
         finally { DeleteTemp(directory); }
