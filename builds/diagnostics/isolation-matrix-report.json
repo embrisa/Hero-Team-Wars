@@ -1,0 +1,108 @@
+{
+  "generated_utc": "2026-09-01T20:48:26.515Z",
+  "expected_source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "variants": [
+    {
+      "build_id": "f4d3fe36-f9e7-48e8-b647-061621cb031a",
+      "version_label": "v9",
+      "variant_id": "v9-objects-only-disabled-selection",
+      "description": "Contains all 5 v8 object definitions in war3map.w3u (H001-H004, n0AL), but HTW_HeroSelection_Begin is a no-op. Proves whether war3map.w3u itself crashes the engine loader.",
+      "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+      "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+      "source_unchanged": true,
+      "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\f4d3fe36-f9e7-48e8-b647-061621cb031a\\HeroTeamWars_v9-objects-only-disabled-selection_f4d3fe36-f9e7-48e8-b647-061621cb031a.w3m",
+      "output_sha256": "47BC727800BBA455F833FF3D78C2F45324DE8C1718F1EAD2236B86DF2084CD30",
+      "output_size_bytes": 47151,
+      "reopened": true,
+      "opaque_members_preserved": true,
+      "runtime_status": "untested",
+      "script": {
+        "sha256": "7865B1D6916C0C7CFE9F2EDEA34BD3C2FC3CB3F115D0E15679FCAD91DEDBA74E",
+        "size_bytes": 41422
+      },
+      "objects": {
+        "count": 5,
+        "has_w3u": true,
+        "w3u_sha256": "4F21BE155269904464D428F84B0E407FDAEEA0A4EEDD5E9F7BDD5C43F21B1F41",
+        "w3u_size_bytes": 967
+      },
+      "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v9-objects-only-disabled-selection-f4d3fe36-f9e7-48e8-b647-061621cb031a"
+    },
+    {
+      "build_id": "91207484-a5c2-44c9-a640-116460cde65f",
+      "version_label": "v10",
+      "variant_id": "v10-direct-spawn-h001",
+      "description": "Contains all 4 custom hero definitions (H001-H004) in war3map.w3u. At map init, directly spawns 'H001' for each player without an altar.",
+      "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+      "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+      "source_unchanged": true,
+      "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\91207484-a5c2-44c9-a640-116460cde65f\\HeroTeamWars_v10-direct-spawn-h001_91207484-a5c2-44c9-a640-116460cde65f.w3m",
+      "output_sha256": "82B5FD80D39006B02537523B94C0D95799B3236C8A8724884FDC89B8B21AA33C",
+      "output_size_bytes": 47161,
+      "reopened": true,
+      "opaque_members_preserved": true,
+      "runtime_status": "untested",
+      "script": {
+        "sha256": "4FC766BF197DA1990DAC439CD58EE51DD5D815D779771116B7932F94B9DCF919",
+        "size_bytes": 42125
+      },
+      "objects": {
+        "count": 4,
+        "has_w3u": true,
+        "w3u_sha256": "7C85302C86C4826C6802A1F8EED2B7C60D0966304672826ED0439DD86F07BB63",
+        "w3u_size_bytes": 828
+      },
+      "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v10-direct-spawn-h001-91207484-a5c2-44c9-a640-116460cde65f"
+    },
+    {
+      "build_id": "b029679c-2200-4044-9534-e372c1da0886",
+      "version_label": "v11",
+      "variant_id": "v11-stock-tavern-no-w3u",
+      "description": "Zero custom objects (no war3map.w3u in archive). At map init, creates standard tavern ('ntav') at (216, -336) with a 5-second timer before starting waves.",
+      "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+      "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+      "source_unchanged": true,
+      "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\b029679c-2200-4044-9534-e372c1da0886\\HeroTeamWars_v11-stock-tavern-no-w3u_b029679c-2200-4044-9534-e372c1da0886.w3m",
+      "output_sha256": "A52E00F2B2D27D536EB54F8A23109569478DC897259531EB457B2063DD21080B",
+      "output_size_bytes": 46423,
+      "reopened": true,
+      "opaque_members_preserved": true,
+      "runtime_status": "untested",
+      "script": {
+        "sha256": "75A485AF5E4D8A170DF9AF32D1C10B7F632CC5B0A79C4078873A3B83C5148A23",
+        "size_bytes": 42244
+      },
+      "objects": {
+        "count": 0,
+        "has_w3u": false
+      },
+      "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v11-stock-tavern-no-w3u-b029679c-2200-4044-9534-e372c1da0886"
+    },
+    {
+      "build_id": "5bf08b23-2ac5-46c6-87a4-58b8c34f46a8",
+      "version_label": "v12",
+      "variant_id": "v12-minimal-custom-heroes-direct-spawn",
+      "description": "Contains 4 custom heroes (H001-H004) with ONLY unam modified (no ustr/uagi/uint/uhpm/ugol/ulum). Directly spawns H001 at start.",
+      "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+      "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+      "source_unchanged": true,
+      "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\5bf08b23-2ac5-46c6-87a4-58b8c34f46a8\\HeroTeamWars_v12-minimal-custom-heroes-direct-spawn_5bf08b23-2ac5-46c6-87a4-58b8c34f46a8.w3m",
+      "output_sha256": "241B10AC92B0FD9D7E2824669557473C930521B51F17629DF8F1FB897B562EEE",
+      "output_size_bytes": 46511,
+      "reopened": true,
+      "opaque_members_preserved": true,
+      "runtime_status": "untested",
+      "script": {
+        "sha256": "4FC766BF197DA1990DAC439CD58EE51DD5D815D779771116B7932F94B9DCF919",
+        "size_bytes": 42125
+      },
+      "objects": {
+        "count": 4,
+        "has_w3u": true,
+        "w3u_sha256": "E7FBDDC11D5E451E8F5E44EEB7B9BDB61596976DB2DB829A6A101D499D894C4C",
+        "w3u_size_bytes": 176
+      },
+      "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v12-minimal-custom-heroes-direct-spawn-5bf08b23-2ac5-46c6-87a4-58b8c34f46a8"
+    }
+  ]
+}
