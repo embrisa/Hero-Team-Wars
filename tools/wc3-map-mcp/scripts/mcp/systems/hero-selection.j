@@ -37,6 +37,10 @@ function HTW_HeroSelection_DeployHero takes integer playerId returns nothing
     set x = GetRectCenterX(HTW_ArenaRect[teamIndex])
     set y = GetRectCenterY(HTW_ArenaRect[teamIndex])
     call SetUnitPosition(HTW_HeroUnitByPlayer[playerId], x + I2R(playerId * 64), y + I2R(playerId * 48))
+    if GetLocalPlayer() == Player(playerId - 1) then
+        call PanCameraToTimed(x + I2R(playerId * 64), y + I2R(playerId * 48), 0.)
+        call SelectUnit(HTW_HeroUnitByPlayer[playerId], true)
+    endif
     set HTW_HeroAliveByPlayer[playerId] = true
     set HTW_HeroDeathAccountedByPlayer[playerId] = false
     set HTW_AliveHeroCount = HTW_AliveHeroCount + 1
@@ -60,6 +64,11 @@ function HTW_HeroSelection_Complete takes nothing returns nothing
     set playerId = 1
     loop
         exitwhen playerId > HTW_ActivePlayerCount
+        if HTW_HeroSelectionFog[playerId] != null then
+            call FogModifierStop(HTW_HeroSelectionFog[playerId])
+            call DestroyFogModifier(HTW_HeroSelectionFog[playerId])
+            set HTW_HeroSelectionFog[playerId] = null
+        endif
         call HTW_HeroSelection_DeployHero(playerId)
         set playerId = playerId + 1
     endloop
@@ -148,8 +157,7 @@ endfunction
 
 function HTW_HeroSelection_Begin takes nothing returns nothing
     local integer playerId
-    local fogmodifier fmA
-    local fogmodifier fmB
+    local player p
     set HTW_HeroSelectionComplete = false
     set HTW_HeroSelectionBuilding = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), 'n0AL', 216., -336., 270.)
     set HTW_HeroSelectionTrigger = CreateTrigger()
@@ -159,13 +167,20 @@ function HTW_HeroSelection_Begin takes nothing returns nothing
     set HTW_HeroSelectionTimer = CreateTimer()
     call TimerStart(HTW_HeroSelectionTimer, I2R(HTW_HeroSelectionSeconds), false, function HTW_HeroSelection_OnTimeout)
 
-    // Grant shared vision over the altar area so players can interact with it
-    set playerId = 0
+    // Grant active shared vision over the altar area so players can interact with it
+    set playerId = 1
     loop
-        exitwhen playerId >= HTW_ActivePlayerCount
-        call CreateFogModifierRadius(Player(playerId), FOG_OF_WAR_VISIBLE, 216., -336., 800., true, false)
+        exitwhen playerId > HTW_ActivePlayerCount
+        set p = Player(playerId - 1)
+        set HTW_HeroSelectionFog[playerId] = CreateFogModifierRadius(p, FOG_OF_WAR_VISIBLE, 216., -336., 1000., true, false)
+        call FogModifierStart(HTW_HeroSelectionFog[playerId])
+        if GetLocalPlayer() == p then
+            call PanCameraToTimed(216., -336., 0.)
+            call SelectUnit(HTW_HeroSelectionBuilding, true)
+        endif
         set playerId = playerId + 1
     endloop
+    set p = null
 
     call DisplayTextToPlayer(GetLocalPlayer(), 0., 0., "Choose a hero at the shared HTW Hero Altar.")
     call HTW_Debug_LogText("shared custom Hero Altar created; hero selection is open")

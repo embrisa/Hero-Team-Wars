@@ -23,6 +23,7 @@ function HTW_State_Reset takes nothing returns nothing
     set index = 1
     loop
         exitwhen index > 24
+        set HTW_HeroSelectionFog[index] = null
         set HTW_HeroUnitByPlayer[index] = null
         set HTW_HeroAliveByPlayer[index] = false
         set HTW_HeroDeathAccountedByPlayer[index] = false

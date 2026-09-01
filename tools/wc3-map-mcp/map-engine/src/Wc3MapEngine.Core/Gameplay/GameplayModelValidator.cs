@@ -21,7 +21,7 @@ public static class GameplayModelValidator
     private static readonly Regex Function = new("(?im)^\\s*function\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+takes\\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly HashSet<string> VariableTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "integer", "real", "boolean", "string", "handle", "timer", "trigger", "unit", "group", "region", "rect", "player", "force"
+        "integer", "real", "boolean", "string", "handle", "timer", "trigger", "unit", "group", "region", "rect", "player", "force", "fogmodifier"
     };
     private static readonly HashSet<string> EventTypes = new(StringComparer.Ordinal)
     {
