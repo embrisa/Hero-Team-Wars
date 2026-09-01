@@ -15,3 +15,7 @@ Builds begin with `runtime_status: untested`. Opening a file or starting a proce
 ## Source drift is reported
 
 The source map is immutable to the toolchain. Reinspect the current source, compare its SHA-256 with the transaction manifest, and begin a new transaction if the user intentionally changed it in World Editor.
+
+## V8 custom-hero compile vs load failures
+
+See [v8-custom-hero-runtime-lessons.md](v8-custom-hero-runtime-lessons.md). Use it for rebuild pitfalls, War3Log vs static parse, and object-data encoding. Use jassdoc for native/API facts. The load crash is unresolved.
