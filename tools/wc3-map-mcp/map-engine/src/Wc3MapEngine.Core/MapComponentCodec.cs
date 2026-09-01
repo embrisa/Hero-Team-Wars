@@ -316,7 +316,7 @@ public static class MapComponentCodec
     public static byte[] SerializeObjectMember(string archivePath, JsonArray definitions)
     {
         var category = ObjectCategory(archivePath);
-        var rebuilt = BuildObjectMember(category, ObjectDataFormatVersion.v3, definitions);
+        var rebuilt = BuildObjectMember(category, ObjectDataFormatVersion.v2, definitions);
         return Serialize(writer => WriteObjectMember(writer, rebuilt));
     }
 

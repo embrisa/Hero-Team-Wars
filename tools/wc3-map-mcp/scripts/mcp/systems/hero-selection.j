@@ -147,6 +147,9 @@ function HTW_HeroSelection_OnTimeout takes nothing returns nothing
 endfunction
 
 function HTW_HeroSelection_Begin takes nothing returns nothing
+    local integer playerId
+    local fogmodifier fmA
+    local fogmodifier fmB
     set HTW_HeroSelectionComplete = false
     set HTW_HeroSelectionBuilding = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), 'n0AL', 216., -336., 270.)
     set HTW_HeroSelectionTrigger = CreateTrigger()
@@ -155,6 +158,15 @@ function HTW_HeroSelection_Begin takes nothing returns nothing
     call HTW_HeroSelection_RefillStock()
     set HTW_HeroSelectionTimer = CreateTimer()
     call TimerStart(HTW_HeroSelectionTimer, I2R(HTW_HeroSelectionSeconds), false, function HTW_HeroSelection_OnTimeout)
+
+    // Grant shared vision over the altar area so players can interact with it
+    set playerId = 0
+    loop
+        exitwhen playerId >= HTW_ActivePlayerCount
+        call CreateFogModifierRadius(Player(playerId), FOG_OF_WAR_VISIBLE, 216., -336., 800., true, false)
+        set playerId = playerId + 1
+    endloop
+
     call DisplayTextToPlayer(GetLocalPlayer(), 0., 0., "Choose a hero at the shared HTW Hero Altar.")
     call HTW_Debug_LogText("shared custom Hero Altar created; hero selection is open")
 endfunction
