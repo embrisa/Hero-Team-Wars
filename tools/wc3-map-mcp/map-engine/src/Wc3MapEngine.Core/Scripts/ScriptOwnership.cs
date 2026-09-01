@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using War3Net.CodeAnalysis.Jass;
+using Wc3MapEngine.Core.Jass;
 
 namespace Wc3MapEngine.Core.Scripts;
 
@@ -90,11 +91,10 @@ public static class ScriptOwnership
                 throw new InvalidDataException($"MCP-owned JASS source must declare exactly one main function; found {mainFunctions.Count}.");
             }
 
-            // Warcraft III 2.0.4 War3Log: "encountered undeclared identifier 'SetUnitStock'".
-            // common.j exposes AddUnitToStock/RemoveUnitFromStock, not SetUnitStock.
-            if (Regex.IsMatch(source, @"\bSetUnitStock\s*\(", RegexOptions.CultureInvariant))
+            var apiValidation = new JassValidationService(JassApiRepository.Default).ValidateSource(source);
+            if (!apiValidation.IsValid)
             {
-                throw new InvalidDataException("MCP-owned JASS source must not call SetUnitStock; Warcraft III cannot compile that identifier. Use AddUnitToStock/RemoveUnitFromStock.");
+                throw new InvalidDataException(JassValidationFailure.Format(apiValidation));
             }
         }
         catch (InvalidDataException)

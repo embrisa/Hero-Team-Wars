@@ -17,6 +17,7 @@ function Require-Command([string] $Name) {
 Require-Command "dotnet"
 Require-Command "node"
 Require-Command "npm"
+Require-Command "git"
 
 $nodeVersion = (& node --version).Trim()
 $npmVersion = (& npm --version).Trim()
@@ -27,6 +28,9 @@ Write-Host "MCP root: $mcpRoot"
 Write-Host "Node: $nodeVersion"
 Write-Host "npm: $npmVersion"
 Write-Host ".NET SDK: $dotnetVersion"
+
+& (Join-Path $PSScriptRoot "sync-jassdoc.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Pinned jassdoc dataset generation failed." }
 
 Push-Location $engineRoot
 try {

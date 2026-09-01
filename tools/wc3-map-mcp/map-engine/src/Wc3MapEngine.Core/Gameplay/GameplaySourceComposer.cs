@@ -64,7 +64,12 @@ public static class GameplaySourceComposer
         if (profile is not ("mvp_2arena" or "full_6team" or "gui_compatible")) throw new EngineException("INVALID_ARGUMENT", $"Unsupported gameplay profile '{profile}'.");
         if (profile == "gui_compatible") throw new EngineException("CAPABILITY_GATED", "GUI-compatible trigger composition is gated pending exact WTG/WCT/WTS fixtures and World Editor evidence.");
         if (StringValue(manifest, "schema_version") is { } schema && schema != "1.0") throw new EngineException("INVALID_ARGUMENT", $"Unsupported gameplay manifest schema '{schema}'.");
-        if (StringValue(manifest, "native_catalogue_version") is { } nativeCatalogue && nativeCatalogue != JassNativeCatalogue.Version) throw new EngineException("INVALID_ARGUMENT", $"Gameplay manifest native catalogue '{nativeCatalogue}' does not match pinned engine catalogue '{JassNativeCatalogue.Version}'.");
+        if (StringValue(manifest, "native_catalogue_version") is { } nativeCatalogue
+            && nativeCatalogue != JassNativeCatalogue.Version
+            && nativeCatalogue != JassNativeCatalogue.LegacyManifestVersion)
+        {
+            throw new EngineException("INVALID_ARGUMENT", $"Gameplay manifest native catalogue '{nativeCatalogue}' does not match pinned engine catalogue '{JassNativeCatalogue.Version}'.");
+        }
         if (manifest["profiles"] is JsonObject profiles && profiles[profile] is not JsonObject) throw new EngineException("INVALID_ARGUMENT", $"Gameplay manifest has no definition for profile '{profile}'.");
 
         var profileSpec = (manifest["profiles"] as JsonObject)?[profile] as JsonObject ?? HtwProfileModel.ProfileSpec(profile);

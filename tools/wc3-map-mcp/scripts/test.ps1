@@ -5,6 +5,10 @@ $ErrorActionPreference = "Stop"
 $mcpRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $engineRoot = Join-Path $mcpRoot "map-engine"
 $serverRoot = Join-Path $mcpRoot "mcp-server"
+$jassApiData = Join-Path $engineRoot "data/jassdoc/jass-api.json"
+if (-not (Test-Path -LiteralPath $jassApiData -PathType Leaf)) {
+    throw "Canonical JASS API data is missing. Run scripts/sync-jassdoc.ps1 (or bootstrap.ps1) before testing."
+}
 
 Push-Location $engineRoot
 try {

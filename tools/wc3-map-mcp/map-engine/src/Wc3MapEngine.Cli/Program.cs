@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Wc3MapEngine.Contracts;
 using Wc3MapEngine.Core;
 using Wc3MapEngine.Core.Gameplay;
+using Wc3MapEngine.Core.Jass;
 using Wc3MapEngine.Core.Scripts;
 
 namespace Wc3MapEngine.Cli;
@@ -93,6 +94,10 @@ internal static class Program
                 "compare_maps" => CompareMaps(request.Payload),
                 "compose_gameplay_source" => ComposeGameplaySource(request.Payload, validationOnly: false),
                 "validate_gameplay_source" => ComposeGameplaySource(request.Payload, validationOnly: true),
+                "jass_lookup" => JassService().Lookup(request.Payload),
+                "jass_search" => JassService().Search(request.Payload),
+                "jass_validate_call" => JassService().ValidateCall(request.Payload),
+                "jass_validate_source" => JassService().ValidateSource(request.Payload),
                 "run_scenario" => ScenarioRunner.Run(request.Payload),
                 _ => throw new EngineException("INVALID_ARGUMENT", $"Unknown engine operation '{request.Operation}'.")
             };
@@ -159,6 +164,22 @@ internal static class Program
         }
 
         return result;
+    }
+
+    private static JassApiService JassService()
+    {
+        try
+        {
+            return new JassApiService(JassApiRepository.Default);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            throw new EngineException(
+                "DEPENDENCY_MISSING",
+                $"The canonical local JASS API dataset is unavailable: {exception.Message} Run tools/wc3-map-mcp/scripts/sync-jassdoc.ps1, rebuild the engine, and retry.",
+                false,
+                exception);
+        }
     }
 
     private static JsonObject HashFile(JsonObject payload)

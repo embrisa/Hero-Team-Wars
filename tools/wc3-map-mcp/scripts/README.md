@@ -10,5 +10,7 @@ All helpers resolve their own MCP root, so the caller's current directory does n
 - `validate-gameplay.ps1`: validates a gameplay manifest and profile through the published engine.
 - `run-scenario.ps1`: builds an explicitly supplied canonical revision and runs its deterministic static scenario harness.
 - `verify-feature-roundtrip.ps1`: builds an explicitly supplied canonical fixture and prints the reopen/archive evidence.
+- `sync-jassdoc.ps1`: fetches the pinned jassdoc commit into a temporary checkout and generates the ignored local JASS API dataset.
+- `import-jassdoc.mjs`: deterministically parses `common.j`, `Blizzard.j`, and `builtin-types.j` into the local JASS API JSON schema.
 
 Every helper fails on errors and prints the artifact or report path it produced.

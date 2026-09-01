@@ -237,6 +237,66 @@ describe("MCP transaction and build workflow", () => {
     expect(sourceHash()).toBe(before);
   }, 120_000);
 
+  it("rejects an unknown JASS API before changing the transaction revision", async () => {
+    const before = sourceHash();
+    client = new McpClient();
+    await client.initialize();
+
+    const begin = await client.call("wc3_begin_transaction", {
+      project_id: "hero-team-wars",
+      map: "map/HeroTeamWars_M0_2Arena.w3m",
+      expected_source_hash: before,
+      label: "jass-validation-gate"
+    });
+    expect(begin.structuredContent.ok).toBe(true);
+    transactionId = begin.structuredContent.data.transaction_id as string;
+    const transactionRoot = join(projectRoot, "tools/wc3-map-mcp/snapshots/transactions", transactionId);
+    const canonicalPath = join(transactionRoot, "working/canonical-map.json");
+    const initialCanonical = readFileSync(canonicalPath, "utf8");
+    const canonical = JSON.parse(initialCanonical);
+    const stagedScriptHash = canonical.scripts.find((item: any) => item.archive_path === "war3map.j").sha256;
+    const invalidSource = "function main takes nothing returns nothing\n    call SetUnitStock(null, 'H001', 1)\nendfunction\nfunction config takes nothing returns nothing\n    call SetPlayers(1)\nendfunction\n";
+
+    const rejected = await client.call("wc3_apply_operations", {
+      project_id: "hero-team-wars",
+      transaction_id: transactionId,
+      expected_revision: 0,
+      operations: [{
+        operation_id: randomUUID(),
+        type: "set_script_source",
+        target: { archive_path: "war3map.j" },
+        expected: stagedScriptHash,
+        value: { language: "jass", source: invalidSource },
+        rationale: "Prove unknown canonical API calls fail before staging."
+      }]
+    });
+
+    expect(rejected.structuredContent.ok).toBe(false);
+    expect(rejected.structuredContent.error.code).toBe("INVALID_ARGUMENT");
+    expect(rejected.structuredContent.error.message).toMatch(/SetUnitStock/);
+    expect(JSON.stringify(rejected.structuredContent.error)).toMatch(/AddUnitToStock/);
+    expect(readFileSync(canonicalPath, "utf8")).toBe(initialCanonical);
+    expect(existsSync(join(transactionRoot, "revisions/0001-after-operations.json"))).toBe(false);
+
+    const validSource = "function main takes nothing returns nothing\n    call AddUnitToStock(null, 'H001', 1, 2)\nendfunction\nfunction config takes nothing returns nothing\n    call SetPlayers(1)\nendfunction\n";
+    const accepted = await client.call("wc3_apply_operations", {
+      project_id: "hero-team-wars",
+      transaction_id: transactionId,
+      expected_revision: 0,
+      operations: [{
+        operation_id: randomUUID(),
+        type: "set_script_source",
+        target: { archive_path: "war3map.j" },
+        expected: stagedScriptHash,
+        value: { language: "jass", source: validSource },
+        rationale: "Prove a canonical jassdoc-backed API call can be staged."
+      }]
+    });
+    expect(accepted.structuredContent.ok).toBe(true);
+    expect(accepted.structuredContent.data.revision).toBe(1);
+    expect(sourceHash()).toBe(before);
+  }, 120_000);
+
   it("keeps failed batches and dry runs at the previous revision", async () => {
     const before = sourceHash();
     client = new McpClient();

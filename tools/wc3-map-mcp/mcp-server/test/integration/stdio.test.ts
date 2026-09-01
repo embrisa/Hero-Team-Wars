@@ -48,6 +48,11 @@ function requestProcess(): Promise<{ lines: string[]; stderr: string }> {
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 19, method: "tools/call", params: { name: "wc3_get_script_source", arguments: { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", archive_path: "war3map.j" } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 20, method: "tools/call", params: { name: "wc3_compose_gameplay_source", arguments: { project_id: "hero-team-wars", manifest_path: "tools/wc3-map-mcp/scripts/mcp/manifest.json", profile: "mvp_2arena" } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 21, method: "tools/call", params: { name: "wc3_validate_gameplay_source", arguments: { project_id: "hero-team-wars", manifest_path: "tools/wc3-map-mcp/scripts/mcp/manifest.json", profile: "mvp_2arena" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 22, method: "tools/call", params: { name: "jass_lookup", arguments: { name: "AddUnitToStock" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 23, method: "tools/call", params: { name: "jass_lookup", arguments: { name: "SetUnitStock" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 24, method: "tools/call", params: { name: "jass_search", arguments: { query: "unit stock", limit: 6 } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 25, method: "tools/call", params: { name: "jass_validate_call", arguments: { function: "AddUnitToStock", arguments: ["null", "'H001'"] } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 26, method: "tools/call", params: { name: "jass_validate_source", arguments: { source: "function MyCustomFunction takes nothing returns nothing\nendfunction\nfunction Test takes nothing returns nothing\n call MyCustomFunction()\nendfunction" } } })}\n`);
     child.stdin.end();
   });
 }
@@ -80,6 +85,10 @@ describe("MCP STDIO", () => {
     const list = response(result.lines, 2);
     const toolNames = list.result.tools.map((tool: any) => tool.name);
     expect(toolNames).toEqual([
+      "jass_lookup",
+      "jass_search",
+      "jass_validate_call",
+      "jass_validate_source",
       "wc3_project_status",
       "wc3_inspect_map",
       "wc3_list_archive_files",
@@ -149,5 +158,33 @@ describe("MCP STDIO", () => {
     const validationReport = response(result.lines, 21);
     expect(validationReport.result.structuredContent.ok).toBe(true);
     expect(validationReport.result.structuredContent.data.static_validation.evidence_level).toBe("static_only");
+
+    const knownJass = response(result.lines, 22);
+    expect(knownJass.result.structuredContent.ok).toBe(true);
+    expect(knownJass.result.structuredContent.data.symbol).toEqual(expect.objectContaining({
+      name: "AddUnitToStock",
+      kind: "native",
+      source: "common.j",
+      return_type: "nothing"
+    }));
+    expect(knownJass.result.structuredContent.data.symbol.parameters).toHaveLength(4);
+
+    const unknownJass = response(result.lines, 23);
+    expect(unknownJass.result.structuredContent.ok).toBe(true);
+    expect(unknownJass.result.structuredContent.data.found).toBe(false);
+    expect(unknownJass.result.structuredContent.data.suggestions.map((item: any) => item.name)).toContain("AddUnitToStock");
+
+    const stockSearch = response(result.lines, 24);
+    expect(stockSearch.result.structuredContent.ok).toBe(true);
+    expect(stockSearch.result.structuredContent.data.results.map((item: any) => item.name)).toEqual(expect.arrayContaining(["AddUnitToStock", "RemoveUnitFromStock"]));
+
+    const invalidCall = response(result.lines, 25);
+    expect(invalidCall.result.structuredContent.ok).toBe(true);
+    expect(invalidCall.result.structuredContent.data.valid).toBe(false);
+    expect(invalidCall.result.structuredContent.data.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "ARGUMENT_COUNT" })]));
+
+    const localSource = response(result.lines, 26);
+    expect(localSource.result.structuredContent.ok).toBe(true);
+    expect(localSource.result.structuredContent.data.valid).toBe(true);
   });
 });

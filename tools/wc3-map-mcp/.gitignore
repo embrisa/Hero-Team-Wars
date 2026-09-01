@@ -8,6 +8,10 @@ snapshots/*
 !snapshots/README.md
 builds/mcp/*
 
+# Local canonical JASS API import (generated from the pinned jassdoc checkout).
+map-engine/data/jassdoc/jass-api.json
+map-engine/data/jassdoc/source/
+
 # Node and .NET build outputs
 mcp-server/node_modules/
 mcp-server/dist/

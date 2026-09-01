@@ -9,4 +9,7 @@
     <PackageReference Include="War3Net.Build.Core" Version="6.0.3" />
     <PackageReference Include="War3Net.CodeAnalysis.Jass" Version="6.0.2" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\data\jassdoc\jass-api.json" Link="data\jassdoc\jass-api.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\..\data\jassdoc\jass-api.json')" />
+  </ItemGroup>
 </Project>
