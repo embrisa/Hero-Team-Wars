@@ -34,6 +34,19 @@ Wait for relevant subagents before concluding the task.
 Avoid having multiple agents modify the same files concurrently unless there
 is a clear reason to do so.
 
+## Manual Warcraft III verification ownership
+
+- The user performs all manual verification inside Warcraft III. Do not use
+  Windows UI automation or other interactive control to verify the lobby, map
+  load, camera, selection flow, combat, or gameplay behavior.
+- The agent may perform static checks, source validation, transaction/build
+  checks, archive reinspection, and other noninteractive MCP verification, but
+  must stop at the runtime artifact handoff and clearly label runtime behavior
+  as unverified until the user reports it.
+- Do not infer successful gameplay from process start, editor launch, map load
+  intent, static inspection, or build success. Record runtime evidence only
+  from explicit user observations.
+
 ## Finish every task with Git
 
 - Treat the repository as a shared working tree. Preserve unrelated user changes and inspect `git status` before editing.
