@@ -16,7 +16,9 @@ import { registerTransactionTools } from "./transactions.js";
 import { registerBuildTools } from "./builds.js";
 import { registerLaunchTools } from "./launches.js";
 import { registerGameplayTools } from "./gameplay.js";
+import { registerJassTools } from "./jass.js";
 import { GameplayService } from "../services/gameplay-service.js";
+import { JassService } from "../services/jass-service.js";
 import { isToolEnabledForProject } from "../services/capability-catalog.js";
 
 export interface ToolServices {
@@ -27,6 +29,7 @@ export interface ToolServices {
   builds: BuildService;
   launches: LaunchService;
   gameplay: GameplayService;
+  jass: JassService;
 }
 
 export function registerTools(server: McpServer, services: ToolServices): void {
@@ -39,6 +42,10 @@ export function registerTools(server: McpServer, services: ToolServices): void {
   const register = (name: string, config: Record<string, unknown>, handler: (input: any) => Promise<Record<string, unknown>>): void => {
     if (enabled(name)) server.registerTool(name, config as never, handler as never);
   };
+
+  // JASS knowledge is backed by one canonical worker dataset, not project
+  // files. Keep these tools visible even when a project allow-list omits them.
+  registerJassTools(server, services.jass);
 
   if (enabled("wc3_project_status")) registerProjectStatus(server, services.projects);
   if (enabled("wc3_inspect_map")) registerInspectMap(server, services.inspections);

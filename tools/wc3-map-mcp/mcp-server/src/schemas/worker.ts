@@ -22,7 +22,11 @@ export const workerOperationSchema = z.enum([
   "compare_maps",
   "compose_gameplay_source",
   "validate_gameplay_source",
-  "run_scenario"
+  "run_scenario",
+  "jass_lookup",
+  "jass_search",
+  "jass_validate_call",
+  "jass_validate_source"
 ]);
 
 export const workerErrorSchema = z.object({

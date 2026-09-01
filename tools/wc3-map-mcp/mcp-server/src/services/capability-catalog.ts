@@ -21,7 +21,12 @@ const PROFILE_TOOLS: Record<CapabilityProfile, string[]> = {
 const READ_ONLY_TOOLS = new Set([
   "wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component",
   "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps", "wc3_compose_gameplay_source",
-  "wc3_validate_gameplay_source"
+  "wc3_validate_gameplay_source", "jass_lookup", "jass_search", "jass_validate_call", "jass_validate_source"
+]);
+
+/** Global canonical knowledge tools are not project-scoped allow-list entries. */
+export const GLOBAL_KNOWLEDGE_TOOLS = new Set([
+  "jass_lookup", "jass_search", "jass_validate_call", "jass_validate_source"
 ]);
 
 const MUTATING_TOOLS = new Set([
@@ -88,6 +93,7 @@ export function isToolSupportedByProfile(profile: CapabilityProfile, name: strin
 export function isToolEnabledForProject(project: ProjectConfig, name: string): boolean {
   if (!isToolSupportedByProfile(project.profile, name)) return false;
   if (project.write_policy === "read_only" && !READ_ONLY_TOOLS.has(name)) return false;
+  if (GLOBAL_KNOWLEDGE_TOOLS.has(name)) return true;
   return project.enabled_tools.length === 0 || project.enabled_tools.includes(name);
 }
 

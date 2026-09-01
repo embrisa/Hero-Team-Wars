@@ -90,7 +90,7 @@ export class ProjectService {
     const engine = await this.worker.request<Record<string, unknown>>("environment_status", { configured_files: configuredFiles });
     const expectedHash = project.config.baseline_sha256?.toUpperCase();
     const actualHash = sourceHash?.sha256.toUpperCase();
-    const readOnlyTools = ["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps", "wc3_compose_gameplay_source", "wc3_validate_gameplay_source"];
+    const readOnlyTools = ["wc3_project_status", "wc3_inspect_map", "wc3_list_archive_files", "wc3_get_component", "wc3_get_script_source", "wc3_validate_map", "wc3_compare_maps", "wc3_compose_gameplay_source", "wc3_validate_gameplay_source", "jass_lookup", "jass_search", "jass_validate_call", "jass_validate_source"];
     const transactionTools = ["wc3_begin_transaction", "wc3_apply_operations", "wc3_transaction_diff", "wc3_validate_transaction", "wc3_discard_transaction"];
     const gameplayTools = ["wc3_compose_gameplay_source", "wc3_validate_gameplay_source", "wc3_prepare_gameplay_chunk", "wc3_run_scenario_build", "wc3_record_chunk_result"];
     const laterTools = ["wc3_build_map", "wc3_build_report", "wc3_launch_editor", "wc3_launch_test_map", "wc3_record_test_result", "wc3_get_test_session", "wc3_promote_build", ...gameplayTools];

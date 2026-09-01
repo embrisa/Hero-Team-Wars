@@ -32,3 +32,27 @@ export const runScenarioBuildSchema = z.object({ project_id: z.string().min(1).m
 export const recordChunkResultSchema = z.object({ project_id: z.string().min(1).max(100), chunk_id: z.string().regex(/^HTW-[0-9]{2}$/), scenario_id: z.string().min(1).max(100), transaction_id: uuidSchema, revision: z.number().int().min(0), build_id: uuidSchema, expected_build_hash: sha256Schema, result: z.enum(["pass", "fail"]), evidence_level: z.enum(["static_only", "user_observed"]).default("static_only"), test_session_id: uuidSchema.optional(), notes: z.string().max(10000) }).strict().superRefine((value, context) => {
   if (value.evidence_level === "user_observed" && !value.test_session_id) context.addIssue({ code: "custom", path: ["test_session_id"], message: "user_observed chunk evidence requires an exact test_session_id." });
 });
+
+const jassSymbolNameSchema = z.string().trim().min(1).max(128).regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "Expected a JASS symbol name.");
+const jassSourceSchema = z.string().min(1).max(16 * 1024 * 1024);
+
+/** Global, project-independent access to the canonical jassdoc dataset. */
+export const jassLookupSchema = z.object({
+  name: jassSymbolNameSchema.describe("Exact JASS native or Blizzard.j symbol name to look up.")
+}).strict();
+
+export const jassSearchSchema = z.object({
+  query: z.string().trim().min(1).max(200).describe("Name, concept, parameter, or documentation keywords to search for."),
+  limit: z.number().int().min(1).max(50).default(10).describe("Maximum number of ranked matches to return.")
+}).strict();
+
+export const jassValidateCallSchema = z.object({
+  function: jassSymbolNameSchema.describe("Exact JASS function name used by the call."),
+  arguments: z.array(z.string().min(1).max(64 * 1024)).max(128).describe("JASS argument expressions in source order."),
+  local_source: jassSourceSchema.optional().describe("Optional source containing local declarations that may define the function.")
+}).strict();
+
+export const jassValidateSourceSchema = z.object({
+  source: jassSourceSchema.describe("Complete JASS source block or file to validate."),
+  context_source: jassSourceSchema.optional().describe("Optional existing map/source context containing declarations visible to the supplied source.")
+}).strict();
