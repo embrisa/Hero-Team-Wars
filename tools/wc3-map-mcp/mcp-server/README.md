@@ -25,3 +25,9 @@ The checked-in example configuration is `read_only` and allow-lists exactly seve
 Gameplay-source workflow: call `wc3_get_script_source` to obtain the current complete `war3map.j` text and SHA-256, begin a transaction with that map hash, then apply a `set_script_source` operation whose `target` is `{ "archive_path": "war3map.j" }`, whose `expected` is the script SHA-256, and whose `value` is `{ "language": "jass", "source": "<complete source>" }`. Validate and build the transaction before launching or promoting its uniquely named artifact. The source map is never overwritten.
 
 Never invent JASS API names or rely on memory for signatures. Generated and direct JASS replacements are checked against jassdoc plus declarations in the complete staged source before transaction state changes. Correct validation errors and retry; the server never silently substitutes a fuzzy match.
+
+Keep the agent-facing contract catalog current when this server changes:
+`../../../tasks/wc3-map-mcp/09-mcp-tool-contracts.md`. Changes to registrations,
+Zod schemas, normalized responses, errors, policy gates, or worker behavior must
+update the catalog and any affected versioned contract schema/README in the
+same change, followed by a registration/schema/documentation consistency check.

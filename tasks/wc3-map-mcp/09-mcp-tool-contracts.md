@@ -7,6 +7,18 @@ truth is `tools/wc3-map-mcp/mcp-server/src/tools/` plus
 `tools/wc3-map-mcp/mcp-server/src/schemas/operations.ts`. Update this catalog
 when the public surface changes.
 
+## Maintenance contract
+
+This catalog is a maintained contract, not a historical design note. Any code
+or configuration change that affects a tool name, request field, default,
+response field, artifact/hash behavior, error, policy gate, serializer,
+capability, evidence state, or workflow must update this file and every related
+README, versioned JSON schema, decision/phase note, and Codex allow-list in the
+same change. Breaking wire changes require the appropriate schema-version
+decision. Before finishing, compare tool registrations, executable schemas,
+`contracts/schemas/`, `.codex/config.toml`, and this catalog; do not knowingly
+leave them inconsistent.
+
 The current server exposes 28 tools: 7 map read tools, 4 global JASS/jassdoc
 knowledge tools, 5 transaction tools, 3 build tools, 4 launch/evidence tools,
 and 5 gameplay-source tools.

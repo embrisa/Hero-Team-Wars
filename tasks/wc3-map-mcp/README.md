@@ -16,6 +16,12 @@ Do not give an agent only a phase title. Give it the phase file and require it t
 4. `IMPLEMENTATION-CONVENTIONS.md` - exact folder ownership, naming, configuration, error, testing, logging, and handoff conventions.
 5. `09-mcp-tool-contracts.md` - the complete implemented MCP tool catalog, request/response contracts, policy gates, and evidence workflow.
 
+The contract catalog and related documentation are maintained deliverables.
+Any implementation, schema, tool-registration, configuration, output, error,
+policy, or evidence change must update the affected catalog, schemas, READMEs,
+and phase/decision notes in the same change. Agents must not finish with a
+known contract/documentation mismatch.
+
 An agent must then read the phase file it is assigned plus any documents listed in that file's `Required reading` section. It must inspect the current filesystem before acting because later agents may have completed earlier work.
 
 ## Task order

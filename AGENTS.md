@@ -69,6 +69,24 @@ is a clear reason to do so.
   `tools/wc3-map-mcp/scripts/sync-jassdoc.ps1` from the pinned `lep/jassdoc`
   commit; its ignored dataset and upstream checkout must not be committed.
 
+## Documentation and contract maintenance
+
+- Documentation is part of the implementation, not a later cleanup. When code
+  changes a tool name, request/response schema, error, policy gate, output,
+  serializer, path, evidence state, configuration, or workflow, update every
+  affected contract/README/agent document in the same change.
+- For MCP changes, at minimum review
+  `tasks/wc3-map-mcp/09-mcp-tool-contracts.md`,
+  `tools/wc3-map-mcp/mcp-server/README.md`,
+  `tools/wc3-map-mcp/README.md`, the versioned schemas under
+  `tools/wc3-map-mcp/contracts/schemas/`, and `.codex/config.toml` when the
+  public tool surface changes. Update the relevant decision, phase, or
+  compatibility document too.
+- Before completion, compare registrations, schemas, host allow-lists, and
+  documented tool names/fields. Do not leave a known documentation/contract
+  mismatch for a later task; if a change is intentionally documentation-only,
+  state that no runtime contract changed.
+
 ## Finish every task with Git
 
 - Treat the repository as a shared working tree. Preserve unrelated user changes and inspect `git status` before editing.
