@@ -8,12 +8,13 @@ The first target is `C:\Users\hp\Documents\Warcraft III\Hero Team Wars\map\HeroT
 
 ## Mandatory context for every assigned agent
 
-Do not give an agent only a phase title. Give it the phase file and require it to read these four files first:
+Do not give an agent only a phase title. Give it the phase file and require it to read these five files first:
 
 1. `AGENT-START-HERE.md` - user goal, current machine state, project state, terminology, and non-negotiable safety rules.
 2. `REFERENCE-MCP-AND-TOOLING.md` - exact MCP SDK model, STDIO rules, TypeScript packages, Codex connection, .NET worker protocol, and external tooling.
 3. `REFERENCE-WC3-MAP-FORMATS.md` - how WC3 maps are packaged, important archive members, War3Net responsibilities, and compatibility risks.
 4. `IMPLEMENTATION-CONVENTIONS.md` - exact folder ownership, naming, configuration, error, testing, logging, and handoff conventions.
+5. `09-mcp-tool-contracts.md` - the complete implemented MCP tool catalog, request/response contracts, policy gates, and evidence workflow.
 
 An agent must then read the phase file it is assigned plus any documents listed in that file's `Required reading` section. It must inspect the current filesystem before acting because later agents may have completed earlier work.
 

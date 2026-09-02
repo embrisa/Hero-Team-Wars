@@ -43,6 +43,11 @@ is known but the exact API name is not, then lookup for the exact jassdoc
 signature and annotations. All script-producing transaction paths invoke the
 same validator automatically before a new revision can be published.
 
+For the complete contract of every exposed tool—including exact request fields,
+response envelopes, typed operation families, policy gates, artifact/hash
+links, and runtime evidence rules—read
+`../../tasks/wc3-map-mcp/09-mcp-tool-contracts.md` before calling the MCP.
+
 The existing map remains at `../../map/HeroTeamWars_M0_2Arena.w3m`. Development outputs must go to configured staging/build locations and never overwrite it.
 
 Last observed source SHA-256: `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`. Every inspection, transaction, and build recomputes it.

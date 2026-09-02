@@ -8,6 +8,13 @@ Before working in this directory, read these files completely:
 4. `../../tasks/wc3-map-mcp/IMPLEMENTATION-CONVENTIONS.md`
 5. the assigned phase file under `../../tasks/wc3-map-mcp/`
 
+Before calling or changing an MCP tool, also read
+`../../tasks/wc3-map-mcp/09-mcp-tool-contracts.md`. It catalogs the complete
+implemented surface, including the four global jassdoc tools, exact schemas,
+read/write policy, transaction preconditions, artifact/hash contracts, and
+runtime evidence gates. Keep that catalog synchronized with the schemas and
+tool registrations when the MCP surface changes.
+
 The source map at `../../map/HeroTeamWars_M0_2Arena.w3m` is immutable. Recompute its SHA-256 before and after work. All writes use MCP-owned staging/build paths. Do not install or upgrade machine-level prerequisites without explicit authorization. Do not claim World Editor/game/runtime success without observed evidence tied to the exact build hash.
 
 For v8 custom-hero rebuild pitfalls, War3Log vs static parse, and object-data encoding lessons, read `docs/troubleshooting/v8-custom-hero-runtime-lessons.md`. Do not duplicate jassdoc native/API facts there; look those up in the pinned jassdoc index.
