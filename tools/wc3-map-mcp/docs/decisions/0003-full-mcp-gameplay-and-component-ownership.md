@@ -1,6 +1,6 @@
 # ADR 0003: Full MCP gameplay and map-component ownership
 
-Status: MCP-native/static implementation accepted; GUI compatibility and exact editor/game acceptance remain gated by the task packets `14` through `19`.
+Status: MCP-native/static implementation accepted; GUI compatibility and exact editor/game acceptance remain gated by the current capability matrix and exact editor/game evidence.
 
 ## Context
 
@@ -47,9 +47,8 @@ member, category, field, and project profile.
 
 ## Implementation references
 
-- `tasks/wc3-map-mcp/14-phase-5a-gameplay-source-and-trigger-support.md`
-- `tasks/wc3-map-mcp/15-phase-5b-region-support.md`
-- `tasks/wc3-map-mcp/16-phase-5c-object-and-placement-support.md`
-- `tasks/wc3-map-mcp/17-phase-5d-players-teams-and-forces.md`
-- `tasks/wc3-map-mcp/18-phase-5e-runtime-logic-and-evidence.md`
-- `tasks/wc3-map-mcp/19-phase-5f-full-mcp-feature-rollout.md`
+- `../reference/tool-contracts.md`
+- `../reference/architecture.md`
+- `../reference/map-model-and-contracts.md`
+- `../reference/safety-recovery-and-audit.md`
+- `../reference/testing-and-definition-of-done.md`

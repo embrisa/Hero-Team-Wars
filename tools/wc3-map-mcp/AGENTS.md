@@ -1,26 +1,29 @@
 # WC3 Map MCP Agent Instructions
 
-Before working in this directory, read these files completely:
+Before working in this directory, read these live documents completely:
 
-1. `../../tasks/wc3-map-mcp/AGENT-START-HERE.md`
-2. `../../tasks/wc3-map-mcp/REFERENCE-MCP-AND-TOOLING.md`
-3. `../../tasks/wc3-map-mcp/REFERENCE-WC3-MAP-FORMATS.md`
-4. `../../tasks/wc3-map-mcp/IMPLEMENTATION-CONVENTIONS.md`
-5. the assigned phase file under `../../tasks/wc3-map-mcp/`
+1. `docs/agent-guide.md`
+2. `docs/reference/tool-contracts.md`
+3. `docs/reference/architecture.md`
+4. `docs/reference/map-model-and-contracts.md`
+5. `docs/reference/safety-recovery-and-audit.md`
+6. `docs/reference/testing-and-definition-of-done.md`
+7. `docs/reference/packaging-and-codex-connection.md`
+8. `docs/reference/wc3-map-formats.md`
 
 Before calling or changing an MCP tool, also read
-`../../tasks/wc3-map-mcp/09-mcp-tool-contracts.md`. It catalogs the complete
-implemented surface, including the four global jassdoc tools, exact schemas,
-read/write policy, transaction preconditions, artifact/hash contracts, and
-runtime evidence gates. Keep that catalog synchronized with the schemas and
-tool registrations when the MCP surface changes.
+`docs/reference/tool-contracts.md`. It catalogs the complete implemented
+surface, including the four global jassdoc tools, exact schemas, read/write
+policy, transaction preconditions, artifact/hash contracts, and runtime
+evidence gates. Keep that catalog synchronized with the schemas and tool
+registrations when the MCP surface changes.
 
 Documentation is part of the definition of done. If implementation, schemas,
 tool registration, configuration, outputs, errors, policy, or evidence behavior
-changes, update the catalog and every affected README, versioned contract
-schema, decision/phase note, and Codex allow-list in the same commit. Finish
-with a registration/schema/documentation consistency check; do not knowingly
-leave the agent contract stale.
+changes, update `docs/reference/tool-contracts.md` and every affected README,
+versioned contract schema, decision/compatibility note, and Codex allow-list in
+the same commit. Finish with a registration/schema/documentation consistency
+check; do not knowingly leave the agent contract stale.
 
 The source map at `../../map/HeroTeamWars_M0_2Arena.w3m` is immutable. Recompute its SHA-256 before and after work. All writes use MCP-owned staging/build paths. Do not install or upgrade machine-level prerequisites without explicit authorization. Do not claim World Editor/game/runtime success without observed evidence tied to the exact build hash.
 

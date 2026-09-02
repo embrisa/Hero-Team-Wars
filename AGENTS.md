@@ -50,7 +50,7 @@ is a clear reason to do so.
 ## WC3 Map MCP tools and contracts
 
 - Before using the MCP, read the complete agent-facing catalog at
-  `tasks/wc3-map-mcp/09-mcp-tool-contracts.md`. It is the authoritative
+  `tools/wc3-map-mcp/docs/reference/tool-contracts.md`. It is the authoritative
   summary of every currently exposed tool, exact request fields, outputs,
   policy gates, error envelope, and transaction/evidence workflow.
 - The current surface includes read-only inspection/comparison, canonical
@@ -76,7 +76,7 @@ is a clear reason to do so.
   serializer, path, evidence state, configuration, or workflow, update every
   affected contract/README/agent document in the same change.
 - For MCP changes, at minimum review
-  `tasks/wc3-map-mcp/09-mcp-tool-contracts.md`,
+  `tools/wc3-map-mcp/docs/reference/tool-contracts.md`,
   `tools/wc3-map-mcp/mcp-server/README.md`,
   `tools/wc3-map-mcp/README.md`, the versioned schemas under
   `tools/wc3-map-mcp/contracts/schemas/`, and `.codex/config.toml` when the

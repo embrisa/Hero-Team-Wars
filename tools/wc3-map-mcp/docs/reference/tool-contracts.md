@@ -13,7 +13,7 @@ This catalog is a maintained contract, not a historical design note. Any code
 or configuration change that affects a tool name, request field, default,
 response field, artifact/hash behavior, error, policy gate, serializer,
 capability, evidence state, or workflow must update this file and every related
-README, versioned JSON schema, decision/phase note, and Codex allow-list in the
+README, versioned JSON schema, decision/compatibility note, and Codex allow-list in the
 same change. Breaking wire changes require the appropriate schema-version
 decision. Before finishing, compare tool registrations, executable schemas,
 `contracts/schemas/`, `.codex/config.toml`, and this catalog; do not knowingly
@@ -252,5 +252,5 @@ upgrade themselves to editor-open, game-loaded, smoke, or playtest evidence.
 
 For exact field-level validation, inspect the closed Zod schemas and the
 versioned JSON schemas under `tools/wc3-map-mcp/contracts/schemas/`. For
-runtime/manual boundaries, follow `AGENTS.md`, `AGENT-START-HERE.md`, and
-`11-safety-recovery-and-audit.md`.
+runtime/manual boundaries, follow `../../AGENTS.md`, `../agent-guide.md`, and
+`safety-recovery-and-audit.md`.

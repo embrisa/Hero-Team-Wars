@@ -120,6 +120,7 @@ If a value is changed in the editor, update the ledger in the same work session.
 Complete `HTW-00 — Baseline capture`. Open the current map, do not change it,
 and record the trigger tree, variables, regions, player/force setup, and every
 configured hero/unit/ability that matters to the next chunk. Then follow the
-MCP feature packets `tasks/wc3-map-mcp/14` through `19`. The current ledger
+the current MCP contracts and implementation references under
+`tools/wc3-map-mcp/docs/`. The current ledger
 contains only the previously verified baseline and explicitly marks the gaps
 that need reconfirmation.

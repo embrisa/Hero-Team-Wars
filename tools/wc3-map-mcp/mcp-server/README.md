@@ -27,7 +27,7 @@ Gameplay-source workflow: call `wc3_get_script_source` to obtain the current com
 Never invent JASS API names or rely on memory for signatures. Generated and direct JASS replacements are checked against jassdoc plus declarations in the complete staged source before transaction state changes. Correct validation errors and retry; the server never silently substitutes a fuzzy match.
 
 Keep the agent-facing contract catalog current when this server changes:
-`../../../tasks/wc3-map-mcp/09-mcp-tool-contracts.md`. Changes to registrations,
+`../docs/reference/tool-contracts.md`. Changes to registrations,
 Zod schemas, normalized responses, errors, policy gates, or worker behavior must
 update the catalog and any affected versioned contract schema/README in the
 same change, followed by a registration/schema/documentation consistency check.
