@@ -66,21 +66,14 @@ public sealed class Phase5BuildRoundTripTests
     }
 
     [Fact]
-    public void V8HeroObjectsRoundTripPaladinParentAndSoldUnitsList()
+    public void V8HeroObjectsRoundTripParentsSoldUnitsAndInstantStock()
     {
         var source = FindSourceMap();
         var model = MapInspector.Inspect(source);
-        var guardian = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hpal:H001", ["category"] = "unit", ["rawcode"] = "H001" }, null, new JsonObject
-        {
-            ["object_kind"] = "custom",
-            ["category"] = "unit",
-            ["base_rawcode"] = "Hpal",
-            ["custom_rawcode"] = "H001",
-            ["rawcode"] = "H001",
-            ["display_name"] = "HTW Guardian",
-            ["unknown_ids"] = new JsonArray(),
-            ["modifications"] = new JsonArray(new JsonObject { ["id"] = "unam", ["type"] = "String", ["value"] = "HTW Guardian" })
-        });
+        var guardian = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hpal:H001", ["category"] = "unit", ["rawcode"] = "H001" }, null, HeroDefinition("Hpal", "H001", "HTW Guardian", "A durable frontline hero for the Hero Team Wars MVP.", 25, 16, 14, 700));
+        var striker = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hmkg:H002", ["category"] = "unit", ["rawcode"] = "H002" }, null, HeroDefinition("Hmkg", "H002", "HTW Striker", "A quick melee damage hero for the Hero Team Wars MVP.", 18, 25, 12, 560));
+        var controller = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hamg:H003", ["category"] = "unit", ["rawcode"] = "H003" }, null, HeroDefinition("Hamg", "H003", "HTW Controller", "A high-intelligence control hero for the Hero Team Wars MVP.", 14, 16, 25, 480));
+        var support = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hblm:H004", ["category"] = "unit", ["rawcode"] = "H004" }, null, HeroDefinition("Hblm", "H004", "HTW Support", "A flexible support hero for the Hero Team Wars MVP.", 16, 18, 23, 520));
         var altar = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:ntav:n0AL", ["category"] = "unit", ["rawcode"] = "n0AL" }, null, new JsonObject
         {
             ["object_kind"] = "custom",
@@ -94,7 +87,7 @@ public sealed class Phase5BuildRoundTripTests
                 new JsonObject { ["id"] = "unam", ["type"] = "String", ["value"] = "HTW Hero Altar" },
                 new JsonObject { ["id"] = "useu", ["type"] = "String", ["value"] = "H001,H002,H003,H004" })
         });
-        var staged = OperationApplier.Apply(model, new JsonArray(guardian, altar))["canonical_map"]!;
+        var staged = OperationApplier.Apply(model, new JsonArray(guardian, striker, controller, support, altar))["canonical_map"]!;
         var directory = TempDirectory();
         try
         {
@@ -108,7 +101,16 @@ public sealed class Phase5BuildRoundTripTests
             Assert.Contains("Hpal", encoded);
             Assert.Contains("H001,H002,H003,H004", encoded);
             var definitions = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().ToArray();
-            Assert.Equal("Hpal", definitions.Single(item => item["rawcode"]!.GetValue<string>() == "H001")["base_rawcode"]!.GetValue<string>());
+            Assert.Equal(5, definitions.Length);
+            var expectedParents = new Dictionary<string, string> { ["H001"] = "Hpal", ["H002"] = "Hmkg", ["H003"] = "Hamg", ["H004"] = "Hblm" };
+            foreach (var (rawcode, parent) in expectedParents)
+            {
+                var hero = definitions.Single(item => item["rawcode"]!.GetValue<string>() == rawcode);
+                Assert.Equal(parent, hero["base_rawcode"]!.GetValue<string>());
+                var modifications = hero["modifications"]!.AsArray().OfType<JsonObject>().ToDictionary(item => item["id"]!.GetValue<string>());
+                Assert.Equal(0, modifications["uhst"]["value"]!.GetValue<int>());
+                Assert.Equal(1, modifications["usst"]["value"]!.GetValue<int>());
+            }
             var sold = definitions.Single(item => item["rawcode"]!.GetValue<string>() == "n0AL")["modifications"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "useu");
             Assert.Equal("H001,H002,H003,H004", sold["value"]!.GetValue<string>());
         }
@@ -245,6 +247,31 @@ public sealed class Phase5BuildRoundTripTests
         if (expected is not null) operation["expected"] = expected;
         if (value is not null) operation["value"] = value;
         return operation;
+    }
+
+    private static JsonObject HeroDefinition(string baseRawcode, string customRawcode, string displayName, string tip, int strength, int agility, int intelligence, int hitPoints)
+    {
+        return new JsonObject
+        {
+            ["object_kind"] = "custom",
+            ["category"] = "unit",
+            ["base_rawcode"] = baseRawcode,
+            ["custom_rawcode"] = customRawcode,
+            ["rawcode"] = customRawcode,
+            ["display_name"] = displayName,
+            ["unknown_ids"] = new JsonArray(),
+            ["modifications"] = new JsonArray(
+                new JsonObject { ["id"] = "unam", ["type"] = "String", ["value"] = displayName },
+                new JsonObject { ["id"] = "utip", ["type"] = "String", ["value"] = tip },
+                new JsonObject { ["id"] = "ustr", ["type"] = "Int", ["value"] = strength },
+                new JsonObject { ["id"] = "uagi", ["type"] = "Int", ["value"] = agility },
+                new JsonObject { ["id"] = "uint", ["type"] = "Int", ["value"] = intelligence },
+                new JsonObject { ["id"] = "uhpm", ["type"] = "Int", ["value"] = hitPoints },
+                new JsonObject { ["id"] = "ugol", ["type"] = "Int", ["value"] = 0 },
+                new JsonObject { ["id"] = "ulum", ["type"] = "Int", ["value"] = 0 },
+                new JsonObject { ["id"] = "uhst", ["type"] = "Int", ["value"] = 0 },
+                new JsonObject { ["id"] = "usst", ["type"] = "Int", ["value"] = 1 })
+        };
     }
 
     private static string TempDirectory()

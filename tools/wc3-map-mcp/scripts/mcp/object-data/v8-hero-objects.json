@@ -21,7 +21,9 @@
         { "id": "uint", "type": "Int", "value": 14 },
         { "id": "uhpm", "type": "Int", "value": 700 },
         { "id": "ugol", "type": "Int", "value": 0 },
-        { "id": "ulum", "type": "Int", "value": 0 }
+        { "id": "ulum", "type": "Int", "value": 0 },
+        { "id": "uhst", "type": "Int", "value": 0 },
+        { "id": "usst", "type": "Int", "value": 1 }
       ],
       "codec_version": "wc3-object-data-v1",
       "provenance": "source_of_truth",
@@ -45,7 +47,9 @@
         { "id": "uint", "type": "Int", "value": 12 },
         { "id": "uhpm", "type": "Int", "value": 560 },
         { "id": "ugol", "type": "Int", "value": 0 },
-        { "id": "ulum", "type": "Int", "value": 0 }
+        { "id": "ulum", "type": "Int", "value": 0 },
+        { "id": "uhst", "type": "Int", "value": 0 },
+        { "id": "usst", "type": "Int", "value": 1 }
       ],
       "codec_version": "wc3-object-data-v1",
       "provenance": "source_of_truth",
@@ -69,7 +73,9 @@
         { "id": "uint", "type": "Int", "value": 25 },
         { "id": "uhpm", "type": "Int", "value": 480 },
         { "id": "ugol", "type": "Int", "value": 0 },
-        { "id": "ulum", "type": "Int", "value": 0 }
+        { "id": "ulum", "type": "Int", "value": 0 },
+        { "id": "uhst", "type": "Int", "value": 0 },
+        { "id": "usst", "type": "Int", "value": 1 }
       ],
       "codec_version": "wc3-object-data-v1",
       "provenance": "source_of_truth",
@@ -93,7 +99,9 @@
         { "id": "uint", "type": "Int", "value": 23 },
         { "id": "uhpm", "type": "Int", "value": 520 },
         { "id": "ugol", "type": "Int", "value": 0 },
-        { "id": "ulum", "type": "Int", "value": 0 }
+        { "id": "ulum", "type": "Int", "value": 0 },
+        { "id": "uhst", "type": "Int", "value": 0 },
+        { "id": "usst", "type": "Int", "value": 1 }
       ],
       "codec_version": "wc3-object-data-v1",
       "provenance": "source_of_truth",

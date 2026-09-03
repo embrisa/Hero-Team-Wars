@@ -1,6 +1,6 @@
 # Task: Map MVP Build v15 — Instant Custom Hero Stock Availability & Full Selection Verification
 
-**Status**: Ready for execution  
+**Status**: Implemented; runtime verification pending
 **Target Build Artifact**: `HeroTeamWars_v15.w3m`  
 **Profile**: `mvp_2arena` (4 players, 2 teams of 2, 2 arenas)  
 **Parent Golden Source**: `map/HeroTeamWars_M0_2Arena.w3m` (SHA-256: `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`, immutable)  
@@ -61,3 +61,14 @@ Update all four custom hero definitions (`H001`, `H002`, `H003`, `H004`) to add:
   - The hero is spawned in the correct player arena team slot.
   - The player's camera shifts to center on the deployed hero.
 - [ ] **Game Loop Progression**: After selection, the hero selection building is removed, fog modifiers are cleaned up, and Round 1 wave preparation timer starts.
+
+---
+
+## 5. Agent Execution Record
+
+- Golden source rechecked unchanged: `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`.
+- MCP transaction `453d8e4e-de39-44bf-b806-ec92f6fae4aa`, revision `1`, staged five typed object definitions and passed validation (`buildable=true`).
+- MCP build `dbb6102b-21ba-4b14-beb0-5519cb691fb6` reopened successfully with no semantic differences; output hash `954EBEBCB4FB3564C3BA71736AC2B30E90BE1357D2B66FC95D971D97FE98575C`.
+- Diagnostic runner `builds/diagnostics/build-v15-fix.mjs` generated the published artifact and report `builds/diagnostics/v15-build-report.json`. Published artifact hash: `7977BB1D215A72CBB9D3F50DC61E9AB18521D70CFFC31043275F8562F070CF14`.
+- Published map: `C:\Users\hp\Documents\Warcraft III\Maps\Test\v15\HeroTeamWars_v15.w3m` (49,026 bytes). Static inspection confirmed five `war3map.w3u` definitions and `uhst=0` / `usst=1` on `H001`–`H004`.
+- Automated verification: 94 .NET tests and 44 MCP tests passed. Warcraft III runtime gates remain for the manual checklist above.
