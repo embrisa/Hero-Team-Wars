@@ -66,7 +66,7 @@ public sealed class Phase5BuildRoundTripTests
     }
 
     [Fact]
-    public void V8HeroObjectsRoundTripParentsSoldUnitsAndInstantStock()
+    public void V8HeroObjectsRoundTripParentsSoldUnitsAndCorrectInstantStockFields()
     {
         var source = FindSourceMap();
         var model = MapInspector.Inspect(source);
@@ -108,8 +108,9 @@ public sealed class Phase5BuildRoundTripTests
                 var hero = definitions.Single(item => item["rawcode"]!.GetValue<string>() == rawcode);
                 Assert.Equal(parent, hero["base_rawcode"]!.GetValue<string>());
                 var modifications = hero["modifications"]!.AsArray().OfType<JsonObject>().ToDictionary(item => item["id"]!.GetValue<string>());
-                Assert.Equal(0, modifications["uhst"]["value"]!.GetValue<int>());
-                Assert.Equal(1, modifications["usst"]["value"]!.GetValue<int>());
+                Assert.DoesNotContain("uhst", modifications.Keys);
+                Assert.Equal(0, modifications["usst"]["value"]!.GetValue<int>());
+                Assert.Equal(1, modifications["usrg"]["value"]!.GetValue<int>());
             }
             var sold = definitions.Single(item => item["rawcode"]!.GetValue<string>() == "n0AL")["modifications"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "useu");
             Assert.Equal("H001,H002,H003,H004", sold["value"]!.GetValue<string>());
@@ -269,8 +270,8 @@ public sealed class Phase5BuildRoundTripTests
                 new JsonObject { ["id"] = "uhpm", ["type"] = "Int", ["value"] = hitPoints },
                 new JsonObject { ["id"] = "ugol", ["type"] = "Int", ["value"] = 0 },
                 new JsonObject { ["id"] = "ulum", ["type"] = "Int", ["value"] = 0 },
-                new JsonObject { ["id"] = "uhst", ["type"] = "Int", ["value"] = 0 },
-                new JsonObject { ["id"] = "usst", ["type"] = "Int", ["value"] = 1 })
+                new JsonObject { ["id"] = "usst", ["type"] = "Int", ["value"] = 0 },
+                new JsonObject { ["id"] = "usrg", ["type"] = "Int", ["value"] = 1 })
         };
     }
 

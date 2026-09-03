@@ -1,7 +1,7 @@
 # Task: Map MVP Build v15 — Instant Custom Hero Stock Availability & Full Selection Verification
 
-**Status**: Implemented; runtime verification pending
-**Target Build Artifact**: `HeroTeamWars_v15.w3m`  
+**Status**: Corrected in v16; runtime verification pending
+**Target Build Artifact**: `HeroTeamWars_v16.w3m`
 **Profile**: `mvp_2arena` (4 players, 2 teams of 2, 2 arenas)  
 **Parent Golden Source**: `map/HeroTeamWars_M0_2Arena.w3m` (SHA-256: `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`, immutable)  
 
@@ -10,9 +10,9 @@
 ## 1. Context & Objective
 In build `v14`, the map loaded cleanly without crashing and the shared Hero Altar (`n0AL`) became fully visible and targetable thanks to persistent `FogModifierStart` vision and camera focus.
 
-However, during runtime testing, custom heroes at the altar displayed a long stock cooldown timer (~135 seconds) inherited from standard melee hero tavern defaults (`uhst` / `usst`), preventing instant hero selection.
+However, during runtime testing of v15, custom heroes at the altar still displayed a long stock cooldown timer (~135 seconds). The v15 patch used the wrong rawcode pair: `uhst` is not the stock-start field, and `usst` is Stock Start Delay rather than Stock Replenish Interval. The correct fields are `usst` (start delay) and `usrg` (replenish interval).
 
-**Goal of Step 15 (v15)**:
+**Goal of Step 15 (corrected v16)**:
 1. Eliminate the hero stock delay by explicitly overriding stock availability fields on custom heroes `H001` through `H004`.
 2. Ensure custom heroes can be hired immediately (at second 0) from the shared altar.
 3. Validate the complete end-to-end selection flow: purchasing a hero, slot deduction, deployment to arena spawn points, camera shift to arena, and initiation of Round 1 preparation.
@@ -20,10 +20,10 @@ However, during runtime testing, custom heroes at the altar displayed a long sto
 ---
 
 ## 2. Root Cause Analysis
-- In Warcraft III, tavern/altar stock units rely on two object modification fields:
-  - `uhst` (`Stock Initial Delay` / `Start Delay`): Number of seconds into the game before the unit first appears in shop stock. Defaults to **135 seconds** for standard melee hero base types (`Hpal`, `Hmkg`, `Hamg`, `Hblm`).
-  - `usst` (`Stock Replenish Interval`): Cooldown time (in seconds) to replenish 1 stock count once bought. Defaults to **135 seconds**.
-- In [v8-hero-objects.json](tools/wc3-map-mcp/scripts/mcp/object-data/v8-hero-objects.json), `H001`–`H004` defined base attributes (`ustr`, `uagi`, `uint`, `uhpm`, `ugol`, `ulum`), but omitted explicit `uhst` and `usst` overrides. Consequently, Warcraft III enforced the 135-second initial delay.
+- In Warcraft III, tavern/altar stock units use these unit-object modification fields:
+  - `usst` (`Stock Start Delay`): Number of seconds before the unit first appears in shop stock.
+  - `usrg` (`Stock Replenish Interval`): Cooldown time to replenish one stock count after purchase.
+- In [v8-hero-objects.json](tools/wc3-map-mcp/scripts/mcp/object-data/v8-hero-objects.json), v15 incorrectly added `uhst=0` and `usst=1`; that did not override the inherited `usrg` replenish interval. v16 replaces those with the correct `usst=0` and `usrg=1` overrides.
 
 ---
 
@@ -31,18 +31,18 @@ However, during runtime testing, custom heroes at the altar displayed a long sto
 
 ### A. Object Data Modifications (`v8-hero-objects.json`)
 Update all four custom hero definitions (`H001`, `H002`, `H003`, `H004`) to add:
-- `{ "id": "uhst", "type": "Int", "value": 0 }` — 0-second initial stock cooldown (instant availability at game start).
-- `{ "id": "usst", "type": "Int", "value": 1 }` — 1-second replenish interval.
+- `{ "id": "usst", "type": "Int", "value": 0 }` — 0-second stock start delay (instant availability at game start).
+- `{ "id": "usrg", "type": "Int", "value": 1 }` — 1-second replenish interval.
 
 ### B. Map Build Execution
 1. Verify .NET test suite passes (`dotnet test`).
-2. Run build runner with `ObjectDataFormatVersion.v2` and the updated `v8-hero-objects.json`.
-3. Output artifact to `builds/mcp/hero-team-wars/<build-uuid>/HeroTeamWars_v15-instant-hero-stock_<build-uuid>.w3m`.
-4. Generate and save diagnostic build report `builds/diagnostics/v15-build-report.json`.
+2. Run build runner with `ObjectDataFormatVersion.v2` and the corrected `v8-hero-objects.json`.
+3. Output artifact to `builds/mcp/hero-team-wars/<build-uuid>/HeroTeamWars_v16-instant-hero-stock_<build-uuid>.w3m`.
+4. Generate and save diagnostic build report `builds/diagnostics/v16-build-report.json`.
 
 ### C. Deployment & Test Staging
-1. Create directory `C:\Users\hp\Documents\Warcraft III\Maps\Test\v15\`.
-2. Copy the generated artifact to `C:\Users\hp\Documents\Warcraft III\Maps\Test\v15\HeroTeamWars_v15.w3m`.
+1. Create directory `C:\Users\hp\Documents\Warcraft III\Maps\Test\v16\`.
+2. Copy the generated artifact to `C:\Users\hp\Documents\Warcraft III\Maps\Test\v16\HeroTeamWars_v16.w3m`.
 3. Compute and log SHA-256 hash.
 
 ### D. Source Control & Handoff
@@ -69,6 +69,7 @@ Update all four custom hero definitions (`H001`, `H002`, `H003`, `H004`) to add:
 - Golden source rechecked unchanged: `027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834`.
 - MCP transaction `453d8e4e-de39-44bf-b806-ec92f6fae4aa`, revision `1`, staged five typed object definitions and passed validation (`buildable=true`).
 - MCP build `dbb6102b-21ba-4b14-beb0-5519cb691fb6` reopened successfully with no semantic differences; output hash `954EBEBCB4FB3564C3BA71736AC2B30E90BE1357D2B66FC95D971D97FE98575C`.
-- Diagnostic runner `builds/diagnostics/build-v15-fix.mjs` generated the published artifact and report `builds/diagnostics/v15-build-report.json`. Published artifact hash: `7977BB1D215A72CBB9D3F50DC61E9AB18521D70CFFC31043275F8562F070CF14`.
-- Published map: `C:\Users\hp\Documents\Warcraft III\Maps\Test\v15\HeroTeamWars_v15.w3m` (49,026 bytes). Static inspection confirmed five `war3map.w3u` definitions and `uhst=0` / `usst=1` on `H001`–`H004`.
-- Automated verification: 94 .NET tests and 44 MCP tests passed. Warcraft III runtime gates remain for the manual checklist above.
+- v15 runtime feedback: the user opened `C:\Users\hp\Documents\Warcraft III\Maps\Test\v15\HeroTeamWars_v15.w3m` and still saw the inherited long stock cooldown. `War3Log.txt` records the exact v15 map opening and no compile error; runtime UI behavior remains user-observed.
+- Static v15 inspection confirmed the wrong fields were encoded: `uhst=0` / `usst=1` on `H001`–`H004`.
+- v16 correction: use `usst=0` / `usrg=1`; build and publish a separate v16 artifact, leaving v15 intact for comparison.
+- Automated verification: 94 .NET tests and 44 MCP tests passed before the v16 correction; rerun the full suite after the correction. Warcraft III runtime gates remain for the manual checklist above.

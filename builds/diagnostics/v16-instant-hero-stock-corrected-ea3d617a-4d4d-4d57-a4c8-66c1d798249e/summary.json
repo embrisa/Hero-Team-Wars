@@ -1,0 +1,26 @@
+{
+  "build_id": "ea3d617a-4d4d-4d57-a4c8-66c1d798249e",
+  "version_label": "v16",
+  "variant_id": "v16-instant-hero-stock-corrected",
+  "description": "MVP custom hero selection build with ObjectDataFormatVersion.v2, custom heroes H001..H004, shared altar n0AL, persistent altar vision/camera focus, and usst=0 / usrg=1 stock overrides for instant hero availability.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\ea3d617a-4d4d-4d57-a4c8-66c1d798249e\\HeroTeamWars_v16-instant-hero-stock-corrected_ea3d617a-4d4d-4d57-a4c8-66c1d798249e.w3m",
+  "output_sha256": "0C2347BB5B9064D39ED6EB77EC532134299F47BFD246F28B668D52F17555D9B3",
+  "output_size_bytes": 49026,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "3594549FB360F204379D02812B2D720AC458E239C090215E34A67ABD6B30F036",
+    "size_bytes": 48170
+  },
+  "objects": {
+    "count": 5,
+    "has_w3u": true,
+    "w3u_sha256": "03913DD7805E7307D3948B63F081F20D26C1075B217176930115AB7DCA444274",
+    "w3u_size_bytes": 1043
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v16-instant-hero-stock-corrected-ea3d617a-4d4d-4d57-a4c8-66c1d798249e"
+}
