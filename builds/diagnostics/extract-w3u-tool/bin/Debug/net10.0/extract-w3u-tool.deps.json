@@ -1,0 +1,289 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "extract-w3u-tool/1.0.0": {
+        "dependencies": {
+          "Wc3MapEngine.Core": "1.0.0"
+        },
+        "runtime": {
+          "extract-w3u-tool.dll": {}
+        }
+      },
+      "Microsoft.Win32.SystemEvents/6.0.0": {
+        "runtime": {
+          "lib/net6.0/Microsoft.Win32.SystemEvents.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net6.0/Microsoft.Win32.SystemEvents.dll": {
+            "rid": "win",
+            "assetType": "runtime",
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        }
+      },
+      "Pidgin/3.1.0": {
+        "runtime": {
+          "lib/net5.0/Pidgin.dll": {
+            "assemblyVersion": "3.1.0.0",
+            "fileVersion": "3.1.0.0"
+          }
+        }
+      },
+      "SharpZipLib/1.4.2": {
+        "runtime": {
+          "lib/net6.0/ICSharpCode.SharpZipLib.dll": {
+            "assemblyVersion": "1.4.2.13",
+            "fileVersion": "1.4.2.13"
+          }
+        }
+      },
+      "System.Drawing.Common/6.0.0": {
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "6.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/System.Drawing.Common.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/unix/lib/net6.0/System.Drawing.Common.dll": {
+            "rid": "unix",
+            "assetType": "runtime",
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          },
+          "runtimes/win/lib/net6.0/System.Drawing.Common.dll": {
+            "rid": "win",
+            "assetType": "runtime",
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        }
+      },
+      "System.IO.Hashing/8.0.0": {
+        "runtime": {
+          "lib/net8.0/System.IO.Hashing.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.23.53103"
+          }
+        }
+      },
+      "War3Net.Build.Core/6.0.3": {
+        "dependencies": {
+          "War3Net.CodeAnalysis.Jass": "6.0.2",
+          "War3Net.IO.Mpq": "6.0.3",
+          "War3Net.IO.Slk": "6.0.2"
+        },
+        "runtime": {
+          "lib/net10.0/War3Net.Build.Core.dll": {
+            "assemblyVersion": "6.0.3.0",
+            "fileVersion": "6.0.3.0"
+          }
+        }
+      },
+      "War3Net.CodeAnalysis/6.0.2": {
+        "dependencies": {
+          "Pidgin": "3.1.0"
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.CodeAnalysis.dll": {
+            "assemblyVersion": "6.0.2.0",
+            "fileVersion": "6.0.2.0"
+          }
+        }
+      },
+      "War3Net.CodeAnalysis.Jass/6.0.2": {
+        "dependencies": {
+          "War3Net.CodeAnalysis": "6.0.2",
+          "War3Net.Common": "6.0.2"
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.CodeAnalysis.Jass.dll": {
+            "assemblyVersion": "6.0.2.0",
+            "fileVersion": "6.0.2.0"
+          }
+        }
+      },
+      "War3Net.Common/6.0.2": {
+        "dependencies": {
+          "System.Drawing.Common": "6.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.Common.dll": {
+            "assemblyVersion": "6.0.2.0",
+            "fileVersion": "6.0.2.0"
+          }
+        }
+      },
+      "War3Net.IO.Compression/6.0.2": {
+        "dependencies": {
+          "SharpZipLib": "1.4.2",
+          "System.IO.Hashing": "8.0.0",
+          "War3Net.Common": "6.0.2"
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.IO.Compression.dll": {
+            "assemblyVersion": "6.0.2.0",
+            "fileVersion": "6.0.2.0"
+          }
+        }
+      },
+      "War3Net.IO.Mpq/6.0.3": {
+        "dependencies": {
+          "War3Net.IO.Compression": "6.0.2"
+        },
+        "runtime": {
+          "lib/net10.0/War3Net.IO.Mpq.dll": {
+            "assemblyVersion": "6.0.3.0",
+            "fileVersion": "6.0.3.0"
+          }
+        }
+      },
+      "War3Net.IO.Slk/6.0.2": {
+        "dependencies": {
+          "War3Net.Common": "6.0.2"
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.IO.Slk.dll": {
+            "assemblyVersion": "6.0.2.0",
+            "fileVersion": "6.0.2.0"
+          }
+        }
+      },
+      "Wc3MapEngine.Contracts/1.0.0": {
+        "runtime": {
+          "Wc3MapEngine.Contracts.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Wc3MapEngine.Core/1.0.0": {
+        "dependencies": {
+          "War3Net.Build.Core": "6.0.3",
+          "War3Net.CodeAnalysis.Jass": "6.0.2",
+          "War3Net.IO.Mpq": "6.0.3",
+          "Wc3MapEngine.Contracts": "1.0.0"
+        },
+        "runtime": {
+          "Wc3MapEngine.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "extract-w3u-tool/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Win32.SystemEvents/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-hqTM5628jSsQiv+HGpiq3WKBl2c8v1KZfby2J6Pr7pEPlK9waPdgEO6b8A/+/xn/yZ9ulv8HuqK71ONy2tg67A==",
+      "path": "microsoft.win32.systemevents/6.0.0",
+      "hashPath": "microsoft.win32.systemevents.6.0.0.nupkg.sha512"
+    },
+    "Pidgin/3.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-bJXIaV7E18oXLVmg3SdxB3UzTNt6RElLaA3eDPMaH/MTGUTa6NqGbySDm5NEmsudOi/zVxldExke3omoHQu31g==",
+      "path": "pidgin/3.1.0",
+      "hashPath": "pidgin.3.1.0.nupkg.sha512"
+    },
+    "SharpZipLib/1.4.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-yjj+3zgz8zgXpiiC3ZdF/iyTBbz2fFvMxZFEBPUcwZjIvXOf37Ylm+K58hqMfIBt5JgU/Z2uoUS67JmTLe973A==",
+      "path": "sharpziplib/1.4.2",
+      "hashPath": "sharpziplib.1.4.2.nupkg.sha512"
+    },
+    "System.Drawing.Common/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-NfuoKUiP2nUWwKZN6twGqXioIe1zVD0RIj2t976A+czLHr2nY454RwwXs6JU9Htc6mwqL6Dn/nEL3dpVf2jOhg==",
+      "path": "system.drawing.common/6.0.0",
+      "hashPath": "system.drawing.common.6.0.0.nupkg.sha512"
+    },
+    "System.IO.Hashing/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ne1843evDugl0md7Fjzy6QjJrzsjh46ZKbhf8GwBXb5f/gw97J4bxMs0NQKifDuThh/f0bZ0e62NPl1jzTuRqA==",
+      "path": "system.io.hashing/8.0.0",
+      "hashPath": "system.io.hashing.8.0.0.nupkg.sha512"
+    },
+    "War3Net.Build.Core/6.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-s5Om1PzBcIjWWybiNvHyOWs8t1FHG2NSksaDbhf4RqXkV6cw/SCHjLDSGyFjPOEE86O4a1kxFI+zJh8Mr5gZbA==",
+      "path": "war3net.build.core/6.0.3",
+      "hashPath": "war3net.build.core.6.0.3.nupkg.sha512"
+    },
+    "War3Net.CodeAnalysis/6.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-d8qieXx8J/pIr/B1lqTBuh5WqVsulJZ3n8Fzy1UWWGXPq0Ajbw2TjPM/shWCArElrawYrZYaUxy99Bj+ITtDig==",
+      "path": "war3net.codeanalysis/6.0.2",
+      "hashPath": "war3net.codeanalysis.6.0.2.nupkg.sha512"
+    },
+    "War3Net.CodeAnalysis.Jass/6.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-CJQYvyvB3STcgCpTjGsfYkOt6fdkBm4uK3wO/EFWAM5joQhiz8O1/idJz/OoQhFBV5XrtVqo4QZ3XAMQQG2wNw==",
+      "path": "war3net.codeanalysis.jass/6.0.2",
+      "hashPath": "war3net.codeanalysis.jass.6.0.2.nupkg.sha512"
+    },
+    "War3Net.Common/6.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-yvkqqAIArv7imGrNCzLwAUZ4LeGax9LiB7fqbxTz6ZoGZWklQ7sdPKLYZj6pmV0Voo+OJLKg9XLiAPcZ4d6CDw==",
+      "path": "war3net.common/6.0.2",
+      "hashPath": "war3net.common.6.0.2.nupkg.sha512"
+    },
+    "War3Net.IO.Compression/6.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-9MBhfG27lXLOq1iZRdP0fte43Ta98HmrNDV0NXXOPRjJ6Yh82wio4Hp7fLBMx/+Luh9AIWkp0bUl7unHMjg78A==",
+      "path": "war3net.io.compression/6.0.2",
+      "hashPath": "war3net.io.compression.6.0.2.nupkg.sha512"
+    },
+    "War3Net.IO.Mpq/6.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-352wwf9k7Dtf6hJVfXhmDbFoWx9r5E3XC0JtiKbAve1fKdIoj934KyZA4ImgSdGkU71MBpoNYf3RNbDdXzmglg==",
+      "path": "war3net.io.mpq/6.0.3",
+      "hashPath": "war3net.io.mpq.6.0.3.nupkg.sha512"
+    },
+    "War3Net.IO.Slk/6.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-OJIqDZMdKqHdudghmrFLih5zrIHx3h6fCnWKSA/UpJRkBjaTKFsdFuM0rD1msbTzMGJchaZXY2x0QlOgJcWzfQ==",
+      "path": "war3net.io.slk/6.0.2",
+      "hashPath": "war3net.io.slk.6.0.2.nupkg.sha512"
+    },
+    "Wc3MapEngine.Contracts/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Wc3MapEngine.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

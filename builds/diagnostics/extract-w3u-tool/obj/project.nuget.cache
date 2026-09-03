@@ -1,8 +1,21 @@
 {
   "version": 2,
-  "dgSpecHash": "AiK+rRbUPn0=",
+  "dgSpecHash": "3RsFB6tClkY=",
   "success": true,
-  "projectFilePath": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\extract-w3u-tool\\extract-w3u-tool.csproj",
-  "expectedPackageFiles": [],
+  "projectFilePath": "c:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\extract-w3u-tool\\extract-w3u-tool.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\hp\\.nuget\\packages\\microsoft.win32.systemevents\\6.0.0\\microsoft.win32.systemevents.6.0.0.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\pidgin\\3.1.0\\pidgin.3.1.0.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\sharpziplib\\1.4.2\\sharpziplib.1.4.2.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\system.drawing.common\\6.0.0\\system.drawing.common.6.0.0.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\system.io.hashing\\8.0.0\\system.io.hashing.8.0.0.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\war3net.build.core\\6.0.3\\war3net.build.core.6.0.3.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\war3net.codeanalysis\\6.0.2\\war3net.codeanalysis.6.0.2.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\war3net.codeanalysis.jass\\6.0.2\\war3net.codeanalysis.jass.6.0.2.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\war3net.common\\6.0.2\\war3net.common.6.0.2.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\war3net.io.compression\\6.0.2\\war3net.io.compression.6.0.2.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\war3net.io.mpq\\6.0.3\\war3net.io.mpq.6.0.3.nupkg.sha512",
+    "C:\\Users\\hp\\.nuget\\packages\\war3net.io.slk\\6.0.2\\war3net.io.slk.6.0.2.nupkg.sha512"
+  ],
   "logs": []
 }

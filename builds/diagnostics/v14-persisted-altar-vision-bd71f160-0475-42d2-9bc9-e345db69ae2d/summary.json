@@ -1,0 +1,26 @@
+{
+  "build_id": "bd71f160-0475-42d2-9bc9-e345db69ae2d",
+  "version_label": "v14",
+  "variant_id": "v14-persisted-altar-vision",
+  "description": "Complete MVP Custom Hero Selection build: uses war3map.w3u v2 format, custom heroes H001..H004 and shared altar n0AL. At map start, creates and starts persistent FogModifiers (FogModifierStart) for all players over the altar area, pans camera to altar, and selects the altar.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\bd71f160-0475-42d2-9bc9-e345db69ae2d\\HeroTeamWars_v14-persisted-altar-vision_bd71f160-0475-42d2-9bc9-e345db69ae2d.w3m",
+  "output_sha256": "C70F11C959C755315274C002B01224957DAE9D8760627DF9A316FB8D30C05D44",
+  "output_size_bytes": 48897,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "3594549FB360F204379D02812B2D720AC458E239C090215E34A67ABD6B30F036",
+    "size_bytes": 48170
+  },
+  "objects": {
+    "count": 5,
+    "has_w3u": true,
+    "w3u_sha256": "A1F131CF8A4C3FA8C33CB4B4FD80839997FBBDDDD804944783BDFC704C256777",
+    "w3u_size_bytes": 915
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v14-persisted-altar-vision-bd71f160-0475-42d2-9bc9-e345db69ae2d"
+}

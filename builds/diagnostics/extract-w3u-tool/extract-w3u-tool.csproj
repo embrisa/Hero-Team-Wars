@@ -6,14 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="War3Net.IO.Mpq">
-      <HintPath>C:\Users\hp\Documents\Warcraft III\Hero Team Wars\tools\wc3-map-mcp\map-engine\publish\War3Net.IO.Mpq.dll</HintPath>
-    </Reference>
-    <Reference Include="War3Net.Common">
-      <HintPath>C:\Users\hp\Documents\Warcraft III\Hero Team Wars\tools\wc3-map-mcp\map-engine\publish\War3Net.Common.dll</HintPath>
-    </Reference>
-    <Reference Include="War3Net.IO.Compression">
-      <HintPath>C:\Users\hp\Documents\Warcraft III\Hero Team Wars\tools\wc3-map-mcp\map-engine\publish\War3Net.IO.Compression.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\..\..\tools\wc3-map-mcp\map-engine\src\Wc3MapEngine.Core\Wc3MapEngine.Core.csproj" />
   </ItemGroup>
 </Project>

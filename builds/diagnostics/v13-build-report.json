@@ -1,0 +1,26 @@
+{
+  "build_id": "6ce3711c-3b26-4bf1-b5c9-b52b38ca5ca8",
+  "version_label": "v13",
+  "variant_id": "v13-custom-heroes-w3u-v2-format",
+  "description": "Complete MVP Custom Hero Selection build: uses war3map.w3u encoded with ObjectDataFormatVersion.v2 (fixing the 4-byte unk header alignment crash), includes custom heroes H001..H004 and shared altar n0AL, and grants vision modifier over the altar during selection.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\6ce3711c-3b26-4bf1-b5c9-b52b38ca5ca8\\HeroTeamWars_v13-custom-heroes-w3u-v2-format_6ce3711c-3b26-4bf1-b5c9-b52b38ca5ca8.w3m",
+  "output_sha256": "DA9E1C0153C2895FE73416A9E199E3DDEC78D246B31AD854F836D74966A5CEDA",
+  "output_size_bytes": 48710,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "33D855401929D107C891B8AD7F645843141355B0C11C2EFAA9241B6DC8AB8454",
+    "size_bytes": 47346
+  },
+  "objects": {
+    "count": 5,
+    "has_w3u": true,
+    "w3u_sha256": "A1F131CF8A4C3FA8C33CB4B4FD80839997FBBDDDD804944783BDFC704C256777",
+    "w3u_size_bytes": 915
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v13-custom-heroes-w3u-v2-format-6ce3711c-3b26-4bf1-b5c9-b52b38ca5ca8"
+}

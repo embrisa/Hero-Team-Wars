@@ -1,0 +1,26 @@
+{
+  "build_id": "91207484-a5c2-44c9-a640-116460cde65f",
+  "version_label": "v10",
+  "variant_id": "v10-direct-spawn-h001",
+  "description": "Contains all 4 custom hero definitions (H001-H004) in war3map.w3u. At map init, directly spawns 'H001' for each player without an altar.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\91207484-a5c2-44c9-a640-116460cde65f\\HeroTeamWars_v10-direct-spawn-h001_91207484-a5c2-44c9-a640-116460cde65f.w3m",
+  "output_sha256": "82B5FD80D39006B02537523B94C0D95799B3236C8A8724884FDC89B8B21AA33C",
+  "output_size_bytes": 47161,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "4FC766BF197DA1990DAC439CD58EE51DD5D815D779771116B7932F94B9DCF919",
+    "size_bytes": 42125
+  },
+  "objects": {
+    "count": 4,
+    "has_w3u": true,
+    "w3u_sha256": "7C85302C86C4826C6802A1F8EED2B7C60D0966304672826ED0439DD86F07BB63",
+    "w3u_size_bytes": 828
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v10-direct-spawn-h001-91207484-a5c2-44c9-a640-116460cde65f"
+}

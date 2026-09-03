@@ -1,0 +1,26 @@
+{
+  "build_id": "f4d3fe36-f9e7-48e8-b647-061621cb031a",
+  "version_label": "v9",
+  "variant_id": "v9-objects-only-disabled-selection",
+  "description": "Contains all 5 v8 object definitions in war3map.w3u (H001-H004, n0AL), but HTW_HeroSelection_Begin is a no-op. Proves whether war3map.w3u itself crashes the engine loader.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\f4d3fe36-f9e7-48e8-b647-061621cb031a\\HeroTeamWars_v9-objects-only-disabled-selection_f4d3fe36-f9e7-48e8-b647-061621cb031a.w3m",
+  "output_sha256": "47BC727800BBA455F833FF3D78C2F45324DE8C1718F1EAD2236B86DF2084CD30",
+  "output_size_bytes": 47151,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "7865B1D6916C0C7CFE9F2EDEA34BD3C2FC3CB3F115D0E15679FCAD91DEDBA74E",
+    "size_bytes": 41422
+  },
+  "objects": {
+    "count": 5,
+    "has_w3u": true,
+    "w3u_sha256": "4F21BE155269904464D428F84B0E407FDAEEA0A4EEDD5E9F7BDD5C43F21B1F41",
+    "w3u_size_bytes": 967
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v9-objects-only-disabled-selection-f4d3fe36-f9e7-48e8-b647-061621cb031a"
+}

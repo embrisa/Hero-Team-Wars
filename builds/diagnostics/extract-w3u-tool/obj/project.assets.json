@@ -1,11 +1,502 @@
 {
   "version": 4,
   "targets": {
-    "net10.0": {}
+    "net10.0": {
+      "Microsoft.Win32.SystemEvents/6.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/netcoreapp3.1/_._": {}
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net6.0/Microsoft.Win32.SystemEvents.dll": {
+            "assetType": "runtime",
+            "rid": "win"
+          }
+        }
+      },
+      "Pidgin/3.1.0": {
+        "type": "package",
+        "compile": {
+          "lib/net5.0/Pidgin.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net5.0/Pidgin.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "SharpZipLib/1.4.2": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/ICSharpCode.SharpZipLib.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/ICSharpCode.SharpZipLib.dll": {
+            "related": ".pdb;.xml"
+          }
+        }
+      },
+      "System.Drawing.Common/6.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "6.0.0"
+        },
+        "compile": {
+          "lib/net6.0/System.Drawing.Common.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/System.Drawing.Common.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/netcoreapp3.1/_._": {}
+        },
+        "runtimeTargets": {
+          "runtimes/unix/lib/net6.0/System.Drawing.Common.dll": {
+            "assetType": "runtime",
+            "rid": "unix"
+          },
+          "runtimes/win/lib/net6.0/System.Drawing.Common.dll": {
+            "assetType": "runtime",
+            "rid": "win"
+          }
+        }
+      },
+      "System.IO.Hashing/8.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/System.IO.Hashing.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/System.IO.Hashing.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        }
+      },
+      "War3Net.Build.Core/6.0.3": {
+        "type": "package",
+        "dependencies": {
+          "War3Net.CodeAnalysis.Jass": "6.0.2",
+          "War3Net.IO.Mpq": "6.0.3",
+          "War3Net.IO.Slk": "6.0.2"
+        },
+        "compile": {
+          "lib/net10.0/War3Net.Build.Core.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/War3Net.Build.Core.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "War3Net.CodeAnalysis/6.0.2": {
+        "type": "package",
+        "dependencies": {
+          "Pidgin": "3.1.0"
+        },
+        "compile": {
+          "lib/net6.0/War3Net.CodeAnalysis.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.CodeAnalysis.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "War3Net.CodeAnalysis.Jass/6.0.2": {
+        "type": "package",
+        "dependencies": {
+          "War3Net.CodeAnalysis": "6.0.2",
+          "War3Net.Common": "6.0.2"
+        },
+        "compile": {
+          "lib/net6.0/War3Net.CodeAnalysis.Jass.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.CodeAnalysis.Jass.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "War3Net.Common/6.0.2": {
+        "type": "package",
+        "dependencies": {
+          "System.Drawing.Common": "6.0.0"
+        },
+        "compile": {
+          "lib/net6.0/War3Net.Common.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.Common.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "War3Net.IO.Compression/6.0.2": {
+        "type": "package",
+        "dependencies": {
+          "SharpZipLib": "1.4.2",
+          "System.IO.Hashing": "8.0.0",
+          "War3Net.Common": "6.0.2"
+        },
+        "compile": {
+          "lib/net6.0/War3Net.IO.Compression.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.IO.Compression.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "War3Net.IO.Mpq/6.0.3": {
+        "type": "package",
+        "dependencies": {
+          "War3Net.IO.Compression": "6.0.2"
+        },
+        "compile": {
+          "lib/net10.0/War3Net.IO.Mpq.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/War3Net.IO.Mpq.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "War3Net.IO.Slk/6.0.2": {
+        "type": "package",
+        "dependencies": {
+          "War3Net.Common": "6.0.2"
+        },
+        "compile": {
+          "lib/net6.0/War3Net.IO.Slk.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/War3Net.IO.Slk.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Wc3MapEngine.Contracts/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "compile": {
+          "bin/placeholder/Wc3MapEngine.Contracts.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Wc3MapEngine.Contracts.dll": {}
+        }
+      },
+      "Wc3MapEngine.Core/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "War3Net.Build.Core": "6.0.3",
+          "War3Net.CodeAnalysis.Jass": "6.0.2",
+          "War3Net.IO.Mpq": "6.0.3",
+          "Wc3MapEngine.Contracts": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Wc3MapEngine.Core.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Wc3MapEngine.Core.dll": {}
+        }
+      }
+    }
   },
-  "libraries": {},
+  "libraries": {
+    "Microsoft.Win32.SystemEvents/6.0.0": {
+      "sha512": "hqTM5628jSsQiv+HGpiq3WKBl2c8v1KZfby2J6Pr7pEPlK9waPdgEO6b8A/+/xn/yZ9ulv8HuqK71ONy2tg67A==",
+      "type": "package",
+      "path": "microsoft.win32.systemevents/6.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/netcoreapp2.0/Microsoft.Win32.SystemEvents.targets",
+        "buildTransitive/netcoreapp3.1/_._",
+        "lib/net461/Microsoft.Win32.SystemEvents.dll",
+        "lib/net461/Microsoft.Win32.SystemEvents.xml",
+        "lib/net6.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/net6.0/Microsoft.Win32.SystemEvents.xml",
+        "lib/netcoreapp3.1/Microsoft.Win32.SystemEvents.dll",
+        "lib/netcoreapp3.1/Microsoft.Win32.SystemEvents.xml",
+        "lib/netstandard2.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/netstandard2.0/Microsoft.Win32.SystemEvents.xml",
+        "microsoft.win32.systemevents.6.0.0.nupkg.sha512",
+        "microsoft.win32.systemevents.nuspec",
+        "runtimes/win/lib/net6.0/Microsoft.Win32.SystemEvents.dll",
+        "runtimes/win/lib/net6.0/Microsoft.Win32.SystemEvents.xml",
+        "runtimes/win/lib/netcoreapp3.1/Microsoft.Win32.SystemEvents.dll",
+        "runtimes/win/lib/netcoreapp3.1/Microsoft.Win32.SystemEvents.xml",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "Pidgin/3.1.0": {
+      "sha512": "bJXIaV7E18oXLVmg3SdxB3UzTNt6RElLaA3eDPMaH/MTGUTa6NqGbySDm5NEmsudOi/zVxldExke3omoHQu31g==",
+      "type": "package",
+      "path": "pidgin/3.1.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net5.0/Pidgin.dll",
+        "lib/net5.0/Pidgin.xml",
+        "pidgin.3.1.0.nupkg.sha512",
+        "pidgin.nuspec"
+      ]
+    },
+    "SharpZipLib/1.4.2": {
+      "sha512": "yjj+3zgz8zgXpiiC3ZdF/iyTBbz2fFvMxZFEBPUcwZjIvXOf37Ylm+K58hqMfIBt5JgU/Z2uoUS67JmTLe973A==",
+      "type": "package",
+      "path": "sharpziplib/1.4.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "images/sharpziplib-nuget-256x256.png",
+        "lib/net6.0/ICSharpCode.SharpZipLib.dll",
+        "lib/net6.0/ICSharpCode.SharpZipLib.pdb",
+        "lib/net6.0/ICSharpCode.SharpZipLib.xml",
+        "lib/netstandard2.0/ICSharpCode.SharpZipLib.dll",
+        "lib/netstandard2.0/ICSharpCode.SharpZipLib.pdb",
+        "lib/netstandard2.0/ICSharpCode.SharpZipLib.xml",
+        "lib/netstandard2.1/ICSharpCode.SharpZipLib.dll",
+        "lib/netstandard2.1/ICSharpCode.SharpZipLib.pdb",
+        "lib/netstandard2.1/ICSharpCode.SharpZipLib.xml",
+        "sharpziplib.1.4.2.nupkg.sha512",
+        "sharpziplib.nuspec"
+      ]
+    },
+    "System.Drawing.Common/6.0.0": {
+      "sha512": "NfuoKUiP2nUWwKZN6twGqXioIe1zVD0RIj2t976A+czLHr2nY454RwwXs6JU9Htc6mwqL6Dn/nEL3dpVf2jOhg==",
+      "type": "package",
+      "path": "system.drawing.common/6.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/netcoreapp2.0/System.Drawing.Common.targets",
+        "buildTransitive/netcoreapp3.1/_._",
+        "lib/MonoAndroid10/_._",
+        "lib/MonoTouch10/_._",
+        "lib/net461/System.Drawing.Common.dll",
+        "lib/net461/System.Drawing.Common.xml",
+        "lib/net6.0/System.Drawing.Common.dll",
+        "lib/net6.0/System.Drawing.Common.xml",
+        "lib/netcoreapp3.1/System.Drawing.Common.dll",
+        "lib/netcoreapp3.1/System.Drawing.Common.xml",
+        "lib/netstandard2.0/System.Drawing.Common.dll",
+        "lib/netstandard2.0/System.Drawing.Common.xml",
+        "lib/xamarinios10/_._",
+        "lib/xamarinmac20/_._",
+        "lib/xamarintvos10/_._",
+        "lib/xamarinwatchos10/_._",
+        "runtimes/unix/lib/net6.0/System.Drawing.Common.dll",
+        "runtimes/unix/lib/net6.0/System.Drawing.Common.xml",
+        "runtimes/unix/lib/netcoreapp3.1/System.Drawing.Common.dll",
+        "runtimes/unix/lib/netcoreapp3.1/System.Drawing.Common.xml",
+        "runtimes/win/lib/net6.0/System.Drawing.Common.dll",
+        "runtimes/win/lib/net6.0/System.Drawing.Common.xml",
+        "runtimes/win/lib/netcoreapp3.1/System.Drawing.Common.dll",
+        "runtimes/win/lib/netcoreapp3.1/System.Drawing.Common.xml",
+        "system.drawing.common.6.0.0.nupkg.sha512",
+        "system.drawing.common.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "System.IO.Hashing/8.0.0": {
+      "sha512": "ne1843evDugl0md7Fjzy6QjJrzsjh46ZKbhf8GwBXb5f/gw97J4bxMs0NQKifDuThh/f0bZ0e62NPl1jzTuRqA==",
+      "type": "package",
+      "path": "system.io.hashing/8.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.IO.Hashing.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net6.0/_._",
+        "buildTransitive/netcoreapp2.0/System.IO.Hashing.targets",
+        "lib/net462/System.IO.Hashing.dll",
+        "lib/net462/System.IO.Hashing.xml",
+        "lib/net6.0/System.IO.Hashing.dll",
+        "lib/net6.0/System.IO.Hashing.xml",
+        "lib/net7.0/System.IO.Hashing.dll",
+        "lib/net7.0/System.IO.Hashing.xml",
+        "lib/net8.0/System.IO.Hashing.dll",
+        "lib/net8.0/System.IO.Hashing.xml",
+        "lib/netstandard2.0/System.IO.Hashing.dll",
+        "lib/netstandard2.0/System.IO.Hashing.xml",
+        "system.io.hashing.8.0.0.nupkg.sha512",
+        "system.io.hashing.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "War3Net.Build.Core/6.0.3": {
+      "sha512": "s5Om1PzBcIjWWybiNvHyOWs8t1FHG2NSksaDbhf4RqXkV6cw/SCHjLDSGyFjPOEE86O4a1kxFI+zJh8Mr5gZbA==",
+      "type": "package",
+      "path": "war3net.build.core/6.0.3",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net10.0/War3Net.Build.Core.dll",
+        "lib/net10.0/War3Net.Build.Core.xml",
+        "lib/net6.0/War3Net.Build.Core.dll",
+        "lib/net6.0/War3Net.Build.Core.xml",
+        "war3net-icon.png",
+        "war3net.build.core.6.0.3.nupkg.sha512",
+        "war3net.build.core.nuspec"
+      ]
+    },
+    "War3Net.CodeAnalysis/6.0.2": {
+      "sha512": "d8qieXx8J/pIr/B1lqTBuh5WqVsulJZ3n8Fzy1UWWGXPq0Ajbw2TjPM/shWCArElrawYrZYaUxy99Bj+ITtDig==",
+      "type": "package",
+      "path": "war3net.codeanalysis/6.0.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net6.0/War3Net.CodeAnalysis.dll",
+        "lib/net6.0/War3Net.CodeAnalysis.xml",
+        "war3net-icon.png",
+        "war3net.codeanalysis.6.0.2.nupkg.sha512",
+        "war3net.codeanalysis.nuspec"
+      ]
+    },
+    "War3Net.CodeAnalysis.Jass/6.0.2": {
+      "sha512": "CJQYvyvB3STcgCpTjGsfYkOt6fdkBm4uK3wO/EFWAM5joQhiz8O1/idJz/OoQhFBV5XrtVqo4QZ3XAMQQG2wNw==",
+      "type": "package",
+      "path": "war3net.codeanalysis.jass/6.0.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net6.0/War3Net.CodeAnalysis.Jass.dll",
+        "lib/net6.0/War3Net.CodeAnalysis.Jass.xml",
+        "war3net-icon.png",
+        "war3net.codeanalysis.jass.6.0.2.nupkg.sha512",
+        "war3net.codeanalysis.jass.nuspec"
+      ]
+    },
+    "War3Net.Common/6.0.2": {
+      "sha512": "yvkqqAIArv7imGrNCzLwAUZ4LeGax9LiB7fqbxTz6ZoGZWklQ7sdPKLYZj6pmV0Voo+OJLKg9XLiAPcZ4d6CDw==",
+      "type": "package",
+      "path": "war3net.common/6.0.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net6.0/War3Net.Common.dll",
+        "lib/net6.0/War3Net.Common.xml",
+        "war3net-icon.png",
+        "war3net.common.6.0.2.nupkg.sha512",
+        "war3net.common.nuspec"
+      ]
+    },
+    "War3Net.IO.Compression/6.0.2": {
+      "sha512": "9MBhfG27lXLOq1iZRdP0fte43Ta98HmrNDV0NXXOPRjJ6Yh82wio4Hp7fLBMx/+Luh9AIWkp0bUl7unHMjg78A==",
+      "type": "package",
+      "path": "war3net.io.compression/6.0.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net6.0/War3Net.IO.Compression.dll",
+        "lib/net6.0/War3Net.IO.Compression.xml",
+        "war3net-icon.png",
+        "war3net.io.compression.6.0.2.nupkg.sha512",
+        "war3net.io.compression.nuspec"
+      ]
+    },
+    "War3Net.IO.Mpq/6.0.3": {
+      "sha512": "352wwf9k7Dtf6hJVfXhmDbFoWx9r5E3XC0JtiKbAve1fKdIoj934KyZA4ImgSdGkU71MBpoNYf3RNbDdXzmglg==",
+      "type": "package",
+      "path": "war3net.io.mpq/6.0.3",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net10.0/War3Net.IO.Mpq.dll",
+        "lib/net10.0/War3Net.IO.Mpq.xml",
+        "lib/net6.0/War3Net.IO.Mpq.dll",
+        "lib/net6.0/War3Net.IO.Mpq.xml",
+        "war3net-icon.png",
+        "war3net.io.mpq.6.0.3.nupkg.sha512",
+        "war3net.io.mpq.nuspec"
+      ]
+    },
+    "War3Net.IO.Slk/6.0.2": {
+      "sha512": "OJIqDZMdKqHdudghmrFLih5zrIHx3h6fCnWKSA/UpJRkBjaTKFsdFuM0rD1msbTzMGJchaZXY2x0QlOgJcWzfQ==",
+      "type": "package",
+      "path": "war3net.io.slk/6.0.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net6.0/War3Net.IO.Slk.dll",
+        "lib/net6.0/War3Net.IO.Slk.xml",
+        "war3net-icon.png",
+        "war3net.io.slk.6.0.2.nupkg.sha512",
+        "war3net.io.slk.nuspec"
+      ]
+    },
+    "Wc3MapEngine.Contracts/1.0.0": {
+      "type": "project",
+      "path": "../../../tools/wc3-map-mcp/map-engine/src/Wc3MapEngine.Contracts/Wc3MapEngine.Contracts.csproj",
+      "msbuildProject": "../../../tools/wc3-map-mcp/map-engine/src/Wc3MapEngine.Contracts/Wc3MapEngine.Contracts.csproj"
+    },
+    "Wc3MapEngine.Core/1.0.0": {
+      "type": "project",
+      "path": "../../../tools/wc3-map-mcp/map-engine/src/Wc3MapEngine.Core/Wc3MapEngine.Core.csproj",
+      "msbuildProject": "../../../tools/wc3-map-mcp/map-engine/src/Wc3MapEngine.Core/Wc3MapEngine.Core.csproj"
+    }
+  },
   "projectFileDependencyGroups": {
-    "net10.0": []
+    "net10.0": [
+      "Wc3MapEngine.Core >= 1.0.0"
+    ]
   },
   "packageFolders": {
     "C:\\Users\\hp\\.nuget\\packages\\": {}
@@ -13,11 +504,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\extract-w3u-tool\\extract-w3u-tool.csproj",
+      "projectUniqueName": "c:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\extract-w3u-tool\\extract-w3u-tool.csproj",
       "projectName": "extract-w3u-tool",
-      "projectPath": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\extract-w3u-tool\\extract-w3u-tool.csproj",
+      "projectPath": "c:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\extract-w3u-tool\\extract-w3u-tool.csproj",
       "packagesPath": "C:\\Users\\hp\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\extract-w3u-tool\\obj\\",
+      "outputPath": "c:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\extract-w3u-tool\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\hp\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -32,7 +523,11 @@
         "net10.0": {
           "framework": "net10.0",
           "targetAlias": "net10.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "c:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\map-engine\\src\\Wc3MapEngine.Core\\Wc3MapEngine.Core.csproj": {
+              "projectPath": "c:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\map-engine\\src\\Wc3MapEngine.Core\\Wc3MapEngine.Core.csproj"
+            }
+          }
         }
       },
       "warningProperties": {

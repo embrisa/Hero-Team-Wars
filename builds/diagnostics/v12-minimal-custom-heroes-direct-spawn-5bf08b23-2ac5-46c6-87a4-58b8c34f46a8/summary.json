@@ -1,0 +1,26 @@
+{
+  "build_id": "5bf08b23-2ac5-46c6-87a4-58b8c34f46a8",
+  "version_label": "v12",
+  "variant_id": "v12-minimal-custom-heroes-direct-spawn",
+  "description": "Contains 4 custom heroes (H001-H004) with ONLY unam modified (no ustr/uagi/uint/uhpm/ugol/ulum). Directly spawns H001 at start.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\5bf08b23-2ac5-46c6-87a4-58b8c34f46a8\\HeroTeamWars_v12-minimal-custom-heroes-direct-spawn_5bf08b23-2ac5-46c6-87a4-58b8c34f46a8.w3m",
+  "output_sha256": "241B10AC92B0FD9D7E2824669557473C930521B51F17629DF8F1FB897B562EEE",
+  "output_size_bytes": 46511,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "4FC766BF197DA1990DAC439CD58EE51DD5D815D779771116B7932F94B9DCF919",
+    "size_bytes": 42125
+  },
+  "objects": {
+    "count": 4,
+    "has_w3u": true,
+    "w3u_sha256": "E7FBDDC11D5E451E8F5E44EEB7B9BDB61596976DB2DB829A6A101D499D894C4C",
+    "w3u_size_bytes": 176
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v12-minimal-custom-heroes-direct-spawn-5bf08b23-2ac5-46c6-87a4-58b8c34f46a8"
+}

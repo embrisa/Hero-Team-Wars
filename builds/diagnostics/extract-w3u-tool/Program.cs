@@ -1,36 +1,67 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Text;
 using War3Net.IO.Mpq;
 
-var maps = new[]
+namespace ExtractTool
 {
-    @"C:\Users\hp\Documents\Warcraft III\Hero Team Wars\builds\mcp\hero-team-wars\a867c357-0f07-4e33-8e64-5854866357fd\HeroTeamWars_v8-custom-heroes-shared-altar_a867c357-0f07-4e33-8e64-5854866357fd.w3m",
-    @"C:\Users\hp\Documents\Warcraft III\Hero Team Wars\builds\inspection\HeroTeamWars_MCP_FIXED_v7_A8F8FD88.w3m",
-    @"C:\Users\hp\Documents\Warcraft III\Hero Team Wars\builds\diagnostics\v8-object-roundtrip.w3m"
-};
-var outDir = @"C:\Users\hp\Documents\Warcraft III\Hero Team Wars\builds\diagnostics";
-foreach (var map in maps)
-{
-    if (!File.Exists(map)) { Console.WriteLine("MISSING " + map); continue; }
-    using var archive = MpqArchive.Open(map, loadListFile: true);
-    foreach (var name in new[] { "war3map.w3u", "war3map.j", "(listfile)", "(attributes)" })
+    class Program
     {
-        try
+        static void Main(string[] args)
         {
-            using var stream = archive.OpenFile(name);
-            using var ms = new MemoryStream();
-            stream.CopyTo(ms);
-            var bytes = ms.ToArray();
-            var safe = Path.GetFileNameWithoutExtension(map) + "_" + name.Trim('(', ')') ;
-            var outPath = Path.Combine(outDir, safe);
-            File.WriteAllBytes(outPath, bytes);
-            Console.WriteLine(outPath + " " + bytes.Length);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("FAIL " + map + " " + name + " " + ex.Message);
+            if (args.Length == 0) return;
+            var mapPath = args[0];
+            using var archive = MpqArchive.Open(mapPath, loadListFile: true);
+            foreach (var entry in archive)
+            {
+                if (entry.FileName != null && entry.FileName.EndsWith(".w3u", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("=================================");
+                    Console.WriteLine("MAP: " + mapPath);
+                    using var stream = archive.OpenFile(entry.FileName);
+                    using var ms = new MemoryStream();
+                    stream.CopyTo(ms);
+                    var bytes = ms.ToArray();
+                    Console.WriteLine($"Found w3u: size={bytes.Length}");
+                    Console.WriteLine($"Hex start: {Convert.ToHexString(bytes.Take(32).ToArray())}");
+                    using var reader = new BinaryReader(new MemoryStream(bytes));
+                    var formatVersion = reader.ReadInt32();
+                    Console.WriteLine($"Format version: {formatVersion}");
+                    var origCount = reader.ReadInt32();
+                    Console.WriteLine($"Orig count: {origCount}");
+                    var customCount = reader.ReadInt32();
+                    Console.WriteLine($"Custom count: {customCount}");
+                    for (int i = 0; i < customCount; i++)
+                    {
+                        var origId = Encoding.ASCII.GetString(reader.ReadBytes(4));
+                        var customId = Encoding.ASCII.GetString(reader.ReadBytes(4));
+                        var modCount = reader.ReadInt32();
+                        Console.WriteLine($"  CustObj {i}: orig={origId}, custom={customId}, modCount={modCount}");
+                        for (int m = 0; m < modCount; m++)
+                        {
+                            var modId = Encoding.ASCII.GetString(reader.ReadBytes(4));
+                            var varType = reader.ReadInt32();
+                            var valStr = "";
+                            if (varType == 0) valStr = reader.ReadInt32().ToString();
+                            else if (varType == 1 || varType == 2) valStr = reader.ReadSingle().ToString();
+                            else if (varType == 3)
+                            {
+                                var sb = new StringBuilder();
+                                while (true)
+                                {
+                                    var b = reader.ReadByte();
+                                    if (b == 0) break;
+                                    sb.Append((char)b);
+                                }
+                                valStr = sb.ToString();
+                            }
+                            var endInt = reader.ReadInt32();
+                            Console.WriteLine($"    Mod {m}: id={modId}, type={varType}, val={valStr}, endInt={endInt:X8}");
+                        }
+                    }
+                    return;
+                }
+            }
         }
     }
 }

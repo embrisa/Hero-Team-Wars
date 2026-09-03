@@ -1,0 +1,287 @@
+[
+  {
+    "operation_id": "2473452a-d090-45fe-b893-af9dd825245a",
+    "type": "create_object_definition",
+    "target": {
+      "id": "war3map.w3u:new:Hpal:H001",
+      "category": "unit",
+      "rawcode": "H001"
+    },
+    "rationale": "isolation build object definition",
+    "value": {
+      "object_kind": "custom",
+      "category": "unit",
+      "base_rawcode": "Hpal",
+      "custom_rawcode": "H001",
+      "rawcode": "H001",
+      "display_name": "HTW Guardian",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        {
+          "id": "unam",
+          "type": "String",
+          "value": "HTW Guardian"
+        },
+        {
+          "id": "utip",
+          "type": "String",
+          "value": "A durable frontline hero for the Hero Team Wars MVP."
+        },
+        {
+          "id": "ustr",
+          "type": "Int",
+          "value": 25
+        },
+        {
+          "id": "uagi",
+          "type": "Int",
+          "value": 16
+        },
+        {
+          "id": "uint",
+          "type": "Int",
+          "value": 14
+        },
+        {
+          "id": "uhpm",
+          "type": "Int",
+          "value": 700
+        },
+        {
+          "id": "ugol",
+          "type": "Int",
+          "value": 0
+        },
+        {
+          "id": "ulum",
+          "type": "Int",
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "operation_id": "09269f44-7897-4147-a40a-6f436fe2d407",
+    "type": "create_object_definition",
+    "target": {
+      "id": "war3map.w3u:new:Hmkg:H002",
+      "category": "unit",
+      "rawcode": "H002"
+    },
+    "rationale": "isolation build object definition",
+    "value": {
+      "object_kind": "custom",
+      "category": "unit",
+      "base_rawcode": "Hmkg",
+      "custom_rawcode": "H002",
+      "rawcode": "H002",
+      "display_name": "HTW Striker",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        {
+          "id": "unam",
+          "type": "String",
+          "value": "HTW Striker"
+        },
+        {
+          "id": "utip",
+          "type": "String",
+          "value": "A quick melee damage hero for the Hero Team Wars MVP."
+        },
+        {
+          "id": "ustr",
+          "type": "Int",
+          "value": 18
+        },
+        {
+          "id": "uagi",
+          "type": "Int",
+          "value": 25
+        },
+        {
+          "id": "uint",
+          "type": "Int",
+          "value": 12
+        },
+        {
+          "id": "uhpm",
+          "type": "Int",
+          "value": 560
+        },
+        {
+          "id": "ugol",
+          "type": "Int",
+          "value": 0
+        },
+        {
+          "id": "ulum",
+          "type": "Int",
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "operation_id": "b087f455-b599-4a74-86cc-379f266fece4",
+    "type": "create_object_definition",
+    "target": {
+      "id": "war3map.w3u:new:Hamg:H003",
+      "category": "unit",
+      "rawcode": "H003"
+    },
+    "rationale": "isolation build object definition",
+    "value": {
+      "object_kind": "custom",
+      "category": "unit",
+      "base_rawcode": "Hamg",
+      "custom_rawcode": "H003",
+      "rawcode": "H003",
+      "display_name": "HTW Controller",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        {
+          "id": "unam",
+          "type": "String",
+          "value": "HTW Controller"
+        },
+        {
+          "id": "utip",
+          "type": "String",
+          "value": "A high-intelligence control hero for the Hero Team Wars MVP."
+        },
+        {
+          "id": "ustr",
+          "type": "Int",
+          "value": 14
+        },
+        {
+          "id": "uagi",
+          "type": "Int",
+          "value": 16
+        },
+        {
+          "id": "uint",
+          "type": "Int",
+          "value": 25
+        },
+        {
+          "id": "uhpm",
+          "type": "Int",
+          "value": 480
+        },
+        {
+          "id": "ugol",
+          "type": "Int",
+          "value": 0
+        },
+        {
+          "id": "ulum",
+          "type": "Int",
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "operation_id": "6b4a8b56-1a93-47ff-9ab7-0314b88abac5",
+    "type": "create_object_definition",
+    "target": {
+      "id": "war3map.w3u:new:Hblm:H004",
+      "category": "unit",
+      "rawcode": "H004"
+    },
+    "rationale": "isolation build object definition",
+    "value": {
+      "object_kind": "custom",
+      "category": "unit",
+      "base_rawcode": "Hblm",
+      "custom_rawcode": "H004",
+      "rawcode": "H004",
+      "display_name": "HTW Support",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        {
+          "id": "unam",
+          "type": "String",
+          "value": "HTW Support"
+        },
+        {
+          "id": "utip",
+          "type": "String",
+          "value": "A flexible support hero for the Hero Team Wars MVP."
+        },
+        {
+          "id": "ustr",
+          "type": "Int",
+          "value": 16
+        },
+        {
+          "id": "uagi",
+          "type": "Int",
+          "value": 18
+        },
+        {
+          "id": "uint",
+          "type": "Int",
+          "value": 23
+        },
+        {
+          "id": "uhpm",
+          "type": "Int",
+          "value": 520
+        },
+        {
+          "id": "ugol",
+          "type": "Int",
+          "value": 0
+        },
+        {
+          "id": "ulum",
+          "type": "Int",
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "operation_id": "8b4621ca-cc9d-4c69-a9a9-560c7df48b92",
+    "type": "create_object_definition",
+    "target": {
+      "id": "war3map.w3u:new:ntav:n0AL",
+      "category": "unit",
+      "rawcode": "n0AL"
+    },
+    "rationale": "isolation build object definition",
+    "value": {
+      "object_kind": "custom",
+      "category": "unit",
+      "base_rawcode": "ntav",
+      "custom_rawcode": "n0AL",
+      "rawcode": "n0AL",
+      "display_name": "HTW Hero Altar",
+      "dependencies": [],
+      "references": {},
+      "unknown_ids": [],
+      "modifications": [
+        {
+          "id": "unam",
+          "type": "String",
+          "value": "HTW Hero Altar"
+        },
+        {
+          "id": "utip",
+          "type": "String",
+          "value": "A shared altar where every player selects one hero."
+        }
+      ]
+    }
+  }
+]

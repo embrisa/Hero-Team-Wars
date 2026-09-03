@@ -1,0 +1,24 @@
+{
+  "build_id": "b029679c-2200-4044-9534-e372c1da0886",
+  "version_label": "v11",
+  "variant_id": "v11-stock-tavern-no-w3u",
+  "description": "Zero custom objects (no war3map.w3u in archive). At map init, creates standard tavern ('ntav') at (216, -336) with a 5-second timer before starting waves.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\b029679c-2200-4044-9534-e372c1da0886\\HeroTeamWars_v11-stock-tavern-no-w3u_b029679c-2200-4044-9534-e372c1da0886.w3m",
+  "output_sha256": "A52E00F2B2D27D536EB54F8A23109569478DC897259531EB457B2063DD21080B",
+  "output_size_bytes": 46423,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "75A485AF5E4D8A170DF9AF32D1C10B7F632CC5B0A79C4078873A3B83C5148A23",
+    "size_bytes": 42244
+  },
+  "objects": {
+    "count": 0,
+    "has_w3u": false
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v11-stock-tavern-no-w3u-b029679c-2200-4044-9534-e372c1da0886"
+}
