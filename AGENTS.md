@@ -96,6 +96,13 @@ is a clear reason to do so.
 - If no remote, credentials, or upstream branch is available, do not claim the push happened. Report the exact blocker and leave the local commit ready to push.
 - After committing and pushing, verify the final status and the pushed commit/upstream when possible.
 
+## Playable map build handoff
+
+- After completing any task that changes the map, build and validate the changed map, then publish that build as the next numbered playable version under `C:\Users\hp\Documents\Warcraft III\Maps\Test\v<version>\`.
+- Determine `<version>` by inspecting the existing `vN` folders and incrementing the highest version number; never reuse an existing version folder. For example, after `v14`, use `v15`.
+- Copy the validated build artifact into the new folder and name it consistently, normally `HeroTeamWars_v<version>.w3m`, so the user can open Warcraft III, browse to the matching version folder, and launch that map directly.
+- Keep the source map immutable and do not replace older version folders. Record the exact published folder, map filename, build result, and hash in the handoff. Do not claim gameplay or runtime verification; the user performs those checks inside Warcraft III.
+
 ## Warcraft III project scope
 
 - Keep editable project work under this project root; do not modify installed-game files unless explicitly requested.
