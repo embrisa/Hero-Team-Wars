@@ -16,6 +16,7 @@ retains them when their context is needed.
 - [`reference/mcp-and-tooling.md`](reference/mcp-and-tooling.md) and [`reference/wc3-map-formats.md`](reference/wc3-map-formats.md) — protocol/tooling and archive-format references.
 - [`decisions/`](decisions/) — durable architecture decisions.
 - [`compatibility/`](compatibility/) and [`troubleshooting/`](troubleshooting/) — current compatibility findings and recovery lessons.
+- [`compatibility/v21-controller-spells.md`](compatibility/v21-controller-spells.md) — Controller spell definitions, preservation checks, and manual v21 acceptance.
 - [`../work-items/`](../work-items/) — active scoped implementation work, not general agent instructions.
 
 ## Sources of truth

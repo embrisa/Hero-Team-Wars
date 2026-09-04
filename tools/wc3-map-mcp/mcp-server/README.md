@@ -18,6 +18,12 @@ src/
 
 No Warcraft III binary parsing belongs in this component. Run `npm run build`, then start the built entry point with `node dist/index.js`; configure it with `WC3_MAP_MCP_CONFIG` or the checked-in example configuration.
 
+The engine's v21 Controller kit supports Channel (`ANcl`) and Slow (`Aslo`)
+as typed ability parents. No MCP request/response schema, tool registration,
+or promotion evidence gate changed. See
+[`../docs/compatibility/v21-controller-spells.md`](../docs/compatibility/v21-controller-spells.md)
+for kit definitions and the exact-artifact verification procedure.
+
 The four global JASS knowledge tools are always registered because they query the single local canonical dataset rather than a project map. `jass_search` discovers real APIs by concept, `jass_lookup` returns exact signatures and documentation, and the two validation tools check calls/source without mutation. Unknown names remain errors or unknown lookup results; fuzzy matches are suggestions only.
 
 The checked-in example configuration is `read_only` and allow-lists exactly seven tools: `wc3_project_status`, `wc3_inspect_map`, `wc3_list_archive_files`, `wc3_get_component`, `wc3_get_script_source`, `wc3_validate_map`, and `wc3_compare_maps`. In that mode mutation, build, launch, evidence, promotion, and discard tools are not registered. A separately approved project configuration with `write_policy: "writes"` can enable the transaction tools; set `script_policy: "mcp_owned_jass"` to enable gameplay-source mutation, while explicit allow-lists remain enforced per project.

@@ -175,6 +175,12 @@ Important typed preconditions include:
 - `set_script_source` targets only `war3map.j`, expects its current SHA-256,
   and takes `{ language: "jass", source, source_strategy?: "composed" }`.
   Script mutation also requires project `script_policy="mcp_owned_jass"`.
+- The v21 Controller kit uses level-scoped typed ability definitions and a
+  typed helper unit, with MCP-owned spell dispatch. The conservative standard
+  ability compatibility set includes `ANcl` (Channel) and `Aslo` (Slow).
+  This extends supported object parents without changing operation schemas,
+  tool names, transaction gates, or runtime-evidence requirements. See
+  [`../compatibility/v21-controller-spells.md`](../compatibility/v21-controller-spells.md).
 - Rawcodes are exactly four printable ASCII characters. Player IDs are 1-24;
   force indexes are 0-23; logical team IDs are `team_N`; region IDs are
   `region:N`; and placement targets use a stable ID or native creation number.

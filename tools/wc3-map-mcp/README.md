@@ -29,6 +29,12 @@ The trusted-project Codex entry is `.codex/config.toml` at the Hero Team Wars ro
 
 ## Components
 
+The v21 two-team Controller kit is described in
+[`docs/compatibility/v21-controller-spells.md`](docs/compatibility/v21-controller-spells.md).
+It uses typed ability definitions, Channel/Slow parent compatibility, and
+MCP-owned spell dispatch. The public tool schemas and runtime evidence gates
+are unchanged; the exact artifact still needs the user's Warcraft III checks.
+
 - `mcp-server/`: TypeScript STDIO MCP server and orchestration layer.
 - `map-engine/`: .NET/War3Net map inspection, mutation, validation, and build engine.
 - `contracts/`: versioned schemas shared across the process boundary.

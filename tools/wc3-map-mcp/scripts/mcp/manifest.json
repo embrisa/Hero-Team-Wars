@@ -38,7 +38,7 @@
     { "id": "content.send-units", "path": "content/send-units.j", "dependencies": ["core.state", "config.regions"] },
     { "id": "content.heroes", "path": "content/heroes.j", "dependencies": ["core.state", "config.regions"] },
     { "id": "content.items", "path": "content/items.j", "dependencies": ["systems.economy"] },
-    { "id": "content.abilities", "path": "content/abilities.j", "dependencies": ["content.heroes"] },
+    { "id": "content.abilities", "path": "content/abilities.j", "dependencies": ["core.state", "config.teams", "systems.heroes", "content.heroes"] },
     { "id": "tests.assertions", "path": "tests/assertions.j", "dependencies": ["core.debug"] },
     { "id": "tests.scenarios", "path": "tests/scenarios.j", "dependencies": ["tests.assertions", "systems.routing"] }
   ],

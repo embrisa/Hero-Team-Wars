@@ -7,10 +7,11 @@
   "events": [{ "type": "map_initialization" }],
   "conditions": [{ "type": "always" }],
   "actions": [
+    { "type": "call_function", "function": "HTW_Content_Abilities" },
     { "type": "call_function", "function": "HTW_Heroes_Initialize" },
     { "type": "call_function", "function": "HTW_HeroSelection_Begin" }
   ],
-  "references": { "functions": ["HTW_Heroes_Initialize", "HTW_HeroSelection_Begin"] },
+  "references": { "functions": ["HTW_Content_Abilities", "HTW_Heroes_Initialize", "HTW_HeroSelection_Begin"] },
   "source_location": { "path": "triggers/map-init.trigger.json", "line": 1 },
   "provenance": "intended_design",
   "capability": "mcp_native_jass"

@@ -75,7 +75,9 @@
         { "id": "ugol", "type": "Int", "value": 0 },
         { "id": "ulum", "type": "Int", "value": 0 },
         { "id": "usst", "type": "Int", "value": 0 },
-        { "id": "usrg", "type": "Int", "value": 1 }
+        { "id": "usrg", "type": "Int", "value": 1 },
+        { "id": "uabi", "type": "String", "value": "AInv,A2Q1,A2W1,A2E1,A2R1" },
+        { "id": "uhab", "type": "String", "value": "" }
       ],
       "codec_version": "wc3-object-data-v1",
       "provenance": "source_of_truth",
