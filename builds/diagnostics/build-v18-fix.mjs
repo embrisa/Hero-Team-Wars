@@ -6,7 +6,7 @@ import { buildMapVariant, publishPlayableMap } from "./build-matrix-runner.mjs";
 
 const root = "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars";
 const expectedSourceHash = "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834";
-const expectedVersion = 18;
+const defaultVersion = 18;
 const expectedRawcodes = ["H001", "H002", "H003", "H004", "n0AL"];
 const expectedHeroes = {
   H001: { parent: "Hpal", name: "HTW Guardian" },
@@ -156,15 +156,15 @@ function assertInspectedObjects(inspect, expectedObjects) {
   };
 }
 
-async function main() {
+async function main(version = defaultVersion) {
   const fixture = JSON.parse(readFileSync(objectsPath, "utf8"));
   const expectedObjects = assertFixture(fixture.objects);
-  const targetDir = `C:\\Users\\hp\\Documents\\Warcraft III\\Maps\\Test\\v${expectedVersion}`;
+  const targetDir = `C:\\Users\\hp\\Documents\\Warcraft III\\Maps\\Test\\v${version}`;
   assert(!existsSync(targetDir), `target version directory already exists: ${targetDir}`);
 
   const summary = await buildMapVariant({
     variantId: "v18-combined-altar-fix",
-    versionLabel: "v18",
+    versionLabel: `v${version}`,
     description: "Combined HTW altar fix: live v8 hero fixture with v2 object data, n0AL useu roster, zero hero start delay, one-second replenishment, free hero pick, and composed hero-selection JASS.",
     heroObjects: fixture.objects
   });
@@ -185,15 +185,15 @@ async function main() {
   objectData.format_version = w3uBytes.readInt32LE(0);
   objectData.archive_sha256 = inspectedW3u.sha256;
 
-  const published = publishPlayableMap(summary, expectedVersion);
-  assert(published.published_path === join(targetDir, "HeroTeamWars_v18.w3m"), "published path must be the v18 playable filename");
+  const published = publishPlayableMap(summary, version);
+  assert(published.published_path === join(targetDir, `HeroTeamWars_v${version}.w3m`), "published path must use the requested version filename");
   assert(published.published_sha256 === summary.output_sha256, "published copy hash must equal build output hash");
   assert(sha256File(published.published_path) === summary.output_sha256, "published copy rehash must equal build output hash");
   assert(sha256File(join(root, "map", "HeroTeamWars_M0_2Arena.w3m")) === expectedSourceHash, "golden source hash changed after publication");
 
   const report = {
-    experiment: "v18-combined-altar-fix",
-    version_label: "v18",
+    experiment: `v${version}-combined-altar-fix`,
+    version_label: `v${version}`,
     build_id: summary.build_id,
     summary,
     object_data: objectData,
@@ -213,10 +213,10 @@ async function main() {
       runtime_status: "untested"
     }
   };
-  const reportPath = join(root, "builds", "diagnostics", "v18-build-report.json");
+  const reportPath = join(root, "builds", "diagnostics", `v${version}-build-report.json`);
   writeFileSync(reportPath, JSON.stringify(report, null, 2));
 
-  console.log("=== v18 Combined Altar Fix Build Successful ===");
+  console.log(`=== v${version} Combined Altar Fix Build Successful ===`);
   console.log("Output Path:", summary.output_path);
   console.log("Published Path:", published.published_path);
   console.log("SHA-256:", published.published_sha256);

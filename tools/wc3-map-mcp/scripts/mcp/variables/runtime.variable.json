@@ -17,6 +17,7 @@
   { "id": "alive_hero_count", "name": "HTW_AliveHeroCount", "type": "integer", "initial": 0, "provenance": "source_of_truth", "capability": "mcp_native_jass" },
   { "id": "hero_selection_seconds", "name": "HTW_HeroSelectionSeconds", "type": "integer", "initial": 60, "provenance": "source_of_truth", "capability": "mcp_native_jass" },
   { "id": "hero_selection_building", "name": "HTW_HeroSelectionBuilding", "type": "unit", "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "hero_selection_patron_by_player", "name": "HTW_HeroSelectionPatronByPlayer", "type": "unit", "array": true, "array_size": 24, "provenance": "runtime_state", "capability": "mcp_native_jass" },
   { "id": "hero_selection_trigger", "name": "HTW_HeroSelectionTrigger", "type": "trigger", "provenance": "runtime_state", "capability": "mcp_native_jass" },
   { "id": "hero_selection_timer", "name": "HTW_HeroSelectionTimer", "type": "timer", "provenance": "runtime_state", "capability": "mcp_native_jass" },
   { "id": "hero_selection_complete", "name": "HTW_HeroSelectionComplete", "type": "boolean", "initial": false, "provenance": "runtime_state", "capability": "mcp_native_jass" },

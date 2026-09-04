@@ -55,6 +55,10 @@ function HTW_HeroSelection_Complete takes nothing returns nothing
     set playerId = 1
     loop
         exitwhen playerId > HTW_ActivePlayerCount
+        if HTW_HeroSelectionPatronByPlayer[playerId] != null then
+            call RemoveUnit(HTW_HeroSelectionPatronByPlayer[playerId])
+            set HTW_HeroSelectionPatronByPlayer[playerId] = null
+        endif
         if HTW_HeroSelectionFog[playerId] != null then
             call FogModifierStop(HTW_HeroSelectionFog[playerId])
             call DestroyFogModifier(HTW_HeroSelectionFog[playerId])
@@ -130,6 +134,10 @@ function HTW_HeroSelection_OnSell takes nothing returns nothing
         set soldHero = null
         return
     endif
+    if HTW_HeroSelectionPatronByPlayer[playerId] != null then
+        call RemoveUnit(HTW_HeroSelectionPatronByPlayer[playerId])
+        set HTW_HeroSelectionPatronByPlayer[playerId] = null
+    endif
     call HTW_Debug_LogText("player " + I2S(playerId) + " selected " + HTW_Content_HeroName(heroType))
     if HTW_HeroSelection_AllPlayersReady() then
         call HTW_HeroSelection_Complete()
@@ -170,6 +178,7 @@ function HTW_HeroSelection_Begin takes nothing returns nothing
     local integer playerId
     local player p
     local rect altarRect
+    local real patronX
     set HTW_HeroSelectionComplete = false
     set HTW_HeroSelectionBuilding = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), 'n0AL', 216., -336., 270.)
     set HTW_HeroSelectionTrigger = CreateTrigger()
@@ -186,6 +195,11 @@ function HTW_HeroSelection_Begin takes nothing returns nothing
     loop
         exitwhen playerId > HTW_ActivePlayerCount
         set p = Player(playerId - 1)
+        // Tavern hero purchases require an owned nearby patron. Give each
+        // player a temporary Circle of Power beside the shared altar for the
+        // selection window; it is removed after that player buys a hero.
+        set patronX = 216. + I2R((playerId - 1) * 64)
+        set HTW_HeroSelectionPatronByPlayer[playerId] = CreateUnit(p, 'ncop', patronX, -336., 270.)
         set HTW_HeroSelectionFog[playerId] = CreateFogModifierRect(p, FOG_OF_WAR_VISIBLE, altarRect, true, false)
         call FogModifierStart(HTW_HeroSelectionFog[playerId])
         if GetLocalPlayer() == p then

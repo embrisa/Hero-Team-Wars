@@ -1,0 +1,83 @@
+{
+  "experiment": "v19-combined-altar-fix",
+  "version_label": "v19",
+  "build_id": "31487ee1-b2c9-45af-9a46-a02bf631be1b",
+  "summary": {
+    "build_id": "31487ee1-b2c9-45af-9a46-a02bf631be1b",
+    "version_label": "v19",
+    "variant_id": "v18-combined-altar-fix",
+    "description": "Combined HTW altar fix: live v8 hero fixture with v2 object data, n0AL useu roster, zero hero start delay, one-second replenishment, free hero pick, and composed hero-selection JASS.",
+    "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+    "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+    "source_unchanged": true,
+    "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\31487ee1-b2c9-45af-9a46-a02bf631be1b\\HeroTeamWars_v18-combined-altar-fix_31487ee1-b2c9-45af-9a46-a02bf631be1b.w3m",
+    "output_sha256": "CF51306D2B6F39BBE2AB2CA3FE2615E6CBE800537D63D27D19A7484233A7DB07",
+    "output_size_bytes": 49611,
+    "reopened": true,
+    "opaque_members_preserved": true,
+    "runtime_status": "untested",
+    "script": {
+      "sha256": "F83332EC5E6CB02F0BFBB1B1FED944186E4C988834E2DC7402278DCFA6DB1EFD",
+      "size_bytes": 49318
+    },
+    "objects": {
+      "count": 5,
+      "has_w3u": true,
+      "w3u_sha256": "27FCA4C6EADC08DF36958BBD11B7887D0056836D1CC08C154C95ACB9A11FEE50",
+      "w3u_size_bytes": 1075
+    },
+    "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v18-combined-altar-fix-31487ee1-b2c9-45af-9a46-a02bf631be1b",
+    "manifest_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\artifacts\\builds\\31487ee1-b2c9-45af-9a46-a02bf631be1b\\build-manifest.json",
+    "validation_report_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\artifacts\\builds\\31487ee1-b2c9-45af-9a46-a02bf631be1b\\validation-report.json"
+  },
+  "object_data": {
+    "format_version": 2,
+    "object_count": 5,
+    "rawcodes": [
+      "H001",
+      "H002",
+      "H003",
+      "H004",
+      "n0AL"
+    ],
+    "archive_path": "war3map.w3u",
+    "archive_sha256": "27FCA4C6EADC08DF36958BBD11B7887D0056836D1CC08C154C95ACB9A11FEE50",
+    "codec_version": "war3net-6.0.3-typed-components-1"
+  },
+  "published": {
+    "version_label": "v19",
+    "build_id": "31487ee1-b2c9-45af-9a46-a02bf631be1b",
+    "variant_id": "v18-combined-altar-fix",
+    "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+    "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+    "build_output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\31487ee1-b2c9-45af-9a46-a02bf631be1b\\HeroTeamWars_v18-combined-altar-fix_31487ee1-b2c9-45af-9a46-a02bf631be1b.w3m",
+    "published_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Maps\\Test\\v19\\HeroTeamWars_v19.w3m",
+    "published_sha256": "CF51306D2B6F39BBE2AB2CA3FE2615E6CBE800537D63D27D19A7484233A7DB07",
+    "war3map_j_sha256": "F83332EC5E6CB02F0BFBB1B1FED944186E4C988834E2DC7402278DCFA6DB1EFD",
+    "war3map_w3u": {
+      "sha256": "27FCA4C6EADC08DF36958BBD11B7887D0056836D1CC08C154C95ACB9A11FEE50",
+      "size_bytes": 1075
+    },
+    "published_utc": "2026-09-04T10:06:43.191Z"
+  },
+  "static_checks": {
+    "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+    "source_unchanged": true,
+    "object_data_format_version": 2,
+    "custom_object_count": 5,
+    "custom_rawcodes": [
+      "H001",
+      "H002",
+      "H003",
+      "H004",
+      "n0AL"
+    ],
+    "altar_useu": "H001,H002,H003,H004",
+    "hero_stock_start_delay": 0,
+    "hero_stock_replenishment_interval": 1,
+    "hero_gold_cost": 0,
+    "hero_lumber_cost": 0,
+    "output_hash_matches_published_copy": true,
+    "runtime_status": "untested"
+  }
+}

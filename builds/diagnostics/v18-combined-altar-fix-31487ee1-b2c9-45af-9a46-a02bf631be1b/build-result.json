@@ -1,0 +1,433 @@
+{
+  "schema_version": "1.0",
+  "writer_version": "War3Net.IO.Mpq-6.0.3",
+  "profile": "debug",
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\31487ee1-b2c9-45af-9a46-a02bf631be1b\\HeroTeamWars_v18-combined-altar-fix_31487ee1-b2c9-45af-9a46-a02bf631be1b.w3m",
+  "size_bytes": 49611,
+  "sha256": "CF51306D2B6F39BBE2AB2CA3FE2615E6CBE800537D63D27D19A7484233A7DB07",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "runtime_status": "untested",
+  "reopened": true,
+  "semantic_changes": 109,
+  "semantic_differences_after_reopen": [],
+  "opaque_members_preserved": true,
+  "archive_comparison": {
+    "membership_equal": false,
+    "source_member_order": [
+      "(attributes)",
+      "(listfile)",
+      "conversation.json",
+      "war3map.doo",
+      "war3map.j",
+      "war3map.mmp",
+      "war3map.shd",
+      "war3map.w3c",
+      "war3map.w3e",
+      "war3map.w3i",
+      "war3map.w3r",
+      "war3map.wct",
+      "war3map.wpm",
+      "war3map.wtg",
+      "war3map.wts",
+      "war3mapMap.blp",
+      "war3mapUnits.doo"
+    ],
+    "rebuilt_member_order": [
+      "(attributes)",
+      "(listfile)",
+      "conversation.json",
+      "war3map.doo",
+      "war3map.j",
+      "war3map.mmp",
+      "war3map.shd",
+      "war3map.w3c",
+      "war3map.w3e",
+      "war3map.w3i",
+      "war3map.w3r",
+      "war3map.w3u",
+      "war3map.wct",
+      "war3map.wpm",
+      "war3map.wtg",
+      "war3map.wts",
+      "war3mapMap.blp",
+      "war3mapUnits.doo"
+    ],
+    "member_order_changed": true,
+    "content_changes": [
+      {
+        "path": "(attributes)",
+        "kind": "content",
+        "source_sha256": "8828DC98B99FC1CD4EB012BB83B92EDF6A7F12A8A1BC9B2B276C01504C3A9014",
+        "rebuilt_sha256": "3C55029485CDB6E5B9FB9B75C164C01F554DA49A5C258D939B8131017815908A",
+        "source_size_bytes": 76,
+        "rebuilt_size_bytes": 224
+      },
+      {
+        "path": "(listfile)",
+        "kind": "content",
+        "source_sha256": "B32A722932AB6EF50C89180001536FAB7CF359AB55602F117043007D405302BD",
+        "rebuilt_sha256": "70016FF221B07531F3FBCF8048D5BD76A72A258E43F1EE578A9B7116CDE96CFC",
+        "source_size_bytes": 207,
+        "rebuilt_size_bytes": 220
+      },
+      {
+        "path": "war3map.j",
+        "kind": "content",
+        "source_sha256": "1C6C2490AFB31345F1D538284A520D1BD5BE63282B968F5C2C2F572E36CD8DFA",
+        "rebuilt_sha256": "F83332EC5E6CB02F0BFBB1B1FED944186E4C988834E2DC7402278DCFA6DB1EFD",
+        "source_size_bytes": 24144,
+        "rebuilt_size_bytes": 49318
+      },
+      {
+        "path": "war3map.w3r",
+        "kind": "content",
+        "source_sha256": "2F6A0C7C70FDD6AF046BED5B003607AA02966E58A41B1D30036487B0B64642D7",
+        "rebuilt_sha256": "175955720EED5AB4F2BB60A10B411660DA2F901311BAF158173E18486818DD92",
+        "source_size_bytes": 442,
+        "rebuilt_size_bytes": 442
+      },
+      {
+        "path": "war3map.w3u",
+        "kind": "membership",
+        "source_sha256": null,
+        "rebuilt_sha256": "27FCA4C6EADC08DF36958BBD11B7887D0056836D1CC08C154C95ACB9A11FEE50",
+        "source_size_bytes": null,
+        "rebuilt_size_bytes": 1075
+      }
+    ],
+    "changed_member_hashes": [
+      {
+        "path": "(attributes)",
+        "kind": "content",
+        "source_sha256": "8828DC98B99FC1CD4EB012BB83B92EDF6A7F12A8A1BC9B2B276C01504C3A9014",
+        "rebuilt_sha256": "3C55029485CDB6E5B9FB9B75C164C01F554DA49A5C258D939B8131017815908A",
+        "source_size_bytes": 76,
+        "rebuilt_size_bytes": 224
+      },
+      {
+        "path": "(listfile)",
+        "kind": "content",
+        "source_sha256": "B32A722932AB6EF50C89180001536FAB7CF359AB55602F117043007D405302BD",
+        "rebuilt_sha256": "70016FF221B07531F3FBCF8048D5BD76A72A258E43F1EE578A9B7116CDE96CFC",
+        "source_size_bytes": 207,
+        "rebuilt_size_bytes": 220
+      },
+      {
+        "path": "war3map.j",
+        "kind": "content",
+        "source_sha256": "1C6C2490AFB31345F1D538284A520D1BD5BE63282B968F5C2C2F572E36CD8DFA",
+        "rebuilt_sha256": "F83332EC5E6CB02F0BFBB1B1FED944186E4C988834E2DC7402278DCFA6DB1EFD",
+        "source_size_bytes": 24144,
+        "rebuilt_size_bytes": 49318
+      },
+      {
+        "path": "war3map.w3r",
+        "kind": "content",
+        "source_sha256": "2F6A0C7C70FDD6AF046BED5B003607AA02966E58A41B1D30036487B0B64642D7",
+        "rebuilt_sha256": "175955720EED5AB4F2BB60A10B411660DA2F901311BAF158173E18486818DD92",
+        "source_size_bytes": 442,
+        "rebuilt_size_bytes": 442
+      },
+      {
+        "path": "war3map.w3u",
+        "kind": "membership",
+        "source_sha256": null,
+        "rebuilt_sha256": "27FCA4C6EADC08DF36958BBD11B7887D0056836D1CC08C154C95ACB9A11FEE50",
+        "source_size_bytes": null,
+        "rebuilt_size_bytes": 1075
+      }
+    ],
+    "compression_metadata_changes": [
+      {
+        "path": "(attributes)",
+        "source_compressed_size_bytes": 84,
+        "rebuilt_compressed_size_bytes": 173,
+        "source_flags": 2147680768,
+        "rebuilt_flags": 2147680768
+      },
+      {
+        "path": "(listfile)",
+        "source_compressed_size_bytes": 101,
+        "rebuilt_compressed_size_bytes": 102,
+        "source_flags": 2147680768,
+        "rebuilt_flags": 2147680768
+      },
+      {
+        "path": "war3map.j",
+        "source_compressed_size_bytes": 6120,
+        "rebuilt_compressed_size_bytes": 13165,
+        "source_flags": 2147484160,
+        "rebuilt_flags": 2147484160
+      },
+      {
+        "path": "war3map.w3r",
+        "source_compressed_size_bytes": 241,
+        "rebuilt_compressed_size_bytes": 231,
+        "source_flags": 2147484160,
+        "rebuilt_flags": 2147484160
+      }
+    ],
+    "unexpected_content_changes": [],
+    "planned_membership_changes": [
+      "war3map.w3u"
+    ],
+    "opaque_members_preserved": true,
+    "preserved_opaque_members": [
+      {
+        "path": "conversation.json",
+        "source_sha256": "0B3D1BDF2B0E90A774B1E1278E038A670C5B3066019DD8E8849655A4CDEA08CF",
+        "rebuilt_sha256": "0B3D1BDF2B0E90A774B1E1278E038A670C5B3066019DD8E8849655A4CDEA08CF",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.doo",
+        "source_sha256": "1C4B553ADC0B39DF3DE28D6EA7AAB2733E7F2D4B0A22FFE6D0B904416051FE82",
+        "rebuilt_sha256": "1C4B553ADC0B39DF3DE28D6EA7AAB2733E7F2D4B0A22FFE6D0B904416051FE82",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.mmp",
+        "source_sha256": "6F3EED45D493EE0629597831D219DB82F2FE20B1116461E8779C376E7F3E9C34",
+        "rebuilt_sha256": "6F3EED45D493EE0629597831D219DB82F2FE20B1116461E8779C376E7F3E9C34",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.shd",
+        "source_sha256": "DE2F256064A0AF797747C2B97505DC0B9F3DF0DE4F489EAC731C23AE9CA9CC31",
+        "rebuilt_sha256": "DE2F256064A0AF797747C2B97505DC0B9F3DF0DE4F489EAC731C23AE9CA9CC31",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.w3c",
+        "source_sha256": "AF5570F5A1810B7AF78CAF4BC70A660F0DF51E42BAF91D4DE5B2328DE0E83DFC",
+        "rebuilt_sha256": "AF5570F5A1810B7AF78CAF4BC70A660F0DF51E42BAF91D4DE5B2328DE0E83DFC",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.w3e",
+        "source_sha256": "E5B45D4764597201630AD9439A6F95E752D3EFCEA3C6B86A3319AB07506CC7D3",
+        "rebuilt_sha256": "E5B45D4764597201630AD9439A6F95E752D3EFCEA3C6B86A3319AB07506CC7D3",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.w3i",
+        "source_sha256": "85022F4A219BF36221A1C602D5F3AFD937D6937E8B1E3D27C7EE052A4DA7DB4E",
+        "rebuilt_sha256": "85022F4A219BF36221A1C602D5F3AFD937D6937E8B1E3D27C7EE052A4DA7DB4E",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.wct",
+        "source_sha256": "EF454438751B3F49E17122E9181F5E7281B2512B4D01E6ADCD6BEC2FEA8E075D",
+        "rebuilt_sha256": "EF454438751B3F49E17122E9181F5E7281B2512B4D01E6ADCD6BEC2FEA8E075D",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.wpm",
+        "source_sha256": "828DE166A3E3051DB263F9305925D03849C48DD48D78514E59CB509736E24D91",
+        "rebuilt_sha256": "828DE166A3E3051DB263F9305925D03849C48DD48D78514E59CB509736E24D91",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.wtg",
+        "source_sha256": "D96BAF5418CFC289153D2CF8F66EA8DA8AAE6F8174C76A836DEA91BE8531A802",
+        "rebuilt_sha256": "D96BAF5418CFC289153D2CF8F66EA8DA8AAE6F8174C76A836DEA91BE8531A802",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3map.wts",
+        "source_sha256": "B0C24FE1195CEEBFAA9ED4E026E43FEE30845804FCF70E8C0E4A781C8CA251D5",
+        "rebuilt_sha256": "B0C24FE1195CEEBFAA9ED4E026E43FEE30845804FCF70E8C0E4A781C8CA251D5",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3mapMap.blp",
+        "source_sha256": "CCA146ECA18535EDAC40F4E000D3B94743E2E877D51B995920632E5174CB63FC",
+        "rebuilt_sha256": "CCA146ECA18535EDAC40F4E000D3B94743E2E877D51B995920632E5174CB63FC",
+        "content_hash_equal": true
+      },
+      {
+        "path": "war3mapUnits.doo",
+        "source_sha256": "44C1896CB7EFA2666700961A7C23728FEE5451BC713529F1303E8029B78B386D",
+        "rebuilt_sha256": "44C1896CB7EFA2666700961A7C23728FEE5451BC713529F1303E8029B78B386D",
+        "content_hash_equal": true
+      }
+    ],
+    "special_member_checks": [
+      {
+        "path": "(listfile)",
+        "present_in_source": true,
+        "present_in_rebuild": true,
+        "source_sha256": "B32A722932AB6EF50C89180001536FAB7CF359AB55602F117043007D405302BD",
+        "rebuilt_sha256": "70016FF221B07531F3FBCF8048D5BD76A72A258E43F1EE578A9B7116CDE96CFC",
+        "content_hash_equal": false
+      },
+      {
+        "path": "(attributes)",
+        "present_in_source": true,
+        "present_in_rebuild": true,
+        "source_sha256": "8828DC98B99FC1CD4EB012BB83B92EDF6A7F12A8A1BC9B2B276C01504C3A9014",
+        "rebuilt_sha256": "3C55029485CDB6E5B9FB9B75C164C01F554DA49A5C258D939B8131017815908A",
+        "content_hash_equal": false
+      }
+    ]
+  },
+  "validation": {
+    "schema_version": "1.0",
+    "validator_version": "phase3-1.0",
+    "target": "transaction_build",
+    "buildable": true,
+    "findings": [
+      {
+        "severity": "info",
+        "code": "MAP_INFO_EXTENSION_AGREEMENT",
+        "component": "metadata",
+        "target": ".w3m",
+        "provenance": "derived",
+        "message": "The .w3m archive has a readable war3map.w3i map-info contract.",
+        "suggested_action": "Keep the map extension and map-info member together when producing a build.",
+        "suggested_remediation": "Keep the map extension and map-info member together when producing a build."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "(attributes)",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "(listfile)",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "conversation.json",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3map.j",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3map.mmp",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3map.shd",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3map.w3c",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3map.w3e",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3map.wct",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3map.wpm",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3map.wtg",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "OPAQUE_MEMBER_PRESERVED",
+        "component": "archive",
+        "target": "war3mapMap.blp",
+        "provenance": "derived",
+        "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+        "suggested_action": "Do not edit this member through the semantic writer.",
+        "suggested_remediation": "Do not edit this member through the semantic writer."
+      },
+      {
+        "severity": "info",
+        "code": "SCRIPT_CONNECTION_OPAQUE",
+        "component": "scripts",
+        "target": "war3map.j",
+        "provenance": "derived",
+        "message": "GUI/custom-text members are preserved but are not synchronized with MCP-owned JASS source.",
+        "suggested_action": "Treat war3map.j as authoritative and avoid saving the generated trigger source over MCP-owned gameplay code.",
+        "suggested_remediation": "Treat war3map.j as authoritative and avoid saving the generated trigger source over MCP-owned gameplay code."
+      }
+    ],
+    "summary": {
+      "errors": 0,
+      "warnings": 0,
+      "info": 14
+    },
+    "map_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+    "map_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+    "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+    "map_hash": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+    "size_bytes": 38323,
+    "modified_utc": "2026-08-25T13:11:16.3515059Z"
+  }
+}
