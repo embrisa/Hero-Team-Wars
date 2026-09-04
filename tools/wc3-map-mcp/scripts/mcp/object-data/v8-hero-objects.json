@@ -119,7 +119,8 @@
       "unknown_ids": [],
       "modifications": [
         { "id": "unam", "type": "String", "value": "HTW Hero Altar" },
-        { "id": "utip", "type": "String", "value": "A shared altar where every player selects one hero." }
+        { "id": "utip", "type": "String", "value": "A shared altar where every player selects one hero." },
+        { "id": "useu", "type": "String", "value": "H001,H002,H003,H004" }
       ],
       "codec_version": "wc3-object-data-v1",
       "provenance": "source_of_truth",

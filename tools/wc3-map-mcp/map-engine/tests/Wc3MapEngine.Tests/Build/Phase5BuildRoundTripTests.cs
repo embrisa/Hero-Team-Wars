@@ -66,7 +66,7 @@ public sealed class Phase5BuildRoundTripTests
     }
 
     [Fact]
-    public void V8HeroObjectsRoundTripParentsSoldUnitsAndCorrectInstantStockFields()
+    public void V8HeroObjectsFixtureProducesV2FiveObjectsAndExactInstantStockFields()
     {
         var source = FindSourceMap();
         var model = MapInspector.Inspect(source);
@@ -94,18 +94,33 @@ public sealed class Phase5BuildRoundTripTests
             JsonUtilities.WriteAtomic(canonical, staged);
             var result = MapBuilder.Build(source, canonical, output, "debug");
             Assert.True(result["reopened"]!.GetValue<bool>());
-            var encoded = System.Text.Encoding.ASCII.GetString(MapArchive.Read(output).Find("war3map.w3u")!.Bytes);
+            var member = MapArchive.Read(output).Find("war3map.w3u");
+            Assert.NotNull(member);
+            var bytes = member!.Bytes;
+            Assert.Equal(2, BitConverter.ToInt32(bytes, 0));
+            var decodedDefinitions = MapComponentCodec.ToObjectDefinitions("war3map.w3u", bytes);
+            Assert.Equal(bytes, MapComponentCodec.SerializeObjectMember("war3map.w3u", decodedDefinitions));
+            var encoded = System.Text.Encoding.ASCII.GetString(bytes);
             Assert.DoesNotContain("hpal", encoded);
             Assert.Contains("Hpal", encoded);
-            var definitions = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().ToArray();
+            var definitions = decodedDefinitions.OfType<JsonObject>().ToArray();
             Assert.Equal(5, definitions.Length);
-            var expectedParents = new Dictionary<string, string> { ["H001"] = "Hpal", ["H002"] = "Hmkg", ["H003"] = "Hamg", ["H004"] = "Hblm" };
-            foreach (var (rawcode, parent) in expectedParents)
+            var expectedHeroes = new Dictionary<string, (string Parent, string Name)>
+            {
+                ["H001"] = ("Hpal", "HTW Guardian"),
+                ["H002"] = ("Hmkg", "HTW Striker"),
+                ["H003"] = ("Hamg", "HTW Controller"),
+                ["H004"] = ("Hblm", "HTW Support")
+            };
+            foreach (var (rawcode, expected) in expectedHeroes)
             {
                 var hero = definitions.Single(item => item["rawcode"]!.GetValue<string>() == rawcode);
-                Assert.Equal(parent, hero["base_rawcode"]!.GetValue<string>());
+                Assert.Equal(expected.Parent, hero["base_rawcode"]!.GetValue<string>());
                 var modifications = hero["modifications"]!.AsArray().OfType<JsonObject>().ToDictionary(item => item["id"]!.GetValue<string>());
+                Assert.Equal(expected.Name, modifications["unam"]["value"]!.GetValue<string>());
                 Assert.DoesNotContain("uhst", modifications.Keys);
+                Assert.Equal(0, modifications["ugol"]["value"]!.GetValue<int>());
+                Assert.Equal(0, modifications["ulum"]["value"]!.GetValue<int>());
                 Assert.Equal(0, modifications["usst"]["value"]!.GetValue<int>());
                 Assert.Equal(1, modifications["usrg"]["value"]!.GetValue<int>());
             }
@@ -114,6 +129,7 @@ public sealed class Phase5BuildRoundTripTests
             var altarMods = altar["modifications"]!.AsArray().OfType<JsonObject>().ToDictionary(item => item["id"]!.GetValue<string>());
             Assert.Equal("HTW Hero Altar", altarMods["unam"]["value"]!.GetValue<string>());
             Assert.Equal("A shared altar where every player selects one hero.", altarMods["utip"]["value"]!.GetValue<string>());
+            Assert.Equal("H001,H002,H003,H004", altarMods["useu"]["value"]!.GetValue<string>());
         }
         finally { DeleteTemp(directory); }
     }

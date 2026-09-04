@@ -1,0 +1,28 @@
+{
+  "build_id": "97ae1c4b-45c4-4485-95e9-a189294582a4",
+  "version_label": "v18",
+  "variant_id": "v18-combined-altar-fix",
+  "description": "Combined HTW altar fix: live v8 hero fixture with v2 object data, n0AL useu roster, zero hero start delay, one-second replenishment, free hero pick, and composed hero-selection JASS.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\97ae1c4b-45c4-4485-95e9-a189294582a4\\HeroTeamWars_v18-combined-altar-fix_97ae1c4b-45c4-4485-95e9-a189294582a4.w3m",
+  "output_sha256": "F4B8E55143F0A67264ABD073255E947416C73288E4DA1EC122156C366DD1DD40",
+  "output_size_bytes": 49220,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "8267C092FEDEF734DBA7A909E77D43D5AEBF93E7C05607F37054C44835BA4688",
+    "size_bytes": 48393
+  },
+  "objects": {
+    "count": 5,
+    "has_w3u": true,
+    "w3u_sha256": "27FCA4C6EADC08DF36958BBD11B7887D0056836D1CC08C154C95ACB9A11FEE50",
+    "w3u_size_bytes": 1075
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\v18-combined-altar-fix-97ae1c4b-45c4-4485-95e9-a189294582a4",
+  "manifest_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\artifacts\\builds\\97ae1c4b-45c4-4485-95e9-a189294582a4\\build-manifest.json",
+  "validation_report_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\artifacts\\builds\\97ae1c4b-45c4-4485-95e9-a189294582a4\\validation-report.json"
+}

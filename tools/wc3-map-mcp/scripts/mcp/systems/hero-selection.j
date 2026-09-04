@@ -1,17 +1,3 @@
-function HTW_HeroSelection_RefillStock takes nothing returns nothing
-    if HTW_HeroSelectionBuilding == null then
-        return
-    endif
-    call RemoveUnitFromStock(HTW_HeroSelectionBuilding, HTW_Content_HeroTypeForSlot(1))
-    call RemoveUnitFromStock(HTW_HeroSelectionBuilding, HTW_Content_HeroTypeForSlot(2))
-    call RemoveUnitFromStock(HTW_HeroSelectionBuilding, HTW_Content_HeroTypeForSlot(3))
-    call RemoveUnitFromStock(HTW_HeroSelectionBuilding, HTW_Content_HeroTypeForSlot(4))
-    call AddUnitToStock(HTW_HeroSelectionBuilding, HTW_Content_HeroTypeForSlot(1), 1, 1)
-    call AddUnitToStock(HTW_HeroSelectionBuilding, HTW_Content_HeroTypeForSlot(2), 1, 1)
-    call AddUnitToStock(HTW_HeroSelectionBuilding, HTW_Content_HeroTypeForSlot(3), 1, 1)
-    call AddUnitToStock(HTW_HeroSelectionBuilding, HTW_Content_HeroTypeForSlot(4), 1, 1)
-endfunction
-
 function HTW_HeroSelection_PlayerHasTeammateHero takes integer playerId, integer heroType returns boolean
     local integer teamIndex
     local integer teammateId
@@ -61,6 +47,11 @@ function HTW_HeroSelection_Complete takes nothing returns nothing
         call RemoveUnit(HTW_HeroSelectionBuilding)
         set HTW_HeroSelectionBuilding = null
     endif
+    if HTW_HeroSelectionTrigger != null then
+        call DisableTrigger(HTW_HeroSelectionTrigger)
+        call DestroyTrigger(HTW_HeroSelectionTrigger)
+        set HTW_HeroSelectionTrigger = null
+    endif
     set playerId = 1
     loop
         exitwhen playerId > HTW_ActivePlayerCount
@@ -77,7 +68,7 @@ function HTW_HeroSelection_Complete takes nothing returns nothing
     call HTW_Waves_Prepare()
 endfunction
 
-function HTW_HeroSelection_SelectForPlayer takes integer playerId, integer heroType returns boolean
+function HTW_HeroSelection_SelectUnitForPlayer takes integer playerId, integer heroType, unit heroUnit returns boolean
     if playerId < 1 or playerId > HTW_ActivePlayerCount or not HTW_Content_IsHeroType(heroType) then
         return false
     endif
@@ -86,9 +77,19 @@ function HTW_HeroSelection_SelectForPlayer takes integer playerId, integer heroT
     endif
     set HTW_HeroSelectedByPlayer[playerId] = true
     set HTW_HeroTypeByPlayer[playerId] = heroType
-    set HTW_HeroUnitByPlayer[playerId] = HTW_Content_CreateHero(playerId, heroType, 216., -336.)
+    if heroUnit == null then
+        set heroUnit = HTW_Content_CreateHero(playerId, heroType, 216., -336.)
+    else
+        call SetUnitOwner(heroUnit, Player(playerId - 1), true)
+    endif
+    set HTW_HeroUnitByPlayer[playerId] = heroUnit
     call DisplayTextToPlayer(Player(playerId - 1), 0., 0., "Selected " + HTW_Content_HeroName(heroType) + ".")
+    set heroUnit = null
     return true
+endfunction
+
+function HTW_HeroSelection_SelectForPlayer takes integer playerId, integer heroType returns boolean
+    return HTW_HeroSelection_SelectUnitForPlayer(playerId, heroType, null)
 endfunction
 
 function HTW_HeroSelection_AllPlayersReady takes nothing returns boolean
@@ -106,19 +107,29 @@ endfunction
 
 function HTW_HeroSelection_OnSell takes nothing returns nothing
     local unit soldHero
+    local unit buyer
     local integer playerId
     local integer heroType
     set soldHero = GetSoldUnit()
-    set playerId = GetPlayerId(GetOwningPlayer(soldHero)) + 1
+    if soldHero == null then
+        return
+    endif
+    set buyer = GetBuyingUnit()
+    if buyer != null then
+        set playerId = GetPlayerId(GetOwningPlayer(buyer)) + 1
+    else
+        set playerId = GetPlayerId(GetOwningPlayer(soldHero)) + 1
+    endif
+    set buyer = null
     set heroType = GetUnitTypeId(soldHero)
-    if not HTW_HeroSelection_SelectForPlayer(playerId, heroType) then
+    if not HTW_HeroSelection_SelectUnitForPlayer(playerId, heroType, soldHero) then
         call RemoveUnit(soldHero)
-        call HTW_HeroSelection_RefillStock()
-        call DisplayTextToPlayer(Player(playerId - 1), 0., 0., "That hero is unavailable. Choose another hero.")
+        if playerId >= 1 and playerId <= HTW_ActivePlayerCount then
+            call DisplayTextToPlayer(Player(playerId - 1), 0., 0., "That hero is unavailable. Choose another hero.")
+        endif
         set soldHero = null
         return
     endif
-    call HTW_HeroSelection_RefillStock()
     call HTW_Debug_LogText("player " + I2S(playerId) + " selected " + HTW_Content_HeroName(heroType))
     if HTW_HeroSelection_AllPlayersReady() then
         call HTW_HeroSelection_Complete()
@@ -158,21 +169,24 @@ endfunction
 function HTW_HeroSelection_Begin takes nothing returns nothing
     local integer playerId
     local player p
+    local rect altarRect
     set HTW_HeroSelectionComplete = false
     set HTW_HeroSelectionBuilding = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), 'n0AL', 216., -336., 270.)
     set HTW_HeroSelectionTrigger = CreateTrigger()
     call TriggerRegisterUnitEvent(HTW_HeroSelectionTrigger, HTW_HeroSelectionBuilding, EVENT_UNIT_SELL)
     call TriggerAddAction(HTW_HeroSelectionTrigger, function HTW_HeroSelection_OnSell)
-    call HTW_HeroSelection_RefillStock()
     set HTW_HeroSelectionTimer = CreateTimer()
     call TimerStart(HTW_HeroSelectionTimer, I2R(HTW_HeroSelectionSeconds), false, function HTW_HeroSelection_OnTimeout)
 
-    // Grant active shared vision over the altar area so players can interact with it
+    // Create one temporary area rect for all modifiers, then release the rect.
+    // CreateFogModifierRect snapshots the bounds when each modifier is created;
+    // the modifiers remain active until HTW_HeroSelection_Complete destroys them.
+    set altarRect = Rect(-784., -1336., 1216., 664.)
     set playerId = 1
     loop
         exitwhen playerId > HTW_ActivePlayerCount
         set p = Player(playerId - 1)
-        set HTW_HeroSelectionFog[playerId] = CreateFogModifierRadius(p, FOG_OF_WAR_VISIBLE, 216., -336., 1000., true, false)
+        set HTW_HeroSelectionFog[playerId] = CreateFogModifierRect(p, FOG_OF_WAR_VISIBLE, altarRect, true, false)
         call FogModifierStart(HTW_HeroSelectionFog[playerId])
         if GetLocalPlayer() == p then
             call PanCameraToTimed(216., -336., 0.)
@@ -180,6 +194,8 @@ function HTW_HeroSelection_Begin takes nothing returns nothing
         endif
         set playerId = playerId + 1
     endloop
+    call RemoveRect(altarRect)
+    set altarRect = null
     set p = null
 
     call DisplayTextToPlayer(GetLocalPlayer(), 0., 0., "Choose a hero at the shared HTW Hero Altar.")

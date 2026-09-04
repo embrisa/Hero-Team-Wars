@@ -24,8 +24,9 @@ public sealed class GameplayComposerTests
         Assert.Contains("function config takes nothing returns nothing", first["source"]!.GetValue<string>());
         Assert.Contains("call SetPlayers(4)", first["source"]!.GetValue<string>());
         Assert.DoesNotContain("SetUnitStock", first["source"]!.GetValue<string>());
-        Assert.Contains("AddUnitToStock", first["source"]!.GetValue<string>());
-        Assert.Contains("RemoveUnitFromStock", first["source"]!.GetValue<string>());
+        Assert.DoesNotContain("AddUnitToStock", first["source"]!.GetValue<string>());
+        Assert.DoesNotContain("RemoveUnitFromStock", first["source"]!.GetValue<string>());
+        Assert.Contains("CreateFogModifierRect", first["source"]!.GetValue<string>());
     }
 
     [Fact]
