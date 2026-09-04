@@ -7,7 +7,8 @@ using Xunit;
 namespace Wc3MapEngine.Tests.Gameplay;
 
 /// <summary>
-/// Static v21 contract tests for the H003 / HTW Controller spell kit.
+/// Static contract tests for the H003 / HTW Controller spell kit and its v22
+/// hero-ability attachment fix.
 /// These checks intentionally stop at object-data, generated-source, and
 /// typed-codec evidence; Warcraft III runtime behavior remains a manual gate.
 /// </summary>
@@ -95,6 +96,8 @@ public sealed class ControllerAbilityTests
         }
 
         Assert.Equal(KitRawcodes, HeroAbilityRawcodes(heroes["H003"]));
+        Assert.Equal("AInv", ModificationValue(heroes["H003"], "uabi")?.GetValue<string>());
+        Assert.Equal(string.Join(",", KitRawcodes), ModificationValue(heroes["H003"], "uhab")?.GetValue<string>());
         Assert.Empty(HeroAbilityRawcodes(heroes["H001"]));
         Assert.Empty(HeroAbilityRawcodes(heroes["H002"]));
         Assert.Empty(HeroAbilityRawcodes(heroes["H004"]));

@@ -17,6 +17,7 @@ retains them when their context is needed.
 - [`decisions/`](decisions/) — durable architecture decisions.
 - [`compatibility/`](compatibility/) and [`troubleshooting/`](troubleshooting/) — current compatibility findings and recovery lessons.
 - [`compatibility/v21-controller-spells.md`](compatibility/v21-controller-spells.md) — Controller spell definitions, preservation checks, and manual v21 acceptance.
+- [`compatibility/v22-h003-ability-attachment.md`](compatibility/v22-h003-ability-attachment.md) — H003 hero-ability field correction from runtime feedback.
 - [`../work-items/`](../work-items/) — active scoped implementation work, not general agent instructions.
 
 ## Sources of truth

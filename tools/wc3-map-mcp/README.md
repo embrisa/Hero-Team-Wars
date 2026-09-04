@@ -34,6 +34,8 @@ The v21 two-team Controller kit is described in
 It uses typed ability definitions, Channel/Slow parent compatibility, and
 MCP-owned spell dispatch. The public tool schemas and runtime evidence gates
 are unchanged; the exact artifact still needs the user's Warcraft III checks.
+The v22 follow-up stores those skills in H003's hero-ability field; see
+[`docs/compatibility/v22-h003-ability-attachment.md`](docs/compatibility/v22-h003-ability-attachment.md).
 
 - `mcp-server/`: TypeScript STDIO MCP server and orchestration layer.
 - `map-engine/`: .NET/War3Net map inspection, mutation, validation, and build engine.
