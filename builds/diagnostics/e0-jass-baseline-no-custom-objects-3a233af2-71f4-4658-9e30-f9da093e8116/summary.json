@@ -1,0 +1,26 @@
+{
+  "build_id": "3a233af2-71f4-4658-9e30-f9da093e8116",
+  "version_label": "v17",
+  "variant_id": "e0-jass-baseline-no-custom-objects",
+  "description": "E0 baseline: current toolchain rebuild with hero-selection entry disabled, no custom objects, no war3map.w3u in archive.",
+  "source_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_unchanged": true,
+  "output_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\mcp\\hero-team-wars\\3a233af2-71f4-4658-9e30-f9da093e8116\\HeroTeamWars_e0-jass-baseline-no-custom-objects_3a233af2-71f4-4658-9e30-f9da093e8116.w3m",
+  "output_sha256": "3450B51CCEC94FCEFAC184CBCEBBC7FFFC0505875CDCEA490A60FB042701056C",
+  "output_size_bytes": 45869,
+  "reopened": true,
+  "opaque_members_preserved": true,
+  "runtime_status": "untested",
+  "script": {
+    "sha256": "B6F4C8944496AA651AAD5013813719D0C2FF257B02CC76D116653C4EA4596F5B",
+    "size_bytes": 40881
+  },
+  "objects": {
+    "count": 0,
+    "has_w3u": false
+  },
+  "diagnostics": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\builds\\diagnostics\\e0-jass-baseline-no-custom-objects-3a233af2-71f4-4658-9e30-f9da093e8116",
+  "manifest_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\artifacts\\builds\\3a233af2-71f4-4658-9e30-f9da093e8116\\build-manifest.json",
+  "validation_report_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\tools\\wc3-map-mcp\\artifacts\\builds\\3a233af2-71f4-4658-9e30-f9da093e8116\\validation-report.json"
+}

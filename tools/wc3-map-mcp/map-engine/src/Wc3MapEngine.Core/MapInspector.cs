@@ -487,7 +487,7 @@ public static class MapInspector
             ["codec_version"] = MapComponentCodec.CodecVersion,
             ["supported_operations"] = new JsonArray(new JsonNode?[]
             {
-                "create_object_definition", "update_object_definition", "delete_object_definition", "set_object_reference"
+                "create_object_definition", "update_object_definition", "delete_object_definition", "set_object_reference", "set_object_data"
             }),
             ["provenance"] = "observed_archive"
         }).ToArray());

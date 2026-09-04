@@ -1,0 +1,159 @@
+{
+  "schema_version": "1.0",
+  "validator_version": "phase3-1.0",
+  "target": "transaction_build",
+  "buildable": true,
+  "findings": [
+    {
+      "severity": "info",
+      "code": "MAP_INFO_EXTENSION_AGREEMENT",
+      "component": "metadata",
+      "target": ".w3m",
+      "provenance": "derived",
+      "message": "The .w3m archive has a readable war3map.w3i map-info contract.",
+      "suggested_action": "Keep the map extension and map-info member together when producing a build.",
+      "suggested_remediation": "Keep the map extension and map-info member together when producing a build."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "(attributes)",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "(listfile)",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "conversation.json",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3map.j",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3map.mmp",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3map.shd",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3map.w3c",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3map.w3e",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3map.wct",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3map.wpm",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3map.wtg",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "OPAQUE_MEMBER_PRESERVED",
+      "component": "archive",
+      "target": "war3mapMap.blp",
+      "provenance": "derived",
+      "message": "Archive member is preserved byte-for-byte but not semantically decoded.",
+      "suggested_action": "Do not edit this member through the semantic writer.",
+      "suggested_remediation": "Do not edit this member through the semantic writer."
+    },
+    {
+      "severity": "info",
+      "code": "SCRIPT_CONNECTION_OPAQUE",
+      "component": "scripts",
+      "target": "war3map.j",
+      "provenance": "derived",
+      "message": "GUI/custom-text members are preserved but are not synchronized with MCP-owned JASS source.",
+      "suggested_action": "Treat war3map.j as authoritative and avoid saving the generated trigger source over MCP-owned gameplay code.",
+      "suggested_remediation": "Treat war3map.j as authoritative and avoid saving the generated trigger source over MCP-owned gameplay code."
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "info": 14
+  },
+  "map_path": "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars\\map\\HeroTeamWars_M0_2Arena.w3m",
+  "map_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "source_sha256": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "map_hash": "027AA23AAB7D94EDD8CD09EFBE799DBCFCDC5B2775FF0B36A07CD6BB19CEC834",
+  "size_bytes": 38323,
+  "modified_utc": "2026-08-25T13:11:16.3515059Z"
+}

@@ -43,7 +43,7 @@ export class InspectionService {
       throw new AppError("UNSUPPORTED_COMPONENT", `Component '${component}' is not present in the canonical map.`);
     }
     const status = componentStatus(inspection, component, value);
-    if (!["parsed_read_only", "roundtrip_verified", "typed_write_enabled"].includes(String(status.capability)) && !["archive_members", "capabilities", "component_status", "profiles", "profile", "opaque_members"].includes(component)) {
+    if (!["parsed_read_only", "roundtrip_verified", "typed_write_enabled", "mixed"].includes(String(status.capability)) && !["archive_members", "capabilities", "component_status", "profiles", "profile", "opaque_members"].includes(component)) {
       throw new AppError("UNSUPPORTED_COMPONENT", `Component '${component}' is not semantically decoded for this map.`, false, { component, capability: status.capability, reason: status.reason ?? "The Phase 0 parser classified this component as opaque or absent." });
     }
 

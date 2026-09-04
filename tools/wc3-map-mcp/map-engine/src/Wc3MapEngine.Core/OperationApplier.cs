@@ -850,7 +850,10 @@ public static class OperationApplier
         var created = candidate;
         created["id"] = id;
         created["archive_path"] = created["archive_path"]?.DeepClone() ?? MapComponentCodec.ObjectMemberForCategory(StringValue(created, "category")!);
-        if (!created.ContainsKey("display_name")) created.Add("display_name", null);
+        if (!created.ContainsKey("display_name") || created["display_name"] is null)
+        {
+            created["display_name"] = DisplayNameFromModifications(created);
+        }
         created["dependencies"] ??= new JsonArray();
         created["references"] ??= new JsonObject();
         created["codec_version"] ??= MapComponentCodec.CodecVersion;

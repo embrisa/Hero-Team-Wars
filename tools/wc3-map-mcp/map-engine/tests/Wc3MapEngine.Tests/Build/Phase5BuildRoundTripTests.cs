@@ -70,10 +70,59 @@ public sealed class Phase5BuildRoundTripTests
     {
         var source = FindSourceMap();
         var model = MapInspector.Inspect(source);
-        var guardian = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hpal:H001", ["category"] = "unit", ["rawcode"] = "H001" }, null, HeroDefinition("Hpal", "H001", "HTW Guardian", "A durable frontline hero for the Hero Team Wars MVP.", 25, 16, 14, 700));
-        var striker = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hmkg:H002", ["category"] = "unit", ["rawcode"] = "H002" }, null, HeroDefinition("Hmkg", "H002", "HTW Striker", "A quick melee damage hero for the Hero Team Wars MVP.", 18, 25, 12, 560));
-        var controller = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hamg:H003", ["category"] = "unit", ["rawcode"] = "H003" }, null, HeroDefinition("Hamg", "H003", "HTW Controller", "A high-intelligence control hero for the Hero Team Wars MVP.", 14, 16, 25, 480));
-        var support = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:Hblm:H004", ["category"] = "unit", ["rawcode"] = "H004" }, null, HeroDefinition("Hblm", "H004", "HTW Support", "A flexible support hero for the Hero Team Wars MVP.", 16, 18, 23, 520));
+        var fixturePath = FindFixture(Path.Combine("tools", "wc3-map-mcp", "scripts", "mcp", "object-data", "v8-hero-objects.json"));
+        var fixtureNode = JsonNode.Parse(File.ReadAllText(fixturePath))!.AsObject();
+        var objects = fixtureNode["objects"]!.AsArray();
+        var operations = new JsonArray();
+        foreach (var obj in objects.OfType<JsonObject>())
+        {
+            var baseRawcode = obj["base_rawcode"]!.GetValue<string>();
+            var customRawcode = obj["custom_rawcode"]!.GetValue<string>();
+            operations.Add(Operation("create_object_definition", new JsonObject
+            {
+                ["id"] = $"war3map.w3u:new:{baseRawcode}:{customRawcode}",
+                ["category"] = "unit",
+                ["rawcode"] = customRawcode
+            }, null, obj.DeepClone()));
+        }
+        var staged = OperationApplier.Apply(model, operations)["canonical_map"]!;
+        var directory = TempDirectory();
+        try
+        {
+            var canonical = Path.Combine(directory, "canonical.json");
+            var output = Path.Combine(directory, "v8-hero-objects.w3m");
+            JsonUtilities.WriteAtomic(canonical, staged);
+            var result = MapBuilder.Build(source, canonical, output, "debug");
+            Assert.True(result["reopened"]!.GetValue<bool>());
+            var encoded = System.Text.Encoding.ASCII.GetString(MapArchive.Read(output).Find("war3map.w3u")!.Bytes);
+            Assert.DoesNotContain("hpal", encoded);
+            Assert.Contains("Hpal", encoded);
+            var definitions = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().ToArray();
+            Assert.Equal(5, definitions.Length);
+            var expectedParents = new Dictionary<string, string> { ["H001"] = "Hpal", ["H002"] = "Hmkg", ["H003"] = "Hamg", ["H004"] = "Hblm" };
+            foreach (var (rawcode, parent) in expectedParents)
+            {
+                var hero = definitions.Single(item => item["rawcode"]!.GetValue<string>() == rawcode);
+                Assert.Equal(parent, hero["base_rawcode"]!.GetValue<string>());
+                var modifications = hero["modifications"]!.AsArray().OfType<JsonObject>().ToDictionary(item => item["id"]!.GetValue<string>());
+                Assert.DoesNotContain("uhst", modifications.Keys);
+                Assert.Equal(0, modifications["usst"]["value"]!.GetValue<int>());
+                Assert.Equal(1, modifications["usrg"]["value"]!.GetValue<int>());
+            }
+            var altar = definitions.Single(item => item["rawcode"]!.GetValue<string>() == "n0AL");
+            Assert.Equal("ntav", altar["base_rawcode"]!.GetValue<string>());
+            var altarMods = altar["modifications"]!.AsArray().OfType<JsonObject>().ToDictionary(item => item["id"]!.GetValue<string>());
+            Assert.Equal("HTW Hero Altar", altarMods["unam"]["value"]!.GetValue<string>());
+            Assert.Equal("A shared altar where every player selects one hero.", altarMods["utip"]["value"]!.GetValue<string>());
+        }
+        finally { DeleteTemp(directory); }
+    }
+
+    [Fact]
+    public void CustomAltarWithSoldUnitsRoundTripsUseuString()
+    {
+        var source = FindSourceMap();
+        var model = MapInspector.Inspect(source);
         var altar = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:ntav:n0AL", ["category"] = "unit", ["rawcode"] = "n0AL" }, null, new JsonObject
         {
             ["object_kind"] = "custom",
@@ -87,35 +136,43 @@ public sealed class Phase5BuildRoundTripTests
                 new JsonObject { ["id"] = "unam", ["type"] = "String", ["value"] = "HTW Hero Altar" },
                 new JsonObject { ["id"] = "useu", ["type"] = "String", ["value"] = "H001,H002,H003,H004" })
         });
-        var staged = OperationApplier.Apply(model, new JsonArray(guardian, striker, controller, support, altar))["canonical_map"]!;
+        var staged = OperationApplier.Apply(model, new JsonArray(altar))["canonical_map"]!;
         var directory = TempDirectory();
         try
         {
             var canonical = Path.Combine(directory, "canonical.json");
-            var output = Path.Combine(directory, "v8-hero-objects.w3m");
+            var output = Path.Combine(directory, "altar-useu.w3m");
             JsonUtilities.WriteAtomic(canonical, staged);
             var result = MapBuilder.Build(source, canonical, output, "debug");
             Assert.True(result["reopened"]!.GetValue<bool>());
             var encoded = System.Text.Encoding.ASCII.GetString(MapArchive.Read(output).Find("war3map.w3u")!.Bytes);
-            Assert.DoesNotContain("hpal", encoded);
-            Assert.Contains("Hpal", encoded);
             Assert.Contains("H001,H002,H003,H004", encoded);
-            var definitions = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().ToArray();
-            Assert.Equal(5, definitions.Length);
-            var expectedParents = new Dictionary<string, string> { ["H001"] = "Hpal", ["H002"] = "Hmkg", ["H003"] = "Hamg", ["H004"] = "Hblm" };
-            foreach (var (rawcode, parent) in expectedParents)
-            {
-                var hero = definitions.Single(item => item["rawcode"]!.GetValue<string>() == rawcode);
-                Assert.Equal(parent, hero["base_rawcode"]!.GetValue<string>());
-                var modifications = hero["modifications"]!.AsArray().OfType<JsonObject>().ToDictionary(item => item["id"]!.GetValue<string>());
-                Assert.DoesNotContain("uhst", modifications.Keys);
-                Assert.Equal(0, modifications["usst"]["value"]!.GetValue<int>());
-                Assert.Equal(1, modifications["usrg"]["value"]!.GetValue<int>());
-            }
-            var sold = definitions.Single(item => item["rawcode"]!.GetValue<string>() == "n0AL")["modifications"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "useu");
+            var definition = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().Single(item => item["rawcode"]!.GetValue<string>() == "n0AL");
+            var sold = definition["modifications"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "useu");
             Assert.Equal("H001,H002,H003,H004", sold["value"]!.GetValue<string>());
         }
         finally { DeleteTemp(directory); }
+    }
+
+    [Fact]
+    public void ObjectFieldSemanticRegistryCoversAllV8HeroObjectModifications()
+    {
+        var fixturePath = FindFixture(Path.Combine("tools", "wc3-map-mcp", "scripts", "mcp", "object-data", "v8-hero-objects.json"));
+        var fixtureNode = JsonNode.Parse(File.ReadAllText(fixturePath))!.AsObject();
+        var objects = fixtureNode["objects"]!.AsArray();
+        foreach (var obj in objects.OfType<JsonObject>())
+        {
+            var modifications = obj["modifications"]!.AsArray().OfType<JsonObject>();
+            foreach (var mod in modifications)
+            {
+                var id = mod["id"]!.GetValue<string>();
+                var type = mod["type"]!.GetValue<string>();
+                Assert.True(ObjectFieldSemanticRegistry.TryGetFieldMetadata(id, out var meta), $"Field '{id}' should be registered in ObjectFieldSemanticRegistry.");
+                Assert.NotNull(meta);
+                Assert.Equal(type, meta.ExpectedType);
+                Assert.Equal(FieldSemanticProvenance.StaticFixtureBacked, meta.Provenance);
+            }
+        }
     }
 
     [Fact]
@@ -297,5 +354,17 @@ public sealed class Phase5BuildRoundTripTests
             current = current.Parent;
         }
         throw new FileNotFoundException("The local Hero Team Wars source fixture was not found.");
+    }
+
+    private static string FindFixture(string relativePath)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        for (var depth = 0; depth < 12 && current is not null; depth++)
+        {
+            var candidate = Path.Combine(current.FullName, relativePath);
+            if (File.Exists(candidate)) return candidate;
+            current = current.Parent;
+        }
+        throw new FileNotFoundException($"The fixture was not found: {relativePath}");
     }
 }

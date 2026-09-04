@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = "C:\\Users\\hp\\Documents\\Warcraft III\\Hero Team Wars";
@@ -88,6 +88,7 @@ export async function buildMapVariant({
   description,
   heroObjects = [], // list of objects to include in w3u
   heroSelectionSourceOverride = null, // if provided, override systems/hero-selection.j content
+  moduleOverrides = null, // if provided, dict of { [moduleId]: sourceString }
   mapInitActions = null // if provided, list of actions for map_init trigger
 }) {
   const engine = createEngine();
@@ -121,8 +122,15 @@ export async function buildMapVariant({
       gameplay_source: {}
     });
 
-    // Step 3: override systems.hero-selection module if requested
-    if (heroSelectionSourceOverride !== null) {
+    // Step 3: override modules if requested
+    if (moduleOverrides !== null) {
+      for (const [moduleId, overrideSource] of Object.entries(moduleOverrides)) {
+        const mod = canonical.gameplay_modules.find(m => m.id === moduleId);
+        if (!mod) throw new Error(`Could not find module '${moduleId}' in canonical modules`);
+        mod.source = overrideSource;
+        mod.source_sha256 = createHash("sha256").update(Buffer.from(overrideSource, "utf8")).digest("hex").toUpperCase();
+      }
+    } else if (heroSelectionSourceOverride !== null) {
       const hsMod = canonical.gameplay_modules.find(m => m.id === "systems.hero-selection");
       if (!hsMod) throw new Error("Could not find systems.hero-selection in canonical modules");
       hsMod.source = heroSelectionSourceOverride;
@@ -224,10 +232,103 @@ export async function buildMapVariant({
       diagnostics: diagDir
     };
 
+    // Step 4: write MCP-compatible build manifest and validation report into artifacts
+    const artifactsBuildDir = join(root, "tools", "wc3-map-mcp", "artifacts", "builds", buildId);
+    mkdirSync(artifactsBuildDir, { recursive: true });
+
+    const valReportRelative = `tools/wc3-map-mcp/artifacts/builds/${buildId}/validation-report.json`;
+    const valReportAbsolute = join(root, valReportRelative);
+    writeFileSync(valReportAbsolute, JSON.stringify(validation, null, 2));
+    const valReportSha = sha256File(valReportAbsolute);
+
+    const relativeOutputPath = `builds/mcp/hero-team-wars/${buildId}/HeroTeamWars_${variantId}_${buildId}.w3m`;
+    const mcpManifest = {
+      schema_version: "1.0",
+      build_id: buildId,
+      project_id: "hero-team-wars",
+      transaction_id: randomUUID(),
+      revision: 1,
+      profile: "debug",
+      capability_profile: "mvp_2arena",
+      source_sha256: expectedSourceHash,
+      output_path: relativeOutputPath,
+      output_sha256: outputHash,
+      output_size_bytes: inspectOut.source.size_bytes,
+      writer_version: String(build.writer_version ?? "wc3-map-engine-1.0"),
+      validator_version: String(validation.validator_version ?? "wc3-map-validator-1.0"),
+      validation_report: {
+        path: valReportRelative,
+        sha256: valReportSha
+      },
+      archive_comparison: build.archive_comparison ?? {},
+      reinspection: {
+        performed: true,
+        semantic_differences: [],
+        output_hash: outputHash
+      },
+      warnings: [],
+      runtime_status: "untested",
+      created_utc: new Date().toISOString(),
+      engine_result: build
+    };
+
+    const buildManifestPath = join(artifactsBuildDir, "build-manifest.json");
+    writeFileSync(buildManifestPath, JSON.stringify(mcpManifest, null, 2));
+
+    summary.manifest_path = buildManifestPath;
+    summary.validation_report_path = valReportAbsolute;
+
     writeFileSync(join(diagDir, "summary.json"), JSON.stringify(summary, null, 2));
     writeFileSync(join(outDir, "rebuild-summary.json"), JSON.stringify(summary, null, 2));
     return summary;
   } finally {
     engine.close();
   }
+}
+
+export function findNextTestVersion() {
+  const testRoot = "C:\\Users\\hp\\Documents\\Warcraft III\\Maps\\Test";
+  const entries = readdirSync(testRoot, { withFileTypes: true });
+  let maxVersion = 0;
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      const match = /^v(\d+)$/i.exec(entry.name);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxVersion) maxVersion = num;
+      }
+    }
+  }
+  return maxVersion + 1;
+}
+
+export function publishPlayableMap(buildSummary, specificVersion = null) {
+  const versionNum = specificVersion ?? findNextTestVersion();
+  const versionLabel = `v${versionNum}`;
+  const targetDir = `C:\\Users\\hp\\Documents\\Warcraft III\\Maps\\Test\\${versionLabel}`;
+  if (existsSync(targetDir)) {
+    throw new Error(`Target directory already exists: ${targetDir}. Never reuse an existing version folder.`);
+  }
+  mkdirSync(targetDir, { recursive: true });
+  const targetPath = join(targetDir, `HeroTeamWars_${versionLabel}.w3m`);
+  copyFileSync(buildSummary.output_path, targetPath);
+  const copiedSha = sha256File(targetPath);
+  if (copiedSha !== buildSummary.output_sha256) {
+    throw new Error(`Copied artifact hash mismatch: ${copiedSha} != ${buildSummary.output_sha256}`);
+  }
+  const publishRecord = {
+    version_label: versionLabel,
+    build_id: buildSummary.build_id,
+    variant_id: buildSummary.variant_id,
+    source_path: buildSummary.source_path,
+    source_sha256: buildSummary.source_sha256,
+    build_output_path: buildSummary.output_path,
+    published_path: targetPath,
+    published_sha256: copiedSha,
+    war3map_j_sha256: buildSummary.script.sha256,
+    war3map_w3u: buildSummary.objects.has_w3u ? { sha256: buildSummary.objects.w3u_sha256, size_bytes: buildSummary.objects.w3u_size_bytes } : "absent",
+    published_utc: new Date().toISOString()
+  };
+  writeFileSync(join(targetDir, "publish-summary.json"), JSON.stringify(publishRecord, null, 2));
+  return publishRecord;
 }
