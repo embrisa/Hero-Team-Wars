@@ -2,6 +2,10 @@ function HTW_MCP_Bootstrap takes nothing returns nothing
     if HTW_Bootstrapped then
         return
     endif
+    // Keep the complete map visible to every player for the whole match.
+    // These are global toggles; no local-player or temporary fog state is used.
+    call FogEnable(false)
+    call FogMaskEnable(false)
     call HTW_Tuning_Load()
     call HTW_Teams_Initialize()
     call HTW_Regions_Initialize()

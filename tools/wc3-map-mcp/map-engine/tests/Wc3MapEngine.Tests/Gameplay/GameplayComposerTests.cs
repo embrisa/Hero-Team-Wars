@@ -26,7 +26,24 @@ public sealed class GameplayComposerTests
         Assert.DoesNotContain("SetUnitStock", first["source"]!.GetValue<string>());
         Assert.DoesNotContain("AddUnitToStock", first["source"]!.GetValue<string>());
         Assert.DoesNotContain("RemoveUnitFromStock", first["source"]!.GetValue<string>());
-        Assert.Contains("CreateFogModifierRect", first["source"]!.GetValue<string>());
+        Assert.Contains("call FogEnable(false)", first["source"]!.GetValue<string>());
+        Assert.Contains("call FogMaskEnable(false)", first["source"]!.GetValue<string>());
+        Assert.DoesNotContain("FogModifier", first["source"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void ComposerDeploysPurchasedHeroesOnceAtTheirTeamArenaCenter()
+    {
+        var source = GameplaySourceComposer.Compose(FindManifest())["source"]!.GetValue<string>();
+
+        Assert.Contains("set x = GetRectCenterX(HTW_ArenaRect[teamIndex])", source);
+        Assert.Contains("set y = GetRectCenterY(HTW_ArenaRect[teamIndex])", source);
+        Assert.Contains("call SetUnitPosition(HTW_HeroUnitByPlayer[playerId], x, y)", source);
+        Assert.Contains("call PanCameraToTimed(x, y, 0.)", source);
+        Assert.Single(Regex.Matches(source, @"(?m)^\s*call HTW_HeroSelection_DeployHero\(playerId\)\s*$"));
+        Assert.DoesNotContain("SetUnitPosition(HTW_HeroUnitByPlayer[playerId], x + I2R(playerId * 64), y + I2R(playerId * 48))", source);
+        Assert.DoesNotContain("PanCameraToTimed(x + I2R(playerId * 64), y + I2R(playerId * 48), 0.)", source);
+        Assert.DoesNotContain("HTW_HeroSelectionFog", source);
     }
 
     [Fact]

@@ -17,14 +17,14 @@ function HTW_HeroSelection_DeployHero takes integer playerId returns nothing
     local real x
     local real y
     set teamIndex = HTW_Teams_FindByPlayer(playerId)
-    if teamIndex <= 0 or HTW_HeroUnitByPlayer[playerId] == null then
+    if teamIndex <= 0 or HTW_HeroUnitByPlayer[playerId] == null or HTW_HeroAliveByPlayer[playerId] then
         return
     endif
     set x = GetRectCenterX(HTW_ArenaRect[teamIndex])
     set y = GetRectCenterY(HTW_ArenaRect[teamIndex])
-    call SetUnitPosition(HTW_HeroUnitByPlayer[playerId], x + I2R(playerId * 64), y + I2R(playerId * 48))
+    call SetUnitPosition(HTW_HeroUnitByPlayer[playerId], x, y)
     if GetLocalPlayer() == Player(playerId - 1) then
-        call PanCameraToTimed(x + I2R(playerId * 64), y + I2R(playerId * 48), 0.)
+        call PanCameraToTimed(x, y, 0.)
         call SelectUnit(HTW_HeroUnitByPlayer[playerId], true)
     endif
     set HTW_HeroAliveByPlayer[playerId] = true
@@ -59,12 +59,6 @@ function HTW_HeroSelection_Complete takes nothing returns nothing
             call RemoveUnit(HTW_HeroSelectionPatronByPlayer[playerId])
             set HTW_HeroSelectionPatronByPlayer[playerId] = null
         endif
-        if HTW_HeroSelectionFog[playerId] != null then
-            call FogModifierStop(HTW_HeroSelectionFog[playerId])
-            call DestroyFogModifier(HTW_HeroSelectionFog[playerId])
-            set HTW_HeroSelectionFog[playerId] = null
-        endif
-        call HTW_HeroSelection_DeployHero(playerId)
         set playerId = playerId + 1
     endloop
     set HTW_Phase = 1
@@ -87,6 +81,7 @@ function HTW_HeroSelection_SelectUnitForPlayer takes integer playerId, integer h
         call SetUnitOwner(heroUnit, Player(playerId - 1), true)
     endif
     set HTW_HeroUnitByPlayer[playerId] = heroUnit
+    call HTW_HeroSelection_DeployHero(playerId)
     call DisplayTextToPlayer(Player(playerId - 1), 0., 0., "Selected " + HTW_Content_HeroName(heroType) + ".")
     set heroUnit = null
     return true
@@ -177,7 +172,6 @@ endfunction
 function HTW_HeroSelection_Begin takes nothing returns nothing
     local integer playerId
     local player p
-    local rect altarRect
     local real patronX
     set HTW_HeroSelectionComplete = false
     set HTW_HeroSelectionBuilding = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), 'n0AL', 216., -336., 270.)
@@ -187,10 +181,6 @@ function HTW_HeroSelection_Begin takes nothing returns nothing
     set HTW_HeroSelectionTimer = CreateTimer()
     call TimerStart(HTW_HeroSelectionTimer, I2R(HTW_HeroSelectionSeconds), false, function HTW_HeroSelection_OnTimeout)
 
-    // Create one temporary area rect for all modifiers, then release the rect.
-    // CreateFogModifierRect snapshots the bounds when each modifier is created;
-    // the modifiers remain active until HTW_HeroSelection_Complete destroys them.
-    set altarRect = Rect(-784., -1336., 1216., 664.)
     set playerId = 1
     loop
         exitwhen playerId > HTW_ActivePlayerCount
@@ -200,16 +190,12 @@ function HTW_HeroSelection_Begin takes nothing returns nothing
         // selection window; it is removed after that player buys a hero.
         set patronX = 216. + I2R((playerId - 1) * 64)
         set HTW_HeroSelectionPatronByPlayer[playerId] = CreateUnit(p, 'ncop', patronX, -336., 270.)
-        set HTW_HeroSelectionFog[playerId] = CreateFogModifierRect(p, FOG_OF_WAR_VISIBLE, altarRect, true, false)
-        call FogModifierStart(HTW_HeroSelectionFog[playerId])
         if GetLocalPlayer() == p then
             call PanCameraToTimed(216., -336., 0.)
             call SelectUnit(HTW_HeroSelectionBuilding, true)
         endif
         set playerId = playerId + 1
     endloop
-    call RemoveRect(altarRect)
-    set altarRect = null
     set p = null
 
     call DisplayTextToPlayer(GetLocalPlayer(), 0., 0., "Choose a hero at the shared HTW Hero Altar.")

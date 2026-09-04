@@ -111,7 +111,6 @@
     "variables/round.variable.json",
     "variables/wave.variable.json",
     "variables/phase.variable.json",
-    "variables/runtime.variable.json",
-    "variables/hero-selection-fog.variable.json"
+    "variables/runtime.variable.json"
   ]
 }
