@@ -24,6 +24,9 @@ export const workerOperationSchema = z.enum([
   "validate_gameplay_source",
   "run_scenario",
   "jass_lookup",
+  "object_field_lookup",
+  "object_field_search",
+  "object_field_annotations",
   "jass_search",
   "jass_validate_call",
   "jass_validate_source"

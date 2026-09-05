@@ -82,3 +82,12 @@ pollution or parallelize the task.
 - Preserve the approved MVP scope: four users, two teams of two, and two mirrored arenas.
 - Keep design rules consistent across the design documents, especially the current round-robin routing and shared team-life rules.
 - Treat binary map files as valuable user work: make a recoverable copy before risky edits and report whether runtime testing was actually performed.
+
+## Object field discovery
+
+Before editing an unfamiliar object field, use `wc3_object_field_search`, then
+`wc3_object_field_lookup` for its exact case-sensitive ID/readable name and
+category. Never guess rawcodes, types, enum values, native levels or pointers.
+Prefer named `field` modifications; retain raw canonical records for expected
+preconditions. Unknown fields must be preserved unchanged. Metadata and
+readable annotations do not prove runtime behavior.

@@ -1,4 +1,11 @@
 import * as z from "zod/v4";
+
+const objectFieldFilter = {
+  category: z.enum(["unit", "ability", "item", "buff", "upgrade", "doodad", "destructable"]).optional(),
+  base_rawcode: z.string().regex(/^[\x20-\x7E]{4}$/).optional()
+};
+export const objectFieldLookupSchema = z.object({ field: z.string().min(1).max(200).refine(v => v.trim().length > 0), ...objectFieldFilter }).strict();
+export const objectFieldSearchSchema = z.object({ query: z.string().min(1).max(200).refine(v => v.trim().length > 0), ...objectFieldFilter, limit: z.number().int().min(1).max(50).default(10) }).strict();
 import { operationSchema } from "./operations.js";
 import { projectMapSchema, sha256Schema, uuidSchema } from "./common.js";
 

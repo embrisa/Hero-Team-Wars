@@ -19,8 +19,8 @@ decision. Before finishing, compare tool registrations, executable schemas,
 `contracts/schemas/`, `.codex/config.toml`, and this catalog; do not knowingly
 leave them inconsistent.
 
-The current server exposes 28 tools: 7 map read tools, 4 global JASS/jassdoc
-knowledge tools, 5 transaction tools, 3 build tools, 4 launch/evidence tools,
+The current server exposes 30 tools: 7 map read tools, 4 global JASS/jassdoc
+knowledge tools, 2 global object-field tools, 5 transaction tools, 3 build tools, 4 launch/evidence tools,
 and 5 gameplay-source tools.
 
 ## Contract rules shared by every tool
@@ -119,6 +119,31 @@ JSON and upstream checkout are intentionally ignored and must not be
 committed. Script-producing transaction paths run the same validator before
 publishing a revision.
 
+## Global object-field tools
+
+These two tools are project-independent, always registered, read-only and
+backed by the engine's embedded offline catalog. Use search then exact lookup
+before authoring unfamiliar object fields. See
+[`object-field-authoring.md`](object-field-authoring.md) and the
+[generated field reference](object-fields.generated.md).
+
+| Tool | Request contract | Result contract |
+|---|---|---|
+| `wc3_object_field_lookup` | `{ field, category?, base_rawcode? }`; field is 1-200 nonblank characters, an exact case-sensitive ID or readable name. | `catalog_version`, `catalog_sha256`, `found`, `ambiguous`, `identifier_kind`, `field` (null unless uniquely resolved), `matches`, `suggestions`. Entries include native type/scope, base applicability, enum/flag values and pinned source evidence. Prefixes/object IDs are never silently resolved as fields. |
+| `wc3_object_field_search` | `{ query, category?, base_rawcode?, limit? }`; query is 1-200 nonblank characters; limit is 1-50, default 10. | Ranked bounded `matches`, `total_matches`, `catalog_version`, `catalog_sha256`. Case-insensitive discovery does not change case-sensitive authoring. |
+
+`category` is unit, ability, item, buff, upgrade, doodad or destructable.
+`base_rawcode` is exactly four printable ASCII characters and filters direct
+catalog applicability; it does not resolve custom ancestry without a map.
+Catalog hash identifies the embedded metadata content. Evidence remains static.
+
+Object inspection additionally returns separate bounded `object_fields`
+annotations (category/rawcode/fields with id/type/value/scope and readable
+name/description/expected_type/known), without changing canonical artifacts or
+expected records. Apply and transaction diffs add `diff.object_fields` with
+annotated before/after objects; revision-range output concatenates these in
+revision order. Null before/after denotes creation/deletion.
+
 ## Transaction tools
 
 Transaction tools are project-scoped and require a writes-enabled project unless
@@ -185,6 +210,16 @@ Important typed preconditions include:
   hero-ability field; see [`../compatibility/v22-h003-ability-attachment.md`](../compatibility/v22-h003-ability-attachment.md).
   The v23 metadata correction adds explicit hero flags, existing-game icons,
   and typed Channel fields; see [`../compatibility/v23-controller-ability-metadata.md`](../compatibility/v23-controller-ability-metadata.md).
+- Object modification input is either raw `{ id, type, value, ...scope }` or
+  named `{ field, value, ...scope }`. Named input resolves exact names/IDs and
+  types from the catalog; raw and named selectors cannot be mixed. Named enum
+  strings, flag-name arrays and rawcode-list arrays resolve to native values.
+  Native level/variation is explicit; named pointers default from metadata.
+  Updates replace the entire modification array, preserving unrelated records.
+  Changed fields must match catalog category/type/base/scope/value rules;
+  unknown fields must remain unchanged. Hero attachment checks run after the
+  complete batch. Before building, source-relative validation repeats the gates.
+  See the authoring contract for precise preservation and legacy behavior.
 - Rawcodes are exactly four printable ASCII characters. Player IDs are 1-24;
   force indexes are 0-23; logical team IDs are `team_N`; region IDs are
   `region:N`; and placement targets use a stable ID or native creation number.
@@ -239,9 +274,10 @@ upgrade themselves to editor-open, game-loaded, smoke, or playtest evidence.
 
 ## Availability and policy gates
 
-- `.codex/config.toml` must allow-list all 28 names for Codex visibility. The
-  four `jass_*` tools are global and bypass project map allow-list entries, but
-  they still require the local jassdoc dataset.
+- `.codex/config.toml` must allow-list all 30 names for Codex visibility. The
+  four `jass_*` tools and two `wc3_object_field_*` tools are global and bypass
+  project map allow-list entries. JASS requires the local jassdoc dataset;
+  object fields use the embedded catalog.
 - `write_policy="read_only"` exposes only read/validation tools. Writes,
   builds, launches, evidence mutation, promotion, and discard require a
   writes-enabled project configuration.
@@ -259,6 +295,10 @@ upgrade themselves to editor-open, game-loaded, smoke, or playtest evidence.
   `TRANSACTION_STATE`, `PRECONDITION_FAILED`, `PRECONDITION_REQUIRED`,
   `CURSOR_STALE`, `LOCKED`, `LAUNCH_FAILED`, `PROMOTION_FAILED`,
   `CAPABILITY_GATED`, `DISCARD_FAILED`, `OUTPUT_EXISTS`, and `INTERNAL_ERROR`.
+  Object-field errors include `OBJECT_FIELD_UNKNOWN`,
+  `OBJECT_FIELD_TYPE_MISMATCH`, `OBJECT_FIELD_BASE_MISMATCH`,
+  `OBJECT_FIELD_SCOPE_INVALID`, `OBJECT_FIELD_VALUE_INVALID`,
+  `OBJECT_FIELD_DUPLICATE`, and `OBJECT_HERO_SKILL_INVALID`.
 
 For exact field-level validation, inspect the closed Zod schemas and the
 versioned JSON schemas under `tools/wc3-map-mcp/contracts/schemas/`. For

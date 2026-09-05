@@ -50,3 +50,13 @@ Any implementation, schema, registration, configuration, response, error,
 policy, path, serializer, or evidence change must update this guide when its
 workflow or constraints change, plus the affected contract/reference docs and
 README files in the same commit.
+
+## Object field knowledge and authoring
+
+Use `wc3_object_field_search` and `wc3_object_field_lookup` before editing
+unfamiliar field IDs. The shared offline catalog powers readable field names,
+annotated inspection/diffs and enforced field semantics. Unknown legacy fields
+remain unchanged; newly authored fields must match verified metadata. See
+[object-field authoring](reference/object-field-authoring.md) for exact input, scope, evidence,
+preservation and regeneration rules. This is a tooling change; existing maps
+and historical authoring fixtures are not automatically migrated.

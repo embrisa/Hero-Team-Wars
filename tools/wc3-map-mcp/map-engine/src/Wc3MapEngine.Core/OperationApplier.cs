@@ -131,6 +131,7 @@ public static class OperationApplier
             FinalizeGameplayModel(working);
         }
 
+        ObjectFieldCatalog.ValidateRelations(root, working);
         return new JsonObject
         {
             ["canonical_map"] = working,
@@ -138,6 +139,7 @@ public static class OperationApplier
             {
                 ["schema_version"] = "1.0",
                 ["changes"] = allChanges,
+                ["object_fields"] = ObjectFieldCatalog.AnnotateChanges(root, working),
                 ["groups"] = GroupChanges(allChanges),
                 ["reference_rewrites"] = referenceRewrites,
                 ["dependency_order"] = new JsonArray(orderedOperations.Select(operation => (JsonNode?)new JsonObject
@@ -833,7 +835,9 @@ public static class OperationApplier
         candidate["base_rawcode"] ??= candidate["rawcode"]?.DeepClone();
         candidate["custom_rawcode"] ??= candidate["rawcode"]?.DeepClone();
         candidate["object_kind"] ??= "custom";
+        ObjectFieldCatalog.Normalize(candidate);
         ValidateObjectDefinition(root, candidate);
+        ObjectFieldCatalog.ValidateChanges(root, null, candidate);
         var definitions = Collection(root, "object_data");
         var category = StringValue(candidate, "category")!;
         var objectKind = StringValue(candidate, "object_kind") ?? "custom";
@@ -855,6 +859,7 @@ public static class OperationApplier
             created["display_name"] = DisplayNameFromModifications(created);
         }
         created["dependencies"] ??= new JsonArray();
+        created["unknown_ids"] ??= new JsonArray();
         created["references"] ??= new JsonObject();
         created["codec_version"] ??= MapComponentCodec.CodecVersion;
         created["provenance"] = "intended_design";
@@ -877,7 +882,9 @@ public static class OperationApplier
             update.Remove("display_name");
         }
         foreach (var property in update) merged[property.Key] = property.Value?.DeepClone();
+        ObjectFieldCatalog.Normalize(merged);
         ValidateObjectDefinition(root, merged);
+        ObjectFieldCatalog.ValidateChanges(root, definition, merged);
         foreach (var property in update) definition[property.Key] = property.Value?.DeepClone();
         if (merged["modifications"] is JsonNode modifications) definition["modifications"] = modifications.DeepClone();
         if (merged.TryGetPropertyValue("display_name", out var display)) definition["display_name"] = display?.DeepClone();

@@ -119,3 +119,10 @@ Do not write this config until the built entry point exists. After adding it, re
 ## Packaging contents
 
 The local package includes compiled server, published engine, schemas, example config, scripts, licenses/notices, compatibility report, feature capability registry, and documentation. It includes project gameplay source manifests and source modules only when the project explicitly packages them. It excludes accepted source maps, user imports/assets, snapshots, logs, builds, local config, and secrets.
+
+Object-field knowledge is embedded in the compiled engine from the checked-in
+`map-engine/data/object-fields.json`. It does not depend on local game assets,
+an ignored cache or runtime network access. Publish the rebuilt engine and
+server together. The checked-in host allow-list includes all 30 tools,
+including `wc3_object_field_lookup` and `wc3_object_field_search`; reload the
+MCP connection to discover these newly registered names.

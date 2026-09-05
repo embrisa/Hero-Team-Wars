@@ -64,6 +64,13 @@ binary serializer is available.
 
 Each change operation contains operation type, target identity, expected prior value or revision, requested value, rationale, and optional design/chunk reference. Batch application is atomic.
 
+Object modifications accept the additive named `field` authoring alternative;
+canonical models and expected records retain exact raw `id/type/value` and
+native scope. Readable inspection/diff annotations are separate response data,
+excluded from canonical serialization and hashes. See
+[object-field authoring](object-field-authoring.md) for the shared catalog and
+stricter changed-field validation policy.
+
 ## Versioning
 
 Version the MCP tool schema, engine protocol, canonical map schema, transaction manifest, and compatibility report independently. Reject incompatible major versions with a clear upgrade message.

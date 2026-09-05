@@ -6,7 +6,7 @@ const identifier = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
 const moduleIdentifier = z.string().regex(/^[A-Za-z_][A-Za-z0-9_.-]*$/);
 const rawcode = z.string().regex(/^[\x20-\x7E]{4}$/);
 const objectCategory = z.enum(["unit", "ability", "item", "destructable", "doodad", "buff", "upgrade"]);
-const objectModificationSchema = z.object({
+const rawObjectModificationSchema = z.object({
   id: rawcode, type: z.enum(["Int", "Real", "Unreal", "String", "Bool", "Char"]), value: z.union([z.string(), z.number(), z.boolean()]),
   level: z.number().int().nonnegative().optional(), pointer: z.number().int().nonnegative().optional(), variation: z.number().int().nonnegative().optional()
 }).strict().superRefine((value, context) => {
@@ -16,6 +16,12 @@ const objectModificationSchema = z.object({
   if (value.type === "String" && typeof value.value !== "string") context.addIssue({ code: "custom", path: ["value"], message: "String modifications require text." });
   if (value.type === "Bool" && typeof value.value !== "boolean") context.addIssue({ code: "custom", path: ["value"], message: "Bool modifications require a boolean." });
 });
+const namedObjectModificationSchema = z.object({
+  field: z.string().regex(/^[A-Za-z][A-Za-z0-9]*$/).max(200),
+  value: z.union([z.string(), z.number().finite(), z.boolean(), z.array(z.string())]),
+  level: z.number().int().nonnegative().optional(), pointer: z.number().int().nonnegative().optional(), variation: z.number().int().nonnegative().optional()
+}).strict();
+const objectModificationSchema = z.union([rawObjectModificationSchema, namedObjectModificationSchema]);
 const objectDefinitionSchema = z.object({
   id: z.string().min(1).optional(), archive_path: z.string().min(1).optional(), category: objectCategory, object_kind: z.enum(["base", "custom"]),
   base_rawcode: rawcode, custom_rawcode: rawcode, rawcode, display_name: z.string().min(1).nullable().optional(),
@@ -26,10 +32,10 @@ const objectDefinitionSchema = z.object({
   if (value.rawcode !== active) context.addIssue({ code: "custom", path: ["rawcode"], message: "rawcode must match the active base/custom rawcode." });
   if (value.object_kind === "custom" && value.base_rawcode === value.custom_rawcode) context.addIssue({ code: "custom", path: ["custom_rawcode"], message: "Custom objects require distinct base and custom rawcodes." });
   if (value.category === "ability" || value.category === "upgrade") {
-    for (const modification of value.modifications) if (modification.level === undefined || modification.pointer === undefined) context.addIssue({ code: "custom", path: ["modifications"], message: "Ability and upgrade modifications require level and pointer." });
+    for (const modification of value.modifications) if (modification.level === undefined || (!("field" in modification) && modification.pointer === undefined)) context.addIssue({ code: "custom", path: ["modifications"], message: "Ability and upgrade modifications require native level and (for raw records) pointer." });
   }
   if (value.category === "doodad") {
-    for (const modification of value.modifications) if (modification.variation === undefined || modification.pointer === undefined) context.addIssue({ code: "custom", path: ["modifications"], message: "Doodad modifications require variation and pointer." });
+    for (const modification of value.modifications) if (modification.variation === undefined || (!("field" in modification) && modification.pointer === undefined)) context.addIssue({ code: "custom", path: ["modifications"], message: "Doodad modifications require variation and (for raw records) pointer." });
   }
 });
 const objectDefinitionUpdateSchema = z.object({ display_name: z.string().min(1).nullable().optional(), modifications: z.array(objectModificationSchema).optional() }).strict().refine(value => Object.keys(value).length > 0, "Object definition update requires display_name or modifications.");

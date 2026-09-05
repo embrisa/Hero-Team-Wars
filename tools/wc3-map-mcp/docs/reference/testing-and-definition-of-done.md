@@ -2,6 +2,12 @@
 
 ## Test layers
 
+Object-field changes also run the generated-reference/schema drift check in
+`npm test`, the all-catalog-field codec round trips, semantic rejection and
+atomicity tests, source-relative build validation, and MCP lookup/authoring/
+annotation integration. The STDIO suite compares the registered tools against
+the host allow-list and live catalog; worker schema enums must agree too.
+
 ### Unit tests
 
 - schema validation;

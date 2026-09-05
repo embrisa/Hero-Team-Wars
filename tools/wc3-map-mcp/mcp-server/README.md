@@ -42,3 +42,13 @@ Keep the agent-facing contract catalog current when this server changes:
 Zod schemas, normalized responses, errors, policy gates, or worker behavior must
 update the catalog and any affected versioned contract schema/README in the
 same change, followed by a registration/schema/documentation consistency check.
+
+## Object field knowledge and authoring
+
+Use `wc3_object_field_search` and `wc3_object_field_lookup` before editing
+unfamiliar field IDs. The shared offline catalog powers readable field names,
+annotated inspection/diffs and enforced field semantics. Unknown legacy fields
+remain unchanged; newly authored fields must match verified metadata. See
+[object-field authoring](../docs/reference/object-field-authoring.md) for exact input, scope, evidence,
+preservation and regeneration rules. This is a tooling change; existing maps
+and historical authoring fixtures are not automatically migrated.

@@ -10,8 +10,10 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
-    "test": "npm run build && vitest run --no-file-parallelism",
-    "test:watch": "vitest"
+    "test": "npm run build && npm run check:object-fields && vitest run --no-file-parallelism",
+    "test:watch": "vitest",
+    "generate:object-fields": "npm run build && node scripts/generate-object-field-docs.mjs",
+    "check:object-fields": "node scripts/generate-object-field-docs.mjs --check"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",

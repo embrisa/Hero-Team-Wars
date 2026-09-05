@@ -28,3 +28,12 @@ check; do not knowingly leave the agent contract stale.
 The source map at `../../map/HeroTeamWars_M0_2Arena.w3m` is immutable. Recompute its SHA-256 before and after work. All writes use MCP-owned staging/build paths. Do not install or upgrade machine-level prerequisites without explicit authorization. Do not claim World Editor/game/runtime success without observed evidence tied to the exact build hash.
 
 For v8 custom-hero rebuild pitfalls, War3Log vs static parse, and object-data encoding lessons, read `docs/troubleshooting/v8-custom-hero-runtime-lessons.md`. Do not duplicate jassdoc native/API facts there; look those up in the pinned jassdoc index.
+
+## Object field discovery
+
+Before editing an unfamiliar object field, use `wc3_object_field_search`, then
+`wc3_object_field_lookup` for its exact case-sensitive ID/readable name and
+category. Never guess rawcodes, types, enum values, native levels or pointers.
+Prefer named `field` modifications; retain raw canonical records for expected
+preconditions. Unknown fields must be preserved unchanged. Metadata and
+readable annotations do not prove runtime behavior.

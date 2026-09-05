@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "unit",
+        "ability",
+        "item",
+        "buff",
+        "upgrade",
+        "doodad",
+        "destructable"
+      ]
+    },
+    "base_rawcode": {
+      "type": "string",
+      "pattern": "^[\\x20-\\x7E]{4}$"
+    },
+    "limit": {
+      "default": 10,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50
+    }
+  },
+  "required": [
+    "query",
+    "limit"
+  ],
+  "additionalProperties": false
+}

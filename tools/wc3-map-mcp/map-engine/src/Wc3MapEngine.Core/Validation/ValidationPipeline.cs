@@ -286,12 +286,19 @@ public static class ValidationPipeline
 
     private static void ValidateBuildableObjectChanges(JsonObject source, JsonObject staged, JsonArray findings)
     {
+        try { ObjectFieldCatalog.ValidateRelations(source, staged); }
+        catch (EngineException error) { Add(findings, "error", error.Code, "object_data", null, error.Message, "Correct hero skill attachment and metadata using object-field lookup."); }
         var before = EnumerateObjects(source["object_data"]).GroupBy(ObjectIdentity, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var after = EnumerateObjects(staged["object_data"]).GroupBy(ObjectIdentity, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         foreach (var identity in before.Keys.Union(after.Keys, StringComparer.OrdinalIgnoreCase))
         {
             before.TryGetValue(identity, out var left);
             after.TryGetValue(identity, out var right);
+            if (right is not null)
+            {
+                try { ObjectFieldCatalog.ValidateChanges(staged, left, right); }
+                catch (EngineException error) { Add(findings, "error", error.Code, "object_data", identity, error.Message, "Look up the exact field/category, correct its type/base/scope/value, and preserve unknown records unchanged."); }
+            }
             var member = StringValue(right?["archive_path"]) ?? StringValue(left?["archive_path"])
                 ?? (StringValue(right?["category"]) is { } category ? ObjectPlacementSupport.MemberForCategory(category) : null)
                 ?? (StringValue(left?["category"]) is { } oldCategory ? ObjectPlacementSupport.MemberForCategory(oldCategory) : null);

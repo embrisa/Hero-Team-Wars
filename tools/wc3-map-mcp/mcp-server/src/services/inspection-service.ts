@@ -18,7 +18,9 @@ export class InspectionService {
     const full = await this.worker.request<Record<string, unknown>>("inspect_map", { map_path: mapPath }, correlationId);
     const artifact = this.writeArtifact(project, "inspect", full, correlationId);
     const data = section ? { schema_version: full.schema_version, source: full.source, [section]: limitSection(full[section], maxItems, includeProvenance) } : limitTopLevel(full, maxItems, includeProvenance);
-    return { data, artifact, map_hash: (full.source as Record<string, unknown> | undefined)?.sha256, warnings: full.parse_warnings ?? [] };
+    const objectFields = (!section || section === "object_data") && Array.isArray(full.object_data)
+      ? await this.worker.request<Record<string, unknown>>("object_field_annotations", { definitions: full.object_data.slice(0, maxItems) }, correlationId) : {};
+    return { data, artifact, ...objectFields, map_hash: (full.source as Record<string, unknown> | undefined)?.sha256, warnings: full.parse_warnings ?? [] };
   }
 
   public async listArchiveFiles(projectId: string, map: string, correlationId: string): Promise<Record<string, unknown>> {
@@ -53,6 +55,7 @@ export class InspectionService {
     const values = Array.isArray(filtered) ? filtered.slice(offset, offset + maxItems) : filtered;
     if (!Array.isArray(filtered) && cursor) throw new AppError("CURSOR_STALE", `Component '${component}' is not paginated.`);
     const result: Record<string, unknown> = { map_hash: mapHash, component, capability: status.capability, provenance: status.provenance, values };
+    if (component === "object_data" && Array.isArray(values)) Object.assign(result, await this.worker.request("object_field_annotations", { definitions: values }, correlationId));
     if (Array.isArray(filtered) && offset + maxItems < filtered.length) result.next_cursor = encodeComponentCursor(mapHash, component, filter ?? "", offset + maxItems);
     return result;
   }

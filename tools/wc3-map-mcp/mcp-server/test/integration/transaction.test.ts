@@ -55,6 +55,8 @@ class McpClient {
     return this.request("tools/call", { name, arguments: args });
   }
 
+  public listTools(): Promise<any> { return this.request("tools/list", {}); }
+
   public close(): void {
     this.child.stdin.end();
     this.child.kill();
@@ -125,12 +127,60 @@ describe("MCP transaction and build workflow", () => {
       map: "map/HeroTeamWars_M0_2Arena.w3m",
       expected_source_hash: "0000000000000000000000000000000000000000000000000000000000000000"
     });
-
     expect(result.structuredContent.ok).toBe(false);
     expect(result.structuredContent.error.code).toBe("SOURCE_CHANGED");
     expect(sourceHash()).toBe(before);
     const afterTransactions = new Set(readdirSync(transactionRoot, { withFileTypes: true }).filter(entry => entry.isDirectory() && /^[0-9a-f-]{36}$/i.test(entry.name)).map(entry => entry.name));
     expect(afterTransactions).toEqual(existingTransactions);
+  }, 120_000);
+
+  it("resolves named fields and preserves the revision after a semantic field error", async () => {
+    const before = sourceHash();
+    client = new McpClient();
+    await client.initialize();
+    const listed = (await client.listTools()).tools.map((t: any) => t.name).sort();
+    const host = readFileSync(resolve(projectRoot, ".codex/config.toml"), "utf8");
+    const allowed = [...host.matchAll(/"((?:wc3_|jass_)[a-z_]+)"/g)].map(m => m[1]).sort();
+    expect(listed).toEqual(allowed);
+    expect(listed).toHaveLength(30);
+    const contracts = readFileSync(resolve(projectRoot, "tools/wc3-map-mcp/docs/reference/tool-contracts.md"), "utf8");
+    for (const name of listed) expect(contracts).toContain(`| \`${name}\` |`);
+    const begin = await client.call("wc3_begin_transaction", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", expected_source_hash: before });
+    expect(begin.structuredContent.ok).toBe(true);
+    transactionId = begin.structuredContent.data.transaction_id;
+    const value = {
+      category: "ability", object_kind: "custom", base_rawcode: "ANcl", custom_rawcode: "Z091", rawcode: "Z091",
+      modifications: [{ field: "abilityName", value: "Catalog test", level: 0 }, { field: "channelTargetType", value: "point", level: 1 }]
+    };
+    const args = { project_id: "hero-team-wars", transaction_id: transactionId, expected_revision: 0, operations: [operation("create_object_definition", {}, undefined, value)] };
+    const dry = await client.call("wc3_apply_operations", { ...args, dry_run: true });
+    expect(dry.structuredContent.ok).toBe(true);
+    expect(dry.structuredContent.data.diff.object_fields[0].after.fields).toContainEqual(expect.objectContaining({ id: "Ncl2", name: "channelTargetType", value: 2, pointer: 2 }));
+    const invalid = { ...value, modifications: [{ id: "Ncl2", type: "String", value: "point", level: 1, pointer: 2 }] };
+    const failed = await client.call("wc3_apply_operations", { ...args, operations: [operation("create_object_definition", {}, undefined, invalid)] });
+    expect(failed.structuredContent.error.code).toBe("OBJECT_FIELD_TYPE_MISMATCH");
+    const applied = await client.call("wc3_apply_operations", args);
+    expect(applied.structuredContent.ok).toBe(true);
+    expect(applied.structuredContent.data.revision).toBe(1);
+    const canonical = JSON.parse(readFileSync(resolve(projectRoot, applied.structuredContent.data.canonical_path), "utf8"));
+    const ability = canonical.object_data.find((d: any) => d.rawcode === "Z091");
+    expect(ability.modifications[1]).toEqual({ id: "Ncl2", type: "Int", value: 2, level: 1, pointer: 2 });
+    expect(ability.modifications[1].field).toBeUndefined();
+    const diff = await client.call("wc3_transaction_diff", { project_id: "hero-team-wars", transaction_id: transactionId });
+    expect(diff.structuredContent.data.diff.object_fields).toHaveLength(1);
+    const validation = await client.call("wc3_validate_transaction", { project_id: "hero-team-wars", transaction_id: transactionId, revision: 1 });
+    expect(validation.structuredContent.data.report.buildable).toBe(true);
+    const built = await client.call("wc3_build_map", { project_id: "hero-team-wars", transaction_id: transactionId, revision: 1, expected_source_hash: before, profile: "debug" });
+    expect(built.structuredContent.ok).toBe(true);
+    buildId = built.structuredContent.data.build.build_id;
+    const map = built.structuredContent.data.build.output_path;
+    const component = await client.call("wc3_get_component", { project_id: "hero-team-wars", map, component: "object_data" });
+    expect(component.structuredContent.ok).toBe(true);
+    expect(component.structuredContent.data.object_fields[0].fields).toContainEqual(expect.objectContaining({ id: "Ncl2", name: "channelTargetType" }));
+    expect(component.structuredContent.data.values[0].modifications[1].name).toBeUndefined();
+    const inspection = await client.call("wc3_inspect_map", { project_id: "hero-team-wars", map, section: "object_data", max_items_per_section: 1 });
+    expect(inspection.structuredContent.data.object_fields).toHaveLength(1);
+    expect(sourceHash()).toBe(before);
   }, 120_000);
 
   it("stages, diffs, validates, builds, and rehashes a changed copy", async () => {

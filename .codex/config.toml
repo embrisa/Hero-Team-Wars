@@ -15,6 +15,8 @@ enabled_tools = [
   "wc3_validate_map",
   "wc3_compare_maps",
   "jass_lookup",
+  "wc3_object_field_lookup",
+  "wc3_object_field_search",
   "jass_search",
   "jass_validate_call",
   "jass_validate_source",

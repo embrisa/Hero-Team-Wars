@@ -85,6 +85,18 @@ public sealed class Phase5BuildRoundTripTests
                 ["rawcode"] = customRawcode
             }, null, obj.DeepClone()));
         }
+        // The unit fixture now references the Controller kit. Supply minimal
+        // test-only ability dependencies so this stock/codec test is complete.
+        foreach (var rawcode in new[] { "A2Q1", "A2W1", "A2E1", "A2R1" })
+        {
+            operations.Insert(0, Operation("create_object_definition", new JsonObject(), null, new JsonObject
+            {
+                ["category"] = "ability", ["object_kind"] = "custom", ["base_rawcode"] = "ANcl", ["custom_rawcode"] = rawcode, ["rawcode"] = rawcode,
+                ["modifications"] = new JsonArray(
+                    new JsonObject { ["field"] = "heroAbility", ["value"] = true, ["level"] = 0 },
+                    new JsonObject { ["field"] = "normalIcon", ["value"] = "ReplaceableTextures\\CommandButtons\\BTNArcaneTower.blp", ["level"] = 0 })
+            }));
+        }
         var staged = OperationApplier.Apply(model, operations)["canonical_map"]!;
         var directory = TempDirectory();
         try
@@ -183,10 +195,10 @@ public sealed class Phase5BuildRoundTripTests
             {
                 var id = mod["id"]!.GetValue<string>();
                 var type = mod["type"]!.GetValue<string>();
-                Assert.True(ObjectFieldSemanticRegistry.TryGetFieldMetadata(id, out var meta), $"Field '{id}' should be registered in ObjectFieldSemanticRegistry.");
+                var meta = ObjectFieldCatalog.Find(obj["category"]!.GetValue<string>(), id);
                 Assert.NotNull(meta);
-                Assert.Equal(type, meta.ExpectedType);
-                Assert.Equal(FieldSemanticProvenance.StaticFixtureBacked, meta.Provenance);
+                Assert.Equal(type, meta["type"]!.GetValue<string>());
+                Assert.False(meta["runtime_verified"]!.GetValue<bool>());
             }
         }
     }
@@ -199,7 +211,7 @@ public sealed class Phase5BuildRoundTripTests
         var operation = Operation("create_object_definition", new JsonObject { ["id"] = "war3map.w3u:new:hfoo:Z002", ["category"] = "unit", ["rawcode"] = "Z002" }, null, new JsonObject
         {
             ["object_kind"] = "custom", ["category"] = "unit", ["base_rawcode"] = "hfoo", ["custom_rawcode"] = "Z002", ["rawcode"] = "Z002", ["unknown_ids"] = new JsonArray(),
-            ["modifications"] = new JsonArray(new JsonObject { ["id"] = "usca", ["type"] = "Int", ["value"] = 42 })
+            ["modifications"] = new JsonArray(new JsonObject { ["id"] = "usca", ["type"] = "Real", ["value"] = 1.25 })
         });
         var staged = OperationApplier.Apply(model, new JsonArray(operation))["canonical_map"]!;
         var directory = TempDirectory();
@@ -213,7 +225,7 @@ public sealed class Phase5BuildRoundTripTests
             var definition = MapInspector.Inspect(output)["object_data"]!.AsArray().OfType<JsonObject>().Single(item => item["rawcode"]!.GetValue<string>() == "Z002");
             var modification = definition["modifications"]!.AsArray().OfType<JsonObject>().Single();
             Assert.Equal("usca", modification["id"]!.GetValue<string>());
-            Assert.Equal(42, modification["value"]!.GetValue<int>());
+            Assert.Equal(1.25f, modification["value"]!.GetValue<float>());
         }
         finally { DeleteTemp(directory); }
     }

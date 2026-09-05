@@ -53,6 +53,12 @@ World Editor / Warcraft III test launch
 - Validate referential integrity, format limits, scripts, and build output.
 - Never decide whether an operation is authorized.
 
+Object-field metadata is an embedded, pinned JSON catalog owned by the engine.
+Global MCP lookup/search and derived annotations delegate to that catalog;
+TypeScript does not duplicate it. Named modification inputs normalize before
+staging; source-relative semantic validation runs before revision publication
+and again before building. See [object-field authoring](object-field-authoring.md).
+
 The planned full-feature engine is a typed map compiler, not a generic MPQ
 patcher. Its component adapters are independently enabled for gameplay source
 and triggers, regions, object definitions, placements, `war3map.w3i` player/

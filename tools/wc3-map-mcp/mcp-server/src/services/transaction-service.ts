@@ -262,7 +262,8 @@ export class TransactionService {
       source_sha256: loaded.manifest.source.sha256,
       from_revision: from,
       to_revision: to,
-      diff: { schema_version: SCHEMA_VERSION, changes, groups, reference_rewrites: referenceRewrites },
+      diff: { schema_version: SCHEMA_VERSION, changes, groups, reference_rewrites: referenceRewrites,
+        object_fields: reports.flatMap(item => Array.isArray(item.value.object_fields) ? item.value.object_fields : []) },
       groups,
       ...(singleReport ? { artifact_path: relativeProjectPath(project, singleReport.path) } : {}),
       ...(changes.length === 0 ? { note: "No semantic changes were recorded for this revision range." } : {})
@@ -408,7 +409,9 @@ function semanticDiff(value: unknown): Record<string, unknown> {
   const groups = Array.isArray((value as Record<string, unknown>).groups) ? (value as Record<string, unknown>).groups : groupChanges(changes);
   const referenceRewrites = Array.isArray((value as Record<string, unknown>).reference_rewrites) ? (value as Record<string, unknown>).reference_rewrites : [];
   const dependencyOrder = Array.isArray((value as Record<string, unknown>).dependency_order) ? (value as Record<string, unknown>).dependency_order : [];
-  return { schema_version: SCHEMA_VERSION, changes, groups, reference_rewrites: referenceRewrites, dependency_order: dependencyOrder };
+  const objectFields = (value as Record<string, unknown>).object_fields;
+  if (objectFields !== undefined && !Array.isArray(objectFields)) throw new AppError("ENGINE_PROTOCOL_ERROR", "The map engine returned invalid object-field annotations.");
+  return { schema_version: SCHEMA_VERSION, changes, groups, reference_rewrites: referenceRewrites, dependency_order: dependencyOrder, object_fields: objectFields ?? [] };
 }
 
 function stringArray(value: unknown): string[] {

@@ -7,6 +7,8 @@ retains them when their context is needed.
 ## Start here
 
 - [`agent-guide.md`](agent-guide.md) — current workflow, safety gates, and reading order.
+- [`reference/object-field-authoring.md`](reference/object-field-authoring.md) — field lookup, readable authoring, semantic gates and unknown-field preservation.
+- [`reference/object-fields.generated.md`](reference/object-fields.generated.md) — generated field IDs, readable names, types, scope and source evidence.
 - [`reference/tool-contracts.md`](reference/tool-contracts.md) — every exposed tool, schema, policy gate, response, and evidence contract.
 - [`reference/architecture.md`](reference/architecture.md) — process and component boundaries.
 - [`reference/map-model-and-contracts.md`](reference/map-model-and-contracts.md) — typed map model and mutation contracts.

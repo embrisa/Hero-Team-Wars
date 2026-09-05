@@ -53,6 +53,9 @@ function requestProcess(): Promise<{ lines: string[]; stderr: string }> {
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 24, method: "tools/call", params: { name: "jass_search", arguments: { query: "unit stock", limit: 6 } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 25, method: "tools/call", params: { name: "jass_validate_call", arguments: { function: "AddUnitToStock", arguments: ["null", "'H001'"] } } })}\n`);
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 26, method: "tools/call", params: { name: "jass_validate_source", arguments: { source: "function MyCustomFunction takes nothing returns nothing\nendfunction\nfunction Test takes nothing returns nothing\n call MyCustomFunction()\nendfunction" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 27, method: "tools/call", params: { name: "wc3_object_field_lookup", arguments: { field: "Ncl2", category: "ability" } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 28, method: "tools/call", params: { name: "wc3_object_field_search", arguments: { query: "learnable hero skills", category: "unit", limit: 1 } } })}\n`);
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 29, method: "tools/call", params: { name: "wc3_object_field_lookup", arguments: { field: "Ncl" } } })}\n`);
     child.stdin.end();
   });
 }
@@ -89,6 +92,8 @@ describe("MCP STDIO", () => {
       "jass_search",
       "jass_validate_call",
       "jass_validate_source",
+      "wc3_object_field_lookup",
+      "wc3_object_field_search",
       "wc3_project_status",
       "wc3_inspect_map",
       "wc3_list_archive_files",
@@ -103,6 +108,12 @@ describe("MCP STDIO", () => {
     expect(toolNames.some((name: string) => /begin|apply|transaction|build|launch|promote|discard/i.test(name))).toBe(false);
 
     const call = response(result.lines, 3);
+    const lookup = response(result.lines, 27).result.structuredContent.data;
+    expect(lookup.found).toBe(true);
+    expect(lookup.field).toMatchObject({ id: "Ncl2", name: "channelTargetType", type: "Int", data_pointer: 2, runtime_verified: false });
+    expect(lookup.field.values).toContainEqual(expect.objectContaining({ name: "point", value: 2 }));
+    expect(response(result.lines, 28).result.structuredContent.data.matches[0].id).toBe("uhab");
+    expect(response(result.lines, 29).result.structuredContent.data).toMatchObject({ found: false, identifier_kind: "search_prefix" });
     expect(call.result.structuredContent.ok).toBe(true);
     expect(call.result.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "text", text: expect.any(String) })]));
     expect(call.result.structuredContent.correlation_id).toEqual(expect.any(String));

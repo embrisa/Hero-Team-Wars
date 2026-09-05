@@ -140,9 +140,27 @@
       "additionalProperties": false
     },
     "object_modification": {
+      "oneOf": [{ "$ref": "#/$defs/raw_object_modification" }, { "$ref": "#/$defs/named_object_modification" }]
+    },
+    "named_object_modification": {
+      "type": "object", "required": ["field", "value"],
+      "properties": {
+        "field": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$", "maxLength": 200 },
+        "value": { "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }, { "type": "array", "items": { "type": "string" } }] },
+        "level": { "type": "integer", "minimum": 0 }, "pointer": { "type": "integer", "minimum": 0 }, "variation": { "type": "integer", "minimum": 0 }
+      }, "additionalProperties": false
+    },
+    "raw_object_modification": {
       "type": "object",
       "required": ["id", "type", "value"],
-      "properties": { "id": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "type": { "enum": ["Int", "Real", "Unreal", "String", "Bool", "Char"] }, "value": {}, "level": { "type": "integer", "minimum": 0 }, "pointer": { "type": "integer", "minimum": 0 }, "variation": { "type": "integer", "minimum": 0 } },
+      "properties": { "id": { "type": "string", "pattern": "^[\\x20-\\x7E]{4}$" }, "type": { "enum": ["Int", "Real", "Unreal", "String", "Bool", "Char"] }, "value": { "type": ["string", "number", "boolean"] }, "level": { "type": "integer", "minimum": 0 }, "pointer": { "type": "integer", "minimum": 0 }, "variation": { "type": "integer", "minimum": 0 } },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "Int" } } }, "then": { "properties": { "value": { "type": "integer" } } } },
+        { "if": { "properties": { "type": { "enum": ["Real", "Unreal"] } } }, "then": { "properties": { "value": { "type": "number" } } } },
+        { "if": { "properties": { "type": { "const": "Bool" } } }, "then": { "properties": { "value": { "type": "boolean" } } } },
+        { "if": { "properties": { "type": { "const": "String" } } }, "then": { "properties": { "value": { "type": "string" } } } },
+        { "if": { "properties": { "type": { "const": "Char" } } }, "then": { "properties": { "value": { "type": "string", "minLength": 1, "maxLength": 1 } } } }
+      ],
       "additionalProperties": false
     },
     "object_definition": {
