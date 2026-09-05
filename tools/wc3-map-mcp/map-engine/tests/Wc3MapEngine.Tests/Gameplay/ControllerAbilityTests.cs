@@ -75,6 +75,9 @@ public sealed class ControllerAbilityTests
             }
 
             Assert.Equal(expected.Levels, Scalar<int>(modifications, "alev", 0));
+            Assert.True(Scalar<bool>(modifications, "aher", 0), $"{rawcode} must be marked as a hero ability.");
+            Assert.False(Scalar<bool>(modifications, "aite", 0), $"{rawcode} must not be an item ability.");
+            Assert.StartsWith(@"ReplaceableTextures\CommandButtons\", Scalar<string>(modifications, "aart", 0), StringComparison.Ordinal);
             Assert.Equal(expected.ManaCosts, LevelValues<int>(modifications, "amcs", expected.Levels));
             Assert.Equal(expected.Cooldowns, LevelValues<float>(modifications, "acdn", expected.Levels));
         }

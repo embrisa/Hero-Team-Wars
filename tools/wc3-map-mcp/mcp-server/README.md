@@ -25,6 +25,9 @@ or promotion evidence gate changed. See
 for kit definitions and the exact-artifact verification procedure.
 The v22 follow-up stores those skills in H003's hero-ability field; see
 [`../docs/compatibility/v22-h003-ability-attachment.md`](../docs/compatibility/v22-h003-ability-attachment.md).
+The v23 follow-up adds explicit hero flags, existing-game icons, and correctly
+typed Channel metadata; see
+[`../docs/compatibility/v23-controller-ability-metadata.md`](../docs/compatibility/v23-controller-ability-metadata.md).
 
 The four global JASS knowledge tools are always registered because they query the single local canonical dataset rather than a project map. `jass_search` discovers real APIs by concept, `jass_lookup` returns exact signatures and documentation, and the two validation tools check calls/source without mutation. Unknown names remain errors or unknown lookup results; fuzzy matches are suggestions only.
 

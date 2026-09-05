@@ -183,6 +183,8 @@ Important typed preconditions include:
   [`../compatibility/v21-controller-spells.md`](../compatibility/v21-controller-spells.md).
   The v22 attachment correction stores Controller skills in the typed `uhab`
   hero-ability field; see [`../compatibility/v22-h003-ability-attachment.md`](../compatibility/v22-h003-ability-attachment.md).
+  The v23 metadata correction adds explicit hero flags, existing-game icons,
+  and typed Channel fields; see [`../compatibility/v23-controller-ability-metadata.md`](../compatibility/v23-controller-ability-metadata.md).
 - Rawcodes are exactly four printable ASCII characters. Player IDs are 1-24;
   force indexes are 0-23; logical team IDs are `team_N`; region IDs are
   `region:N`; and placement targets use a stable ID or native creation number.

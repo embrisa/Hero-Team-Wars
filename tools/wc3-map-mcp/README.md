@@ -36,6 +36,9 @@ MCP-owned spell dispatch. The public tool schemas and runtime evidence gates
 are unchanged; the exact artifact still needs the user's Warcraft III checks.
 The v22 follow-up stores those skills in H003's hero-ability field; see
 [`docs/compatibility/v22-h003-ability-attachment.md`](docs/compatibility/v22-h003-ability-attachment.md).
+The v23 follow-up adds explicit hero flags, existing-game icons, and correctly
+typed Channel metadata; see
+[`docs/compatibility/v23-controller-ability-metadata.md`](docs/compatibility/v23-controller-ability-metadata.md).
 
 - `mcp-server/`: TypeScript STDIO MCP server and orchestration layer.
 - `map-engine/`: .NET/War3Net map inspection, mutation, validation, and build engine.
