@@ -14,7 +14,7 @@ to Channel; `Ncl` is a search prefix, never a writable ID. `unam` is shared
 by unit/item categories, so lookup without a category returns an ambiguous
 result. Suggestions never resolve writes. Unknown fields remain unknown.
 
-The catalog is a bounded set of 47 reviewed fields, not the complete game's
+The catalog is a bounded set of 60 reviewed fields, not the complete game's
 metadata. Every entry records its pinned source, source file hash, upstream
 metadata type, readable name, canonical type, base applicability, scope,
 data pointer, editor display key and evidence. The metadata fixture does not
@@ -27,6 +27,11 @@ root. This explicit maintenance command downloads only pinned source files;
 review changes before rebuilding. Normal builds and lookup need no network.
 The script's field selection/readable vocabulary is curated; types and scope
 facts are extracted. New fields require source evidence and codec tests.
+
+The Controller repair adds cast/learn hotkeys, separate button positions, learn
+icons/tooltips, skill rank requirements, technology requirements and Channel
+disable-other-abilities metadata. Native hotkeys are String values (for example
+`Q`), at level/pointer 0; Channel `Ncl5` repeats at levels 1+ with pointer 5.
 
 ## Readable modifications
 
@@ -132,4 +137,4 @@ Run `scripts/build.ps1`, then `scripts/test.ps1`. In `mcp-server`,
 request JSON schemas. `npm run check:object-fields` fails on drift and runs as
 part of `npm test`. Tests cover exact/ambiguous lookup, search ranking, named
 resolution, semantic rejection, atomicity, legacy preservation, hero attachment,
-all 47 fields through the binary codecs, and the actual MCP STDIO surface.
+all 60 fields through the binary codecs, and the actual MCP STDIO surface.

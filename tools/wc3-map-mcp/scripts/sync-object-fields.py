@@ -54,9 +54,22 @@ atar allowedTargets Allowed targets filter; separate from Channel target type
 aher heroAbility Hero ability flag; marks a learnable hero skill
 aite itemAbility Item ability flag
 aart normalIcon Normal command button icon path
+ahky hotkey Cast hotkey
+arhk learnHotkey Learn skill hotkey
+abpx buttonPositionX Cast button column
+abpy buttonPositionY Cast button row
+arpx learnButtonPositionX Learn button column
+arpy learnButtonPositionY Learn button row
+arar learnIcon Learn skill icon path
+aret learnTooltip Learn skill tooltip
+arut learnExtendedTooltip Learn skill extended tooltip
+arlv requiredHeroLevel Required hero level for the first skill rank
+alsk heroLevelSkip Hero level interval between skill ranks
+areq abilityRequirements Ability technology requirements
 Ncl1 channelFollowThroughTime Channel follow-through time
 Ncl2 channelTargetType Channel target type enumeration
 Ncl3 channelOptions Channel options bit mask
+Ncl5 channelDisableOtherAbilities Channel disables other abilities while casting
 Ncl6 channelBaseOrder Channel base order string
 Slo1 movementSlowFactor Movement slow factor
 Slo2 attackSlowFactor Attack slow factor
@@ -78,7 +91,8 @@ TYPES = {"int": "Int", "real": "Real", "unreal": "Unreal", "bool": "Bool",
          "channelType": "Int", "channelFlags": "Int", "string": "String",
          "icon": "String", "model": "String", "shadowImage": "String",
          "abilityList": "String", "heroAbilityList": "String", "unitList": "String",
-         "targetList": "String", "orderString": "String"}
+         "targetList": "String", "orderString": "String", "char": "String",
+         "techList": "String"}
 
 
 def parse_slk(text):

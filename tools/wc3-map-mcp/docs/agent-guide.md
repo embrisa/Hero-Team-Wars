@@ -42,7 +42,7 @@ success as gameplay evidence.
 Take task scope from the current user request. Versioned compatibility reports
 describe individual artifacts; inspect Git, the current configuration and
 playable folders before choosing a baseline. The latest recorded repair is
-[v24](compatibility/v24-controller-load-repair.md), still runtime-unverified in
+[v25](compatibility/v25-controller-qwer-spells.md), still runtime-unverified in
 that report. Old work items are historical evidence, not standing task orders.
 
 Read the [engineering audit](engineering-audit.md) for remaining structural

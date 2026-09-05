@@ -353,3 +353,8 @@ For exact field-level validation, inspect the closed Zod schemas and the
 versioned JSON schemas under `tools/wc3-map-mcp/contracts/schemas/`. For
 runtime/manual boundaries, follow `../../AGENTS.md`, `../agent-guide.md`, and
 `safety-recovery-and-audit.md`.
+
+Controller v25 uses the expanded 60-field offline catalog for QWER cast/learn
+hotkeys, button positions, learn icons/tooltips, rank and technology requirements,
+and Channel disable-other-abilities. Hotkeys serialize as native strings; tool
+names, request schemas, and transaction/evidence gates are unchanged.

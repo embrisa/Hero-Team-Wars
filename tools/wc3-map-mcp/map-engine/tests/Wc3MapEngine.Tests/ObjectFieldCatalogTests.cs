@@ -7,6 +7,32 @@ namespace Wc3MapEngine.Tests;
 
 public sealed class ObjectFieldCatalogTests
 {
+    [Theory]
+    [InlineData("hotkey", "ahky", "Q")]
+    [InlineData("learnHotkey", "arhk", "R")]
+    public void HotkeysUseNativeNullTerminatedStrings(string name, string id, string key)
+    {
+        var definition = Ability(new JsonObject { ["field"] = name, ["value"] = key, ["level"] = 0 });
+        ObjectFieldCatalog.Normalize(definition);
+        ObjectFieldCatalog.ValidateChanges(Root(), null, definition);
+        var bytes = MapComponentCodec.SerializeObjectMember("war3map.w3a", new JsonArray(definition));
+        using var reader = new BinaryReader(new MemoryStream(bytes));
+        Assert.Equal(2, reader.ReadInt32());
+        Assert.Equal(0, reader.ReadInt32());
+        Assert.Equal(1, reader.ReadInt32());
+        reader.ReadBytes(8);
+        Assert.Equal(1, reader.ReadInt32());
+        Assert.Equal(id, System.Text.Encoding.ASCII.GetString(reader.ReadBytes(4)));
+        Assert.Equal(3, reader.ReadInt32()); // String tag, not Int/ASCII key code
+        Assert.Equal(0, reader.ReadInt32()); // non-repeated native level
+        Assert.Equal(0, reader.ReadInt32()); // pointer
+        Assert.Equal((byte)key[0], reader.ReadByte());
+        Assert.Equal(0, reader.ReadByte());
+        reader.ReadInt32();
+        Assert.Equal(bytes.Length, reader.BaseStream.Position);
+        Assert.Equal(key, MapComponentCodec.ToObjectDefinitions("war3map.w3a", bytes)[0]!["modifications"]![0]!["value"]!.GetValue<string>());
+    }
+
     [Fact]
     public void LookupDistinguishesExactFieldsPrefixesObjectIdsAndCategories()
     {

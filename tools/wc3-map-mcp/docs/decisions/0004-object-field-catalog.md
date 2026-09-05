@@ -2,6 +2,12 @@
 
 Status: implemented.
 
+The v25 map repair expands the catalog to 60 fields using the same pinned
+metadata, adding cast/learn UI, rank requirements, technology requirements,
+and Channel disable-other-abilities. `char` hotkeys and `techList` requirements
+use native String values. New fields are included in the all-catalog codec
+test, with separate byte-level hotkey tests. No public tool or schema changes.
+
 The unused hard-coded ObjectFieldSemanticRegistry is replaced by one embedded
 catalog generated from selected pinned metadata facts. It serves lookup,
 search, readable authoring, annotations, and pre-write/build validation.

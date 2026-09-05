@@ -57,13 +57,14 @@ function HTW_Abilities_CastNativeSlow takes unit caster, unit target, integer le
     // A2S1 is the custom hidden copy of built-in Aslo.  n2D1 has the ability
     // in its unit ability list.  Add no visible ability to H003 and let the
     // native Aslo buff expire itself after the configured duration.
-    set dummy = CreateUnit(GetOwningPlayer(caster), 'n2D1', GetUnitX(caster), GetUnitY(caster), 0.)
+    set dummy = CreateUnit(GetOwningPlayer(caster), 'n2D1', GetUnitX(target), GetUnitY(target), 0.)
     call SetUnitAbilityLevel(dummy, 'A2S1', level)
-    call IssueTargetOrder(dummy, "slow", target)
-    // Yield once so the native cast is committed before its temporary caster
-    // is removed.  No timer, trigger, or effect handle is retained by JASS.
-    call TriggerSleepAction(0.)
-    call RemoveUnit(dummy)
+    // Each target gets a zero-mana caster at its location. Keep it alive long
+    // enough to commit the native cast without sleeping inside the AoE loop.
+    call UnitApplyTimedLife(dummy, 'BTLF', 2.)
+    if not IssueTargetOrder(dummy, "slow", target) then
+        call RemoveUnit(dummy)
+    endif
     set dummy = null
 endfunction
 
@@ -74,11 +75,12 @@ function HTW_Abilities_CastNativeStun takes unit caster, unit target, integer le
     endif
     // A2T1 is the custom hidden copy of built-in AHtb.  The native stun owns
     // its pause/expiration state; only this short-lived caster is cleaned up.
-    set dummy = CreateUnit(GetOwningPlayer(caster), 'n2D1', GetUnitX(caster), GetUnitY(caster), 0.)
+    set dummy = CreateUnit(GetOwningPlayer(caster), 'n2D1', GetUnitX(target), GetUnitY(target), 0.)
     call SetUnitAbilityLevel(dummy, 'A2T1', level)
-    call IssueTargetOrder(dummy, "thunderbolt", target)
-    call TriggerSleepAction(0.)
-    call RemoveUnit(dummy)
+    call UnitApplyTimedLife(dummy, 'BTLF', 2.)
+    if not IssueTargetOrder(dummy, "thunderbolt", target) then
+        call RemoveUnit(dummy)
+    endif
     set dummy = null
 endfunction
 
@@ -209,6 +211,7 @@ function HTW_Content_Abilities takes nothing returns nothing
     call TriggerRegisterAnyUnitEventBJ(spellTrigger, EVENT_PLAYER_UNIT_SPELL_EFFECT)
     call TriggerAddAction(spellTrigger, function HTW_Abilities_OnSpellEffect)
     // spellTrigger intentionally remains registered for the match; all
-    // per-cast groups and dummy units are released exactly once in their paths.
+    // Per-cast groups are destroyed; successful dummies expire by timed life,
+    // and rejected casts remove their dummies immediately.
     set spellTrigger = null
 endfunction

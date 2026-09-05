@@ -65,3 +65,8 @@ remain unchanged; newly authored fields must match verified metadata. See
 [object-field authoring](../docs/reference/object-field-authoring.md) for exact input, scope, evidence,
 preservation and regeneration rules. This is a tooling change; existing maps
 and historical authoring fixtures are not automatically migrated.
+
+Controller v25 uses the expanded 60-field offline catalog for QWER cast/learn
+hotkeys, button positions, learn icons/tooltips, rank and technology requirements,
+and Channel disable-other-abilities. Hotkeys serialize as native strings; tool
+names, request schemas, and transaction/evidence gates are unchanged.

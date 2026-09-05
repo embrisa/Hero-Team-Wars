@@ -1,4 +1,5 @@
 # MCP-generated build outputs; source maps and design files remain tracked.
 /builds/mcp/
 /builds/diagnostics/v24/
+/builds/diagnostics/v25/
 /tools/wc3-map-mcp/config/wc3-map-mcp.local.json
