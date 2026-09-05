@@ -1,5 +1,9 @@
 # v23 Controller ability metadata fix
 
+The user subsequently reported a load crash. The [v24 investigation](v24-controller-load-repair.md)
+found invalid one-byte/tag-4 boolean serialization in this artifact; the
+previous round-trip check did not establish native-format compatibility.
+
 Historical artifact note: the later [shared object-field catalog decision](../decisions/0004-object-field-catalog.md)
 adds source-backed types, Channel target values, native levels and pointers.
 This v23 note records the changes made at that time; it does not certify every

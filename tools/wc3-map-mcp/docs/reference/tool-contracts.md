@@ -1,5 +1,11 @@
 # WC3 Map MCP Tool Contracts
 
+Object-data serialization: logical `Bool` values use native Int tag 0 and
+four-byte 0/1 values. Inspection exposes catalog-known native 0/1 boolean
+fields as logical `Bool`; unknown integers stay unchanged. Legacy tag-4
+records are readable but only repaired when rewritten. Public tool names and
+request schemas are unchanged. See [object-field authoring](object-field-authoring.md).
+
 This is the agent-facing catalog of the implemented MCP surface. Read it
 before calling a tool or changing a tool schema. The executable source of
 truth is `tools/wc3-map-mcp/mcp-server/src/tools/` plus

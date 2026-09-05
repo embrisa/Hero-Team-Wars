@@ -526,6 +526,17 @@ public static class MapComponentCodec
                 ["type"] = EnumValueFromProperty(item, "Type"),
                 ["value"] = ObjectModificationValue(item)
             };
+            // Warcraft stores metadata booleans as a four-byte integer (tag 0).
+            // Keep the public logical Bool shape for catalog-known 0/1 values.
+            // Other integers, including unknown fields, remain lossless.
+            if (mod["type"]!.GetValue<string>() == "Int"
+                && ObjectFieldCatalog.Find(category, mod["id"]!.GetValue<string>())?["type"]?.GetValue<string>() == "Bool"
+                && mod["value"]!.GetValue<int>() is 0 or 1)
+            {
+                var boolean = mod["value"]!.GetValue<int>() == 1;
+                mod["type"] = "Bool";
+                mod["value"] = boolean;
+            }
             if (item.GetType().Name.Contains("Level", StringComparison.Ordinal))
             {
                 mod["level"] = GetProperty<int>(item, "Level");
@@ -662,7 +673,7 @@ public static class MapComponentCodec
             "Int" => value?.GetValue<int>() ?? throw new EngineException("INVALID_ARGUMENT", "Int object-data value is required."),
             "Real" or "Unreal" => value?.GetValue<float>() ?? throw new EngineException("INVALID_ARGUMENT", "Real object-data value is required."),
             "String" => value?.GetValue<string>() ?? throw new EngineException("INVALID_ARGUMENT", "String object-data value is required."),
-            "Bool" => value?.GetValue<bool>() ?? throw new EngineException("INVALID_ARGUMENT", "Bool object-data value is required."),
+            "Bool" => (value?.GetValue<bool>() ?? throw new EngineException("INVALID_ARGUMENT", "Bool object-data value is required.")) ? 1 : 0,
             "Char" => Character(value),
             _ => throw new EngineException("INVALID_ARGUMENT", $"Unknown object-data value type '{kind}'.")
         };
@@ -699,7 +710,8 @@ public static class MapComponentCodec
     }
 
     private static ObjectDataType ObjectType(JsonNode? value)
-        => Enum.TryParse<ObjectDataType>(value?.GetValue<string>(), ignoreCase: false, out var result)
+        => value?.GetValue<string>() == "Bool" ? ObjectDataType.Int
+            : Enum.TryParse<ObjectDataType>(value?.GetValue<string>(), ignoreCase: false, out var result)
             ? result
             : throw new EngineException("INVALID_ARGUMENT", $"Unknown object-data type '{value}'.");
 

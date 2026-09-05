@@ -1,5 +1,10 @@
 # MCP Server
 
+The worker's [v24 repair](../docs/compatibility/v24-controller-load-repair.md)
+writes logical object-field `Bool` as native four-byte Int 0/1 and exposes
+catalog-known native 0/1 fields as `Bool` on inspection. Tool registrations,
+request/response shapes, schema files and host allow-lists are unchanged.
+
 TypeScript MCP STDIO process responsible for tool schemas, project/path policy, transaction coordination, worker lifecycle, and normalized responses. Binary WC3 parsing remains in the .NET worker.
 
 Expected source layout:

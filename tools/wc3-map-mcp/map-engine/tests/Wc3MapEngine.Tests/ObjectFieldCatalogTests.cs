@@ -109,6 +109,33 @@ public sealed class ObjectFieldCatalogTests
         }
     }
 
+    [Theory]
+    [InlineData("ability", "aher", true)]
+    [InlineData("ability", "aite", false)]
+    [InlineData("unit", "ushr", true)]
+    public void BooleanFieldsUseNativeIntegerBytes(string category, string field, bool value)
+    {
+        var mod = new JsonObject { ["id"] = field, ["type"] = "Bool", ["value"] = value };
+        if (category == "ability") { mod["level"] = 0; mod["pointer"] = 0; }
+        var definition = Ability(mod); definition["category"] = category;
+        var member = ObjectPlacementSupport.MemberForCategory(category);
+        var bytes = MapComponentCodec.SerializeObjectMember(member, new JsonArray(definition));
+        // Independent format assertion: do not let the serializer validate itself.
+        using var reader = new BinaryReader(new MemoryStream(bytes));
+        Assert.Equal(2, reader.ReadInt32());
+        Assert.Equal(0, reader.ReadInt32()); // original table
+        Assert.Equal(1, reader.ReadInt32()); // custom table
+        reader.ReadBytes(8); // base/custom ids
+        Assert.Equal(1, reader.ReadInt32());
+        Assert.Equal(field, System.Text.Encoding.ASCII.GetString(reader.ReadBytes(4)));
+        Assert.Equal(0, reader.ReadInt32()); // native Int tag, never Bool tag 4
+        if (category == "ability") { Assert.Equal(0, reader.ReadInt32()); Assert.Equal(0, reader.ReadInt32()); }
+        Assert.Equal(value ? 1 : 0, reader.ReadInt32()); // four bytes, never one
+        reader.ReadInt32(); // terminator
+        Assert.Equal(bytes.Length, reader.BaseStream.Position);
+        Assert.Equal(mod.ToJsonString(), MapComponentCodec.ToObjectDefinitions(member, bytes)[0]!["modifications"]![0]!.ToJsonString());
+    }
+
     [Fact]
     public void BuildValidationRejectsInvalidCanonicalWritesAndPreservesLegacyUnknownFields()
     {

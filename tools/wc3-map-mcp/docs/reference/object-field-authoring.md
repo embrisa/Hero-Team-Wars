@@ -30,6 +30,14 @@ facts are extracted. New fields require source evidence and codec tests.
 
 ## Readable modifications
 
+`Bool` is a logical authoring type, not a native binary tag. The codec writes
+it as native Int tag `0` with a four-byte `0` or `1`. Inspection maps native
+0/1 integers back to `Bool` only for catalog-known boolean fields; unknown
+fields and other integer values stay integers. Historical tag-4 Bool records
+remain readable for diagnosis, but are repaired when their member is rewritten.
+A byte-for-byte no-op does not repair an untouched legacy member. See the
+[v24 diagnosis](../compatibility/v24-controller-load-repair.md).
+
 The existing create/update/set-object-data operations accept either a raw
 `{ id, type, value, ...scope }` record or a named
 `{ field, value, ...scope }` record. Do not mix `field` with `id` or `type`.

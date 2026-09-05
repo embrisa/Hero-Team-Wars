@@ -1,5 +1,9 @@
 # WC3 Map MCP
 
+The [v24 repair](docs/compatibility/v24-controller-load-repair.md) fixes native
+boolean object-field encoding. Authoring keeps logical `Bool`; binary output
+uses a four-byte integer. Byte-level tests supplement codec round-trip tests.
+
 Live project-local Warcraft III map MCP implementation. Maintained agent-facing
 documentation is indexed in [`docs/README.md`](docs/README.md).
 
