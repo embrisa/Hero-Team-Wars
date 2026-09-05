@@ -1,22 +1,18 @@
 # WC3 Map MCP Agent Instructions
 
-Before working in this directory, read these live documents completely:
-
-1. `docs/agent-guide.md`
-2. `docs/reference/tool-contracts.md`
-3. `docs/reference/architecture.md`
-4. `docs/reference/map-model-and-contracts.md`
-5. `docs/reference/safety-recovery-and-audit.md`
-6. `docs/reference/testing-and-definition-of-done.md`
-7. `docs/reference/packaging-and-codex-connection.md`
-8. `docs/reference/wc3-map-formats.md`
-
-Before calling or changing an MCP tool, also read
-`docs/reference/tool-contracts.md`. It catalogs the complete implemented
+Read the repository `AGENTS.md`, `docs/agent-guide.md`, and the complete
+`docs/reference/tool-contracts.md` before calling or changing an MCP tool.
+The catalog describes the complete implemented
 surface, including the four global jassdoc tools, exact schemas, read/write
 policy, transaction preconditions, artifact/hash contracts, and runtime
 evidence gates. Keep that catalog synchronized with the schemas and tool
 registrations when the MCP surface changes.
+
+Read additional references for the code you touch: architecture and map-model
+contracts for service/model changes; safety/recovery for persistence and paths;
+testing for checks; packaging for setup; map formats for serializers. Use the
+documentation index to find them. Historical work items do not override the
+current user request or describe the current playable version.
 
 Documentation is part of the definition of done. If implementation, schemas,
 tool registration, configuration, outputs, errors, policy, or evidence behavior

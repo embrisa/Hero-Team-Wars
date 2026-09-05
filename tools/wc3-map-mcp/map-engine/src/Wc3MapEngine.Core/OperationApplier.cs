@@ -41,6 +41,10 @@ public static class OperationApplier
         {
             throw new EngineException("INVALID_JSON", "Canonical map root must be an object.");
         }
+        if (operations.Count == 0 || operations.Any(operation => operation is not JsonObject))
+        {
+            throw new EngineException("INVALID_ARGUMENT", "An operation batch must contain one or more operation objects.");
+        }
 
         var working = root.DeepClone() as JsonObject ?? throw new EngineException("INVALID_JSON", "Canonical map could not be cloned.");
         RefreshRegionReferences(working);
@@ -101,6 +105,7 @@ public static class OperationApplier
             applied.Add(operationId);
         }
 
+        var beforeFinalization = working.DeepClone();
         if (operationTypes.Any(IsTeamStructureOperation) && working["teams"] is JsonArray teamRecords)
         {
             working["team_registry"] = HtwProfileModel.BuildTeamRegistry(teamRecords);
@@ -132,6 +137,17 @@ public static class OperationApplier
         }
 
         ObjectFieldCatalog.ValidateRelations(root, working);
+        // Regenerated JASS and derived registries are part of the atomic batch.
+        // Include them in the review diff, attributed to the final operation
+        // whose effects are finalized here, instead of hiding them after diffing.
+        var finalOperation = orderedOperations.Last();
+        foreach (var change in SemanticDiff.CompareCanonical(beforeFinalization, working, RequiredOperationId(finalOperation)).OfType<JsonObject>())
+        {
+            change["target"] = finalOperation["target"]!.DeepClone();
+            change["provenance"] = "derived";
+            if (finalOperation["design_reference"] is not null) change["design_reference"] = finalOperation["design_reference"]!.DeepClone();
+            allChanges.Add(change.DeepClone());
+        }
         return new JsonObject
         {
             ["canonical_map"] = working,

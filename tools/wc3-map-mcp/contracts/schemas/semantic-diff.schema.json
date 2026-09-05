@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.wc3-map-mcp/schemas/semantic-diff.schema.json",
   "title": "WC3 semantic map diff",
+  "description": "Typed and post-batch derived changes, including regenerated script hashes and team registries. Post-batch changes have derived provenance and the final operation ID; full JASS source remains in revision artifacts.",
   "type": "object",
   "required": ["schema_version", "changes"],
   "properties": {

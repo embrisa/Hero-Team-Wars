@@ -50,6 +50,14 @@ same change, followed by a registration/schema/documentation consistency check.
 
 ## Object field knowledge and authoring
 
+Service regression checks cover requested gameplay hashes, module-file drift,
+script-policy enforcement, complete generated-source diffs, build evidence,
+and immutable chunk-result attempts. User-observed chunk results require a
+matching user-recorded game milestone; a process-only or editor session is
+insufficient. See the [engineering audit](../docs/engineering-audit.md) and
+[tool contracts](../docs/reference/tool-contracts.md). Run `../scripts/test.ps1`
+after engine changes; `npm test` alone uses the already-published engine.
+
 Use `wc3_object_field_search` and `wc3_object_field_lookup` before editing
 unfamiliar field IDs. The shared offline catalog powers readable field names,
 annotated inspection/diffs and enforced field semantics. Unknown legacy fields

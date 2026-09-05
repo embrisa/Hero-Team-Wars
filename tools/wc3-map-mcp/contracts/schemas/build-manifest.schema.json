@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.wc3-map-mcp/schemas/build-manifest.schema.json",
   "title": "WC3 map build manifest",
-  "description": "Hash-linked, independently re-inspected Phase 3 build identity and preservation evidence.",
+  "description": "Hash-linked build identity and preservation evidence. Loading verifies output hash/size and successful reinspection identity. engine_result.output_path records the finalized project-relative artifact path.",
   "type": "object",
   "required": [
     "schema_version", "build_id", "project_id", "transaction_id", "revision",

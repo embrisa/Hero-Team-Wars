@@ -118,8 +118,8 @@ Suppose a later agent wants to change the map title in a component proven writab
 7. `wc3_build_map(T1, revision=1)` produces build `B1`, hash `H2`, status untested.
 8. `wc3_launch_editor(B1, expected_hash=H2)` creates session `S1`, initially process-started.
 9. User confirms the exact build opened; `wc3_record_test_result(S1, editor_opened=pass)` records evidence.
-10. Warcraft loads the same `H2`; session records `game_loaded=pass`.
-11. `wc3_promote_build(B1, expected_hash=H2, configured destination)` copies it and verifies the destination hash.
+10. `wc3_launch_test_map(B1, expected_hash=H2)` creates a separate game session `S2`. The user reports `game_loaded=pass`, then `smoke_test=pass` against `S2`.
+11. Only then may `wc3_promote_build(B1, expected_hash=H2, configured destination)` copy it and verify the destination hash. A manual test handoff can copy the validated whole artifact before runtime evidence; it is not promotion.
 
 At no point is the source map overwritten. Every identifier and hash links the audit trail.
 

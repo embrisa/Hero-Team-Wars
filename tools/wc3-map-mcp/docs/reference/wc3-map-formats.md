@@ -46,7 +46,7 @@ This table is guidance, not proof. The engine must base its capability report on
 Every archive member receives one of these states:
 
 - `parsed_read_only`: the engine can parse and report it, but write support is not proven.
-- `roundtrip_verified`: parse/serialize output is editor/game compatible for the current version.
+- `roundtrip_verified`: the engine has parse/serialize fixture evidence. This is static codec evidence, not proof of editor/game compatibility; exact-build runtime observations are separate.
 - `typed_write_enabled`: defined semantic operations and tests exist.
 - `preserved_opaque`: bytes are copied unchanged into builds.
 - `unsupported_blocking`: the member cannot be safely preserved or the operation would require changing it.

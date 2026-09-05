@@ -22,8 +22,13 @@ reports for current build/test evidence.
 
 Read `AGENTS.md` before working here. The documentation directory provides the
 current agent guide, MCP contract catalog, architecture/reference material,
-safety rules, and verification requirements. Active implementation work items
-are kept separately in `work-items/`.
+safety rules, and verification requirements. Historical investigations are
+kept separately in `work-items/`; they do not define the current task.
+
+The [engineering audit](docs/engineering-audit.md) records known structural
+limitations and regression fixes. `scripts/test.ps1` tests .NET, republishes
+that exact engine for the MCP suite, and verifies source-map preservation even
+when a test fails. Runtime observations remain user-owned.
 
 Use `scripts/bootstrap.ps1`, `scripts/build.ps1`, and `scripts/test.ps1` from this directory. The checked-in example configuration is safe to copy to `config/wc3-map-mcp.local.json`; it never replaces the source map.
 

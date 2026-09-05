@@ -268,11 +268,25 @@ public sealed class GameplayComposerTests
             ["rationale"] = "Exercise source-owned variable regeneration."
         });
 
-        var applied = OperationApplier.Apply(canonical, operations)["canonical_map"]!.AsObject();
+        var result = OperationApplier.Apply(canonical, operations);
+        var applied = result["canonical_map"]!.AsObject();
+        var scriptChanges = result["diff"]!["changes"]!.AsArray().OfType<JsonObject>()
+            .Where(change => change["component"]!.GetValue<string>() == "scripts").ToArray();
+        Assert.NotEmpty(scriptChanges);
+        Assert.All(scriptChanges, change => Assert.Equal(operations[0]!["operation_id"]!.GetValue<string>(), change["operation_id"]!.GetValue<string>()));
+        Assert.Contains(scriptChanges, change => change["before"]?.ToJsonString().Contains(canonical["scripts"]![0]!["source_sha256"]!.GetValue<string>()) == true);
 
         Assert.Equal(2, applied["gameplay_variables"]!.AsArray().OfType<JsonObject>().Single(item => item["id"]!.GetValue<string>() == "phase")["initial"]!.GetValue<int>());
         Assert.Contains("set HTW_Phase = 2", applied["scripts"]![0]!["source"]!.GetValue<string>());
         Assert.Equal(applied["scripts"]![0]!["source_sha256"]!.GetValue<string>(), applied["gameplay_source"]!["source_sha256"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void OperationBatchRejectsNonObjectEntriesInsteadOfDroppingThem()
+    {
+        var exception = Assert.Throws<EngineException>(() => OperationApplier.Apply(new JsonObject(), new JsonArray(JsonValue.Create("invalid operation"))));
+        Assert.Equal("INVALID_ARGUMENT", exception.Code);
+        Assert.Throws<EngineException>(() => OperationApplier.Apply(new JsonObject(), new JsonArray()));
     }
 
     [Fact]

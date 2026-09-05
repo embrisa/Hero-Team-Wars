@@ -6,15 +6,12 @@ import { isWithin, relativeProjectPath } from "../config/resolve-project.js";
 import { AppError, asAppError } from "../errors/app-error.js";
 import { sha256File, writeJsonArtifact, type ArtifactRef } from "./artifact-service.js";
 import { ProjectService } from "./project-service.js";
-import { TransactionService } from "./transaction-service.js";
+import { TransactionService, transactionValidationContext } from "./transaction-service.js";
 import { copyFileAtomic, TransactionStore, type TransactionManifest } from "../storage/transaction-store.js";
 import { withProjectLock } from "../storage/project-lock.js";
 import { WorkerClient } from "../transport/worker-client.js";
 
 const BUILD_SCHEMA_VERSION = "1.0";
-const VALIDATION_CONTEXT = {
-  project_id: "hero-team-wars"
-};
 
 export type RuntimeStatus = "untested" | "process_started" | "editor_opened" | "game_loaded" | "smoke_passed" | "playtest_passed";
 
@@ -93,7 +90,7 @@ export class BuildService {
           canonical_path: loaded.paths.canonical,
           output_path: temporaryOutput,
           profile,
-          validation_context: { ...VALIDATION_CONTEXT, project_id: projectId, profile: project.config.profile }
+          validation_context: transactionValidationContext(project, loaded.paths.canonical)
         }, correlationId);
         assertEngineBuildResult(engineResult, temporaryOutput);
 
@@ -105,7 +102,8 @@ export class BuildService {
           left_path: loaded.paths.canonical,
           right_path: temporaryOutput
         }, correlationId);
-        const semanticDifferences = Array.isArray(comparison.semantic_differences) ? comparison.semantic_differences : [];
+        if (!Array.isArray(comparison.semantic_differences)) throw new AppError("ENGINE_PROTOCOL_ERROR", "The map engine returned no semantic comparison result.");
+        const semanticDifferences = comparison.semantic_differences;
         if (semanticDifferences.length !== 0) {
           throw new AppError("BUILD_REOPEN_MISMATCH", "The re-inspected output does not match the intended staged canonical model.", false, { semantic_differences: semanticDifferences });
         }
@@ -128,7 +126,7 @@ export class BuildService {
         const validationPath = validationReport.path;
         const validationHash = sha256File(validationPath).sha256;
         const warnings = validationWarnings(validationReport.value);
-        const sanitizedEngineResult = sanitizeEngineResult(project, engineResult);
+        const sanitizedEngineResult = { ...sanitizeEngineResult(project, engineResult), output_path: outputRelative };
         const manifest: BuildManifest = {
           schema_version: BUILD_SCHEMA_VERSION,
           build_id: buildId,
@@ -209,8 +207,12 @@ export class BuildService {
     const stat = lstatSync(outputPath);
     if (!stat.isFile() || stat.isSymbolicLink()) throw new AppError("PATH_OUTSIDE_ROOT", "The build output must be a regular file.");
     const hash = sha256File(outputPath);
-    if (hash.sha256 !== manifest.output_sha256) {
+    if (hash.sha256 !== manifest.output_sha256 || hash.size_bytes !== manifest.output_size_bytes) {
       throw new AppError("SOURCE_CHANGED", "The build output hash no longer matches its manifest.", false, { expected_sha256: manifest.output_sha256, actual_sha256: hash.sha256 });
+    }
+    if (manifest.reinspection?.performed !== true || !Array.isArray(manifest.reinspection.semantic_differences)
+      || manifest.reinspection.semantic_differences.length !== 0 || manifest.reinspection.output_hash !== hash.sha256) {
+      throw new AppError("BUILD_REOPEN_MISMATCH", "The build manifest does not contain matching successful reinspection evidence.");
     }
     return { project, manifest: { ...manifest, output_path: outputPath }, manifestPath };
   }

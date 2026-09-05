@@ -37,12 +37,24 @@ success as gameplay evidence.
   owns manual Warcraft III verification, and agents must report those gates as
   unverified until the user observes them.
 
-## Active work
+## Current work and known limitations
 
-The current scoped implementation item is
-[`work-items/20-step-15-mvp-v15-instant-hero-stock.md`](../work-items/20-step-15-mvp-v15-instant-hero-stock.md).
-Treat its status and evidence as current work state, not as a replacement for
-the live contracts in `docs/reference/`.
+Take task scope from the current user request. Versioned compatibility reports
+describe individual artifacts; inspect Git, the current configuration and
+playable folders before choosing a baseline. The latest recorded repair is
+[v24](compatibility/v24-controller-load-repair.md), still runtime-unverified in
+that report. Old work items are historical evidence, not standing task orders.
+
+Read the [engineering audit](engineering-audit.md) for remaining structural
+risks, including implicit gameplay seeding in script-enabled transactions,
+stale object fixtures and scenarios that model rules without executing JASS.
+Use `scripts/test.ps1` to test the current published engine and server together.
+
+Gameplay preparation checks requested manifest/module hashes and module drift
+against the initial transaction snapshot. Edit source files before beginning
+the transaction; use typed operations for later staged edits. Chunk results
+are separate immutable attempts, and user-observed results require matching
+gameplay observations on an exact game session.
 
 ## Keeping this guide current
 

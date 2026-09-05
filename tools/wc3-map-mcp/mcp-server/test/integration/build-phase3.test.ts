@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { McpClient } from "../helpers/mcp-client.js";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,62 +35,6 @@ writeFileSync(configPath, JSON.stringify({
   }
 }, null, 2), "utf8");
 
-class McpClient {
-  private readonly child: ChildProcessWithoutNullStreams;
-  private readonly pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
-  private nextId = 1;
-  private stdout = "";
-
-  public constructor() {
-    this.child = spawn(process.execPath, [resolve(serverRoot, "dist/index.js")], { cwd: serverRoot, env: { ...process.env, WC3_MAP_MCP_CONFIG: configPath }, stdio: ["pipe", "pipe", "pipe"] });
-    this.child.stdout.setEncoding("utf8");
-    this.child.stdout.on("data", chunk => this.consume(String(chunk)));
-    this.child.on("error", error => this.rejectAll(error));
-    this.child.on("close", code => { if (code !== 0) this.rejectAll(new Error(`server exited ${code}`)); });
-  }
-
-  public async initialize(): Promise<void> {
-    await this.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "phase3-build-test", version: "1" } });
-    this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} })}\n`);
-  }
-
-  public call(name: string, args: Record<string, unknown>): Promise<any> {
-    return this.request("tools/call", { name, arguments: args });
-  }
-
-  public close(): void {
-    this.child.stdin.end();
-    this.child.kill();
-  }
-
-  private request(method: string, params: Record<string, unknown>): Promise<any> {
-    const id = this.nextId++;
-    return new Promise((resolvePromise, rejectPromise) => {
-      this.pending.set(id, { resolve: resolvePromise, reject: rejectPromise });
-      this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
-    });
-  }
-
-  private consume(chunk: string): void {
-    this.stdout += chunk;
-    const lines = this.stdout.split(/\r?\n/);
-    this.stdout = lines.pop() ?? "";
-    for (const line of lines.filter(Boolean)) {
-      const message = JSON.parse(line) as { id?: number; result?: unknown; error?: { message?: string } };
-      if (message.id === undefined) continue;
-      const waiter = this.pending.get(message.id);
-      if (!waiter) continue;
-      this.pending.delete(message.id);
-      if (message.error) waiter.reject(new Error(message.error.message ?? "JSON-RPC request failed"));
-      else waiter.resolve(message.result);
-    }
-  }
-
-  private rejectAll(error: Error): void {
-    for (const waiter of this.pending.values()) waiter.reject(error);
-    this.pending.clear();
-  }
-}
 
 function sourceHash(): string {
   return createHash("sha256").update(readFileSync(sourcePath)).digest("hex").toUpperCase();
@@ -112,15 +56,21 @@ describe("Phase 3 build contract", () => {
 
   it("builds an exact no-op revision with reinspection, opaque preservation, and a verified manifest", async () => {
     const before = sourceHash();
-    client = new McpClient();
+    client = new McpClient(serverRoot, configPath);
     await client.initialize();
 
     const begin = await client.call("wc3_begin_transaction", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", expected_source_hash: before, label: "phase3-noop" });
     expect(begin.structuredContent.ok).toBe(true);
     transactionId = begin.structuredContent.data.transaction_id as string;
+    const originalScript = await client.call("wc3_get_script_source", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m" });
+    const canonical = JSON.parse(readFileSync(resolve(projectRoot, begin.structuredContent.data.paths.canonical), "utf8"));
+    const script = canonical.scripts.find((item: any) => item.archive_path === "war3map.j");
+    expect(originalScript.structuredContent.ok).toBe(true);
+    expect(script.source_sha256 ?? script.sha256).toBe(originalScript.structuredContent.data.sha256);
 
     const validation = await client.call("wc3_validate_transaction", { project_id: "hero-team-wars", transaction_id: transactionId, revision: 0 });
-    expect(validation.structuredContent.ok).toBe(true);
+    const validationReportPath = validation.structuredContent.error?.details?.report_path;
+    expect(validation.structuredContent.ok, validationReportPath ? readFileSync(resolve(projectRoot, validationReportPath), "utf8") : JSON.stringify(validation.structuredContent)).toBe(true);
     expect(validation.structuredContent.data.report_path).toMatch(/^tools\/wc3-map-mcp\/snapshots\/transactions\//);
     expect(validation.structuredContent.data.report_sha256).toMatch(/^[0-9A-F]{64}$/);
     expect(validation.structuredContent.data.report.buildable).toBe(true);
@@ -133,6 +83,9 @@ describe("Phase 3 build contract", () => {
     expect(built.structuredContent.data.build.reinspection).toEqual(expect.objectContaining({ performed: true, semantic_differences: [] }));
     expect(built.structuredContent.data.build.output_path).not.toMatch(/^[A-Za-z]:[\\/]|^[\\/]/);
     expect(existsSync(resolve(projectRoot, built.structuredContent.data.build.output_path))).toBe(true);
+    const comparison = await client.call("wc3_compare_maps", { project_id: "hero-team-wars", left: "map/HeroTeamWars_M0_2Arena.w3m", right: built.structuredContent.data.build.output_path });
+    expect(comparison.structuredContent.ok).toBe(true);
+    expect(comparison.structuredContent.data.result.semantic_differences).toEqual([]);
 
     const report = await client.call("wc3_build_report", { project_id: "hero-team-wars", build_id: buildId });
     expect(report.structuredContent.ok).toBe(true);

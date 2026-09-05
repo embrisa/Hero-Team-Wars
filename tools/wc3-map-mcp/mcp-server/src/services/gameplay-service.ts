@@ -3,11 +3,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { AppError } from "../errors/app-error.js";
 import { isWithin, relativeProjectPath, resolveConfiguredPath, resolveContained, type ResolvedProject } from "../config/resolve-project.js";
-import { writeJsonArtifact, writeTextArtifact } from "./artifact-service.js";
+import { sha256File, writeJsonArtifact, writeTextArtifact } from "./artifact-service.js";
 import { ProjectService } from "./project-service.js";
 import { TransactionService } from "./transaction-service.js";
 import { BuildService } from "./build-service.js";
-import { LaunchService } from "./launch-service.js";
+import { LaunchService, type TestSession } from "./launch-service.js";
 import { WorkerClient } from "../transport/worker-client.js";
 
 const HASH = /^[0-9A-F]{64}$/i;
@@ -58,25 +58,43 @@ export class GameplayService {
     chunkId: string,
     manifestPath: string,
     profile: string | undefined,
-    correlationId: string
+    correlationId: string,
+    expectedManifestHash?: string,
+    expectedModuleHashes?: Record<string, string>
   ): Promise<Record<string, unknown>> {
     if (!CHUNK.test(chunkId)) throw new AppError("INVALID_ARGUMENT", "chunk_id must use an HTW-## design chunk identifier.");
+    this.projects.assertMutationAllowed(projectId, "wc3_prepare_gameplay_chunk");
     this.projects.assertProfile(projectId, profile, "wc3_prepare_gameplay_chunk");
     assertChunkProfile(projectId, chunkId, this.projects);
     this.projects.assertScriptMutationAllowed(projectId);
-    const manifestComposition = await this.compose(projectId, manifestPath, profile, correlationId);
     const loaded = this.transactions.get(projectId, transactionId);
+    if (loaded.loaded.manifest.revision !== expectedRevision) throw new AppError("PRECONDITION_FAILED", "Gameplay preparation requires the current transaction revision.");
+    const manifestComposition = await this.compose(projectId, manifestPath, profile, correlationId, expectedManifestHash, expectedModuleHashes);
     const canonical = JSON.parse(readFileSync(loaded.loaded.paths.canonical, "utf8")) as {
       scripts?: Array<Record<string, unknown>>;
       gameplay_source?: Record<string, unknown>;
     };
-    const stagedManifestHash = String(canonical.gameplay_source?.manifest_sha256 ?? "").toUpperCase();
+    // Compare disk inputs to the captured initial revision. Typed module or
+    // variable edits regenerate gameplay_source and must remain usable here.
+    const initial = JSON.parse(readFileSync(join(loaded.loaded.paths.revisions, "0000-initial.json"), "utf8")) as {
+      gameplay_source?: Record<string, unknown>;
+      gameplay_modules?: Array<Record<string, unknown>>;
+    };
+    const initialHash = loaded.loaded.manifest.revision_hashes["0"];
+    if (sha256File(join(loaded.loaded.paths.revisions, "0000-initial.json")).sha256 !== initialHash) throw new AppError("SOURCE_CHANGED", "The initial gameplay revision no longer matches its recorded hash.");
+    const stagedManifestHash = String(initial.gameplay_source?.manifest_sha256 ?? "").toUpperCase();
     const currentManifestHash = String(manifestComposition.manifest_sha256 ?? "").toUpperCase();
     if (!HASH.test(stagedManifestHash) || stagedManifestHash !== currentManifestHash) {
       throw new AppError("SOURCE_CHANGED", "The gameplay manifest changed after this transaction was staged; begin a fresh transaction before preparing gameplay source.", false, {
         staged_manifest_sha256: stagedManifestHash,
         current_manifest_sha256: currentManifestHash
       });
+    }
+    const diskModules = manifestComposition.modules as Array<Record<string, unknown>>;
+    const stagedModules = initial.gameplay_modules ?? [];
+    if (!Array.isArray(diskModules) || diskModules.length !== stagedModules.length || stagedModules.some(staged =>
+      !diskModules.some(current => current.id === staged.id && current.source_sha256 === staged.source_sha256))) {
+      throw new AppError("SOURCE_CHANGED", "Gameplay module files changed after staging; begin a fresh transaction to use the new source files.");
     }
     const boundResult = await this.worker.request<Record<string, unknown>>("compose_gameplay_source", {
       canonical_model: canonical,
@@ -153,11 +171,20 @@ export class GameplayService {
     const loaded = this.builds.load(input.project_id, input.build_id);
     if (loaded.manifest.output_sha256.toUpperCase() !== input.expected_build_hash.toUpperCase()) throw new AppError("SOURCE_CHANGED", "The expected build hash does not match the exact build artifact.");
     if (loaded.manifest.transaction_id !== input.transaction_id || loaded.manifest.revision !== input.revision) throw new AppError("PRECONDITION_FAILED", "The chunk result transaction and revision do not match the exact build manifest.");
-    let session: unknown;
+    if (input.evidence_level === "user_observed" && !input.test_session_id) throw new AppError("PRECONDITION_REQUIRED", "User-observed chunk evidence requires an exact game test session.");
+    let session: Record<string, unknown> | undefined;
     if (input.test_session_id) {
       session = await this.launches.get(input.project_id, input.test_session_id);
-      const sessionRecord = session as { session?: { build_id?: string; build_sha256?: string } };
+      const sessionRecord = session as { session?: TestSession };
       if (sessionRecord.session?.build_id !== input.build_id || sessionRecord.session.build_sha256?.toUpperCase() !== input.expected_build_hash.toUpperCase()) throw new AppError("PRECONDITION_FAILED", "The test session does not reference the expected build.");
+      if (input.evidence_level === "user_observed") {
+        const observed = sessionRecord.session;
+        const latest = observed.milestones.at(-1);
+        if (observed.target !== "game" || !latest || latest.recorder !== "user_observation" || latest.result !== input.result
+          || !(latest.milestone === "smoke_test" || latest.milestone === "playtest" || latest.milestone === "game_loaded" && latest.result === "fail")) {
+          throw new AppError("PRECONDITION_FAILED", "User-observed chunk evidence requires a matching user-recorded gameplay result (or failed game load) on the exact game session. Process start, editor open, and load success alone are insufficient.");
+        }
+      }
       this.builds.attachTestSession(input.project_id, input.build_id, input.test_session_id);
     }
     const project = this.projects.project(input.project_id);
@@ -176,7 +203,9 @@ export class GameplayService {
       notes: input.notes,
       recorded_utc: new Date().toISOString()
     };
-    const artifact = writeJsonArtifact(project, artifactPath(project, `gameplay/results/${input.build_id}-${input.chunk_id}-${input.scenario_id}.json`), value, "chunk_result");
+    // Scenario IDs are descriptive input, not filenames. Keep every attempt,
+    // including failures, and avoid overwrites and path interpretation.
+    const artifact = writeJsonArtifact(project, artifactPath(project, `gameplay/results/${input.build_id}-${input.chunk_id}-${randomUUID()}.json`), value, "chunk_result");
     return { ...value, artifact, ...(session ? { test_session: session } : {}) };
   }
 

@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { McpClient } from "../helpers/mcp-client.js";
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,56 +30,6 @@ writeFileSync(configPath, JSON.stringify({
   }
 }, null, 2), "utf8");
 
-class McpClient {
-  private readonly child: ChildProcessWithoutNullStreams;
-  private readonly pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
-  private nextId = 1;
-  private stdout = "";
-
-  public constructor() {
-    this.child = spawn(process.execPath, [resolve(serverRoot, "dist/index.js")], { cwd: serverRoot, env: { ...process.env, WC3_MAP_MCP_CONFIG: configPath }, stdio: ["pipe", "pipe", "pipe"] });
-    this.child.stdout.setEncoding("utf8");
-    this.child.stdout.on("data", chunk => this.consume(String(chunk)));
-    this.child.on("error", error => this.rejectAll(error));
-    this.child.on("close", code => { if (code !== 0) this.rejectAll(new Error(`server exited ${code}`)); });
-  }
-
-  public async initialize(): Promise<void> {
-    await this.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "phase5f-test", version: "1" } });
-    this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} })}\n`);
-  }
-
-  public call(name: string, args: Record<string, unknown>): Promise<any> { return this.request("tools/call", { name, arguments: args }); }
-  public close(): void { this.child.stdin.end(); this.child.kill(); }
-
-  private request(method: string, params: Record<string, unknown>): Promise<any> {
-    const id = this.nextId++;
-    return new Promise((resolvePromise, rejectPromise) => {
-      this.pending.set(id, { resolve: resolvePromise, reject: rejectPromise });
-      this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
-    });
-  }
-
-  private consume(chunk: string): void {
-    this.stdout += chunk;
-    const lines = this.stdout.split(/\r?\n/);
-    this.stdout = lines.pop() ?? "";
-    for (const line of lines.filter(Boolean)) {
-      const message = JSON.parse(line) as { id?: number; result?: unknown; error?: { message?: string } };
-      if (message.id === undefined) continue;
-      const waiter = this.pending.get(message.id);
-      if (!waiter) continue;
-      this.pending.delete(message.id);
-      if (message.error) waiter.reject(new Error(message.error.message ?? "JSON-RPC request failed"));
-      else waiter.resolve(message.result);
-    }
-  }
-
-  private rejectAll(error: Error): void {
-    for (const waiter of this.pending.values()) waiter.reject(error);
-    this.pending.clear();
-  }
-}
 
 function sourceHash(): string { return createHash("sha256").update(readFileSync(sourcePath)).digest("hex").toUpperCase(); }
 
@@ -105,7 +55,7 @@ describe("Phase 5F full MCP rollout", () => {
 
   it("reports capabilities and performs a dependency-ordered cross-feature build", async () => {
     const before = sourceHash();
-    client = new McpClient();
+    client = new McpClient(serverRoot, configPath);
     await client.initialize();
 
     const status = await client.call("wc3_project_status", { project_id: "hero-team-wars" });
@@ -175,7 +125,7 @@ describe("Phase 5F full MCP rollout", () => {
 
   it("keeps HTW-06 behind the full six-team profile", async () => {
     const before = sourceHash();
-    client = new McpClient();
+    client = new McpClient(serverRoot, configPath);
     await client.initialize();
     const begin = await client.call("wc3_begin_transaction", { project_id: "hero-team-wars", map: "map/HeroTeamWars_M0_2Arena.w3m", expected_source_hash: before, label: "phase5f-profile-gate" });
     transactionId = begin.structuredContent.data.transaction_id as string;

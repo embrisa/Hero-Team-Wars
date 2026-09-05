@@ -21,7 +21,9 @@ retains them when their context is needed.
 - [`compatibility/v21-controller-spells.md`](compatibility/v21-controller-spells.md) — Controller spell definitions, preservation checks, and manual v21 acceptance.
 - [`compatibility/v22-h003-ability-attachment.md`](compatibility/v22-h003-ability-attachment.md) — H003 hero-ability field correction from runtime feedback.
 - [`compatibility/v23-controller-ability-metadata.md`](compatibility/v23-controller-ability-metadata.md) — Controller hero flag, icons, and Channel field type correction.
-- [`../work-items/`](../work-items/) — active scoped implementation work, not general agent instructions.
+- [`compatibility/v24-controller-load-repair.md`](compatibility/v24-controller-load-repair.md) — native boolean encoding repair and exact runtime-unverified artifact.
+- [`engineering-audit.md`](engineering-audit.md) — fixed defects, remaining risks and verification from the September audit.
+- [`../work-items/`](../work-items/) — historical scoped investigations; current task scope comes from the user.
 
 ## Sources of truth
 

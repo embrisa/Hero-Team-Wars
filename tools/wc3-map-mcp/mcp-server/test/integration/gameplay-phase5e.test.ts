@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createHash } from "node:crypto";
+import { McpClient } from "../helpers/mcp-client.js";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -37,62 +37,6 @@ writeFileSync(configPath, JSON.stringify({
   }
 }, null, 2), "utf8");
 
-class McpClient {
-  private readonly child: ChildProcessWithoutNullStreams;
-  private readonly pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
-  private nextId = 1;
-  private stdout = "";
-
-  public constructor() {
-    this.child = spawn(process.execPath, [resolve(serverRoot, "dist/index.js")], { cwd: serverRoot, env: { ...process.env, WC3_MAP_MCP_CONFIG: configPath }, stdio: ["pipe", "pipe", "pipe"] });
-    this.child.stdout.setEncoding("utf8");
-    this.child.stdout.on("data", chunk => this.consume(String(chunk)));
-    this.child.on("error", error => this.rejectAll(error));
-    this.child.on("close", code => { if (code !== 0) this.rejectAll(new Error(`server exited ${code}`)); });
-  }
-
-  public async initialize(): Promise<void> {
-    await this.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "phase5e-test", version: "1" } });
-    this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} })}\n`);
-  }
-
-  public call(name: string, args: Record<string, unknown>): Promise<any> {
-    return this.request("tools/call", { name, arguments: args });
-  }
-
-  public close(): void {
-    this.child.stdin.end();
-    this.child.kill();
-  }
-
-  private request(method: string, params: Record<string, unknown>): Promise<any> {
-    const id = this.nextId++;
-    return new Promise((resolvePromise, rejectPromise) => {
-      this.pending.set(id, { resolve: resolvePromise, reject: rejectPromise });
-      this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
-    });
-  }
-
-  private consume(chunk: string): void {
-    this.stdout += chunk;
-    const lines = this.stdout.split(/\r?\n/);
-    this.stdout = lines.pop() ?? "";
-    for (const line of lines.filter(Boolean)) {
-      const message = JSON.parse(line) as { id?: number; result?: unknown; error?: { message?: string } };
-      if (message.id === undefined) continue;
-      const waiter = this.pending.get(message.id);
-      if (!waiter) continue;
-      this.pending.delete(message.id);
-      if (message.error) waiter.reject(new Error(message.error.message ?? "JSON-RPC request failed"));
-      else waiter.resolve(message.result);
-    }
-  }
-
-  private rejectAll(error: Error): void {
-    for (const waiter of this.pending.values()) waiter.reject(error);
-    this.pending.clear();
-  }
-}
 
 function sourceHash(): string {
   return createHash("sha256").update(readFileSync(sourcePath)).digest("hex").toUpperCase();
@@ -116,7 +60,7 @@ describe("Phase 5E gameplay transaction workflow", () => {
 
   it("builds HTW-01 through HTW-05 from source and records hash-bound static results", async () => {
     const before = sourceHash();
-    client = new McpClient();
+    client = new McpClient(serverRoot, configPath);
     await client.initialize();
     const chunks: Record<string, string[]> = {
       "HTW-01": ["fresh_initialization", "preparation_combat_resolution"],
@@ -131,21 +75,42 @@ describe("Phase 5E gameplay transaction workflow", () => {
       expect(begin.structuredContent.ok).toBe(true);
       const transactionId = begin.structuredContent.data.transaction_id as string;
       transactionIds.push(transactionId);
+      let revision = 0;
+
+      if (chunkId === "HTW-01") {
+        for (const precondition of [{ expected_manifest_sha256: "F".repeat(64) }, { expected_module_hashes: { main: "F".repeat(64) } }]) {
+          const stale = await client.call("wc3_prepare_gameplay_chunk", { project_id: "hero-team-wars", transaction_id: transactionId,
+            expected_revision: 0, chunk_id: chunkId, manifest_path: manifestPath, profile: "mvp_2arena", ...precondition });
+          expect(stale.structuredContent.ok).toBe(false);
+          expect(stale.structuredContent.error.code).toBe("PRECONDITION_FAILED");
+          const manifest = JSON.parse(readFileSync(join(transactionRoot, transactionId, "manifest.json"), "utf8"));
+          expect(manifest.revision).toBe(0);
+        }
+        const canonical = JSON.parse(readFileSync(resolve(projectRoot, begin.structuredContent.data.paths.canonical), "utf8"));
+        const phase = canonical.gameplay_variables.find((item: any) => item.id === "phase");
+        const changed = await client.call("wc3_apply_operations", { project_id: "hero-team-wars", transaction_id: transactionId, expected_revision: revision,
+          operations: [{ operation_id: randomUUID(), type: "update_variable", target: { id: "phase" }, expected: phase, value: { initial: 2 }, rationale: "Verify prepare retains a staged variable edit." }] });
+        expect(changed.structuredContent.ok).toBe(true);
+        expect(changed.structuredContent.data.diff.changes.some((item: any) => item.component === "scripts")).toBe(true);
+        revision = changed.structuredContent.data.revision;
+      }
 
       const prepared = await client.call("wc3_prepare_gameplay_chunk", {
-        project_id: "hero-team-wars", transaction_id: transactionId, expected_revision: 0,
+        project_id: "hero-team-wars", transaction_id: transactionId, expected_revision: revision,
         chunk_id: chunkId, manifest_path: manifestPath, profile: "mvp_2arena"
       });
       expect(prepared.structuredContent.ok).toBe(true);
       expect(prepared.structuredContent.data.operation.value.source_strategy).toBe("composed");
-      expect(prepared.structuredContent.data.applied.revision).toBe(1);
+      expect(prepared.structuredContent.data.applied.revision).toBe(revision + 1);
+      revision = prepared.structuredContent.data.applied.revision;
+      if (chunkId === "HTW-01") expect(prepared.structuredContent.data.operation.value.source).toContain("set HTW_Phase = 2");
 
-      const validation = await client.call("wc3_validate_transaction", { project_id: "hero-team-wars", transaction_id: transactionId, revision: 1 });
+      const validation = await client.call("wc3_validate_transaction", { project_id: "hero-team-wars", transaction_id: transactionId, revision });
       expect(validation.structuredContent.ok).toBe(true);
       expect(validation.structuredContent.data.report.buildable).toBe(true);
 
       const run = await client.call("wc3_run_scenario_build", {
-        project_id: "hero-team-wars", transaction_id: transactionId, revision: 1,
+        project_id: "hero-team-wars", transaction_id: transactionId, revision,
         expected_source_hash: before, chunk_id: chunkId, scenario_ids: scenarioIds, profile: "mvp_2arena"
       });
       expect(run.structuredContent.ok).toBe(true);
@@ -162,7 +127,7 @@ describe("Phase 5E gameplay transaction workflow", () => {
       buildIds.push(buildId);
       const recorded = await client.call("wc3_record_chunk_result", {
         project_id: "hero-team-wars", chunk_id: chunkId, scenario_id: scenarioIds[0],
-        transaction_id: transactionId, revision: 1, build_id: buildId, expected_build_hash: buildHash,
+        transaction_id: transactionId, revision, build_id: buildId, expected_build_hash: buildHash,
         result: "pass", evidence_level: "static_only", notes: "Deterministic model scenario passed twice from a fresh transaction."
       });
       expect(recorded.structuredContent.ok).toBe(true);

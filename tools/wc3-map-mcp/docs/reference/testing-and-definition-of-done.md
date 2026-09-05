@@ -2,6 +2,18 @@
 
 ## Test layers
 
+Run `scripts/test.ps1` for the complete automated check. It publishes the engine
+from the tested sources before MCP integration runs and checks the immutable
+source hash in a finally block. `npm test` by itself cannot refresh the engine.
+The shared STDIO test client bounds requests, captures stderr, rejects pending
+calls on any exit and handles malformed JSON without leaving hung promises.
+
+Regression cases include ignored preparation hashes, source-file drift after
+staging, duplicate IDs before worker execution, generated JASS omitted from
+diffs, script-disabled seeding, incorrect capability flags, missing build
+comparison evidence, and false runtime claims from process-only sessions.
+Chunk-result retries preserve earlier failed attempts in separate artifacts.
+
 Object-field changes also run the generated-reference/schema drift check in
 `npm test`, the all-catalog-field codec round trips, semantic rejection and
 atomicity tests, source-relative build validation, and MCP lookup/authoring/

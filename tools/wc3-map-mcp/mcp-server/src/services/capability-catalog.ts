@@ -36,6 +36,13 @@ const MUTATING_TOOLS = new Set([
   "wc3_prepare_gameplay_chunk", "wc3_run_scenario_build", "wc3_record_chunk_result"
 ]);
 
+export const ALL_TOOL_NAMES = [...new Set([...READ_ONLY_TOOLS, ...MUTATING_TOOLS])];
+export const SCRIPT_OPERATIONS = new Set([
+  "set_script_source", "upsert_script_module", "remove_script_module", "set_trigger_mode",
+  "create_trigger", "update_trigger", "move_trigger", "delete_trigger",
+  "create_variable", "update_variable", "delete_variable"
+]);
+
 export interface CapabilityMember {
   member: string;
   component: string;
@@ -98,6 +105,7 @@ export function isToolEnabledForProject(project: ProjectConfig, name: string): b
 }
 
 export function capabilityMatrix(project: ProjectConfig): Record<string, unknown> {
+  const canApply = isToolEnabledForProject(project, "wc3_apply_operations");
   const profiles = Object.fromEntries(CAPABILITY_PROFILES.map(profile => {
     const active = project.profile === profile;
     const profileMembers = MEMBERS.filter(item => item.profiles.includes(profile));
@@ -106,16 +114,16 @@ export function capabilityMatrix(project: ProjectConfig): Record<string, unknown
       component,
       profiles: supportedProfiles,
       capability: supportedProfiles.includes(profile) ? "typed_write_enabled" : "gated",
-      enabled: active && supportedProfiles.includes(profile) && (operation !== "set_script_source" || project.script_policy === "mcp_owned_jass"),
+      enabled: active && canApply && supportedProfiles.includes(profile) && (!SCRIPT_OPERATIONS.has(operation) || project.script_policy === "mcp_owned_jass"),
       reason: supportedProfiles.includes(profile)
-        ? operation === "set_script_source" && project.script_policy !== "mcp_owned_jass" ? "script_policy is not mcp_owned_jass" : "supported by active profile"
+        ? !canApply ? "map mutation is disabled by project policy" : SCRIPT_OPERATIONS.has(operation) && project.script_policy !== "mcp_owned_jass" ? "script_policy is not mcp_owned_jass" : "supported by active profile"
         : `not enabled for ${profile}`
     }));
     return [profile, {
       active,
       status: active ? profile === "gui_compatible" ? "gated" : "enabled" : "available",
-      supported_tools: [...new Set([...READ_ONLY_TOOLS, ...MUTATING_TOOLS])].filter(name => isToolSupportedByProfile(profile, name)),
-      enabled_tools: active ? [...new Set([...READ_ONLY_TOOLS, ...MUTATING_TOOLS])].filter(name => isToolEnabledForProject(project, name)) : [],
+      supported_tools: ALL_TOOL_NAMES.filter(name => isToolSupportedByProfile(profile, name)),
+      enabled_tools: active ? ALL_TOOL_NAMES.filter(name => isToolEnabledForProject(project, name)) : [],
       members: profileMembers.map(item => item.member),
       operations: profileOperations.filter(item => item.profiles.includes(profile)).map(item => item.operation),
       evidence: profile === "gui_compatible" ? "gated_pending_exact_wtg_wct_wts_fixture_and_editor_evidence" : "static_only_until_exact_editor_and_game_observation"
@@ -130,8 +138,8 @@ export function capabilityMatrix(project: ProjectConfig): Record<string, unknown
       ...item,
       profile_status: Object.fromEntries(CAPABILITY_PROFILES.map(profile => [profile, {
         supported: item.profiles.includes(profile),
-        enabled: project.profile === profile && item.profiles.includes(profile) && (item.member !== "war3map.j" || project.script_policy === "mcp_owned_jass"),
-        reason: item.profiles.includes(profile) ? item.evidence : `member is not enabled for ${profile}`
+        enabled: canApply && project.profile === profile && item.profiles.includes(profile) && (item.member !== "war3map.j" || project.script_policy === "mcp_owned_jass"),
+        reason: !canApply ? "map mutation is disabled by project policy" : item.profiles.includes(profile) ? item.evidence : `member is not enabled for ${profile}`
       }]))
     })),
     operations: OPERATION_COMPONENTS.map(([operation, component, profiles]) => ({
@@ -139,9 +147,9 @@ export function capabilityMatrix(project: ProjectConfig): Record<string, unknown
       component,
       profiles,
       capability: profiles.includes(project.profile) ? "typed_write_enabled" : "gated",
-      enabled: profiles.includes(project.profile) && (operation !== "set_script_source" || project.script_policy === "mcp_owned_jass"),
+      enabled: canApply && profiles.includes(project.profile) && (!SCRIPT_OPERATIONS.has(operation) || project.script_policy === "mcp_owned_jass"),
       reason: profiles.includes(project.profile)
-        ? operation === "set_script_source" && project.script_policy !== "mcp_owned_jass" ? "script_policy is not mcp_owned_jass" : "supported by active profile"
+        ? !canApply ? "map mutation is disabled by project policy" : SCRIPT_OPERATIONS.has(operation) && project.script_policy !== "mcp_owned_jass" ? "script_policy is not mcp_owned_jass" : "supported by active profile"
         : `active profile ${project.profile} does not support this operation`
     })),
     gui_trigger_compatibility: {

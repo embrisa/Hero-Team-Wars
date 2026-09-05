@@ -29,7 +29,7 @@ export function registerGameplayTools(gameplay: GameplayService, register: Regis
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
   }, async (input: any) => {
     const id = correlationId();
-    return safeCall(id, () => gameplay.prepare(input.project_id, input.transaction_id, input.expected_revision, input.chunk_id, input.manifest_path, input.profile, id));
+    return safeCall(id, () => gameplay.prepare(input.project_id, input.transaction_id, input.expected_revision, input.chunk_id, input.manifest_path, input.profile, id, input.expected_manifest_sha256, input.expected_module_hashes));
   });
 
   register("wc3_run_scenario_build", {

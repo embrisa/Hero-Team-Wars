@@ -1,6 +1,6 @@
 # Task 21: Custom heroes and shared building investigation and experiment plan
 
-**Status:** Investigation complete; implementation and Warcraft III runtime verification are not started by this task
+**Status:** Historical v16 investigation. Retained for evidence; not current task scope or a standing restriction on later user-authorized work. Subsequent v18-v24 work is recorded in Git and versioned compatibility reports. The statuses below describe the investigation at the time it was written.
 
 **Golden source:** `map/HeroTeamWars_M0_2Arena.w3m`
 

@@ -15,6 +15,9 @@
   field-specific serializer and fixture explicitly enables them.
 - Generated gameplay source is treated as a derived artifact with recorded
   module/trigger/variable inputs, not as an untracked side effect.
+- Chunk results are separate UUID-named attempts; a later pass must not erase
+  an earlier failure. User-observed verification requires matching game
+  milestone evidence, not merely a launch session ID.
 
 ## Recovery artifacts
 

@@ -54,7 +54,10 @@ Builds .NET engine first, then TypeScript server, validates expected outputs, an
 
 ### `scripts/test.ps1`
 
-Runs .NET tests, TypeScript tests, schema validation, and STDIO integration tests. Application tests are opt-in flags because they open visible programs.
+Runs .NET tests, publishes the current engine, then runs TypeScript/schema and
+STDIO integration checks against that engine. Verifies the immutable source
+hash even on failure. There is no application-test flag; the user owns manual
+Warcraft III verification.
 
 ### `scripts/inspect-baseline.ps1`
 

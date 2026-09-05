@@ -16,6 +16,7 @@ import {
 import { withProjectLock } from "../storage/project-lock.js";
 import { WorkerClient } from "../transport/worker-client.js";
 import { operationSchema, type OperationInput } from "../schemas/operations.js";
+import { SCRIPT_OPERATIONS } from "./capability-catalog.js";
 
 const SERVER_VERSION = "0.1.0";
 const SCHEMA_VERSION = "1.0";
@@ -47,7 +48,7 @@ export class TransactionService {
         }
 
         const gameplayManifest = resolveConfiguredPath(project.root, project.config.gameplay_manifest);
-        if (existsSync(gameplayManifest) && project.config.gameplay_source_roots.some(root => isWithin(resolveConfiguredPath(project.root, root), gameplayManifest))) {
+        if (project.config.script_policy === "mcp_owned_jass" && existsSync(gameplayManifest) && project.config.gameplay_source_roots.some(root => isWithin(resolveConfiguredPath(project.root, root), gameplayManifest))) {
           const composition = await this.worker.request<Record<string, unknown>>("compose_gameplay_source", { manifest_path: gameplayManifest, profile: project.config.profile }, correlationId);
           const model = composition.canonical_model as Record<string, unknown> | undefined;
           if (!model) throw new AppError("ENGINE_PROTOCOL_ERROR", "The gameplay composer returned no canonical source model.");
@@ -119,7 +120,7 @@ export class TransactionService {
     if (modeChanges.length > 0 && (expectedRevision !== 0 || parsedOperations.length !== 1)) {
       throw new AppError("PRECONDITION_FAILED", "set_trigger_mode is only valid as the sole operation in a new revision-0 transaction based on a fresh inspection.");
     }
-    if (parsedOperations.some(operation => operation.type === "set_script_source")) {
+    if (parsedOperations.some(operation => SCRIPT_OPERATIONS.has(operation.type))) {
       this.projects.assertScriptMutationAllowed(projectId);
     }
     return withProjectLock(project, "apply_operations", async () => {
@@ -141,13 +142,15 @@ export class TransactionService {
 
       if (dryRun) {
         const result = await this.worker.request<Record<string, unknown>>("apply_operations", { canonical_path: loaded.paths.canonical, operations: parsedOperations }, correlationId);
+        const diff = semanticDiff(result.diff);
+        this.assertScriptDiffAllowed(projectId, diff);
         return {
           transaction_id: transactionId,
           revision: expectedRevision,
           dry_run: true,
           requested_operation_ids: operationIds,
           applied_operation_ids: stringArray(result.applied_operation_ids),
-          diff: semanticDiff(result.diff),
+          diff,
           note: "Dry run only; no revision, canonical state, manifest, or report was written."
         };
       }
@@ -176,6 +179,7 @@ export class TransactionService {
           throw new AppError("ENGINE_PROTOCOL_ERROR", "The map engine returned an incomplete or unknown operation result.");
         }
         const diff = semanticDiff(result.diff);
+        this.assertScriptDiffAllowed(projectId, diff);
         const diffArtifact = writeJsonArtifact(project, relativeProjectPath(project, diffPath), diff, "semantic_diff");
         replaceFileAtomic(revisionPath, loaded.paths.canonical);
         const canonicalHash = sha256File(loaded.paths.canonical).sha256;
@@ -281,10 +285,7 @@ export class TransactionService {
       const rawReport = await this.worker.request<Record<string, unknown>>("validate_canonical", {
         canonical_path: loaded.paths.canonical,
         source_map_path: loaded.paths.sourceMap,
-        validation_context: {
-          project_id: projectId,
-          ...(projectId === "hero-team-wars" ? { profile: project.config.profile } : {})
-        }
+        validation_context: transactionValidationContext(project, loaded.paths.canonical)
       }, correlationId);
       const reportPath = join(loaded.paths.reports, `validation-${revision.toString().padStart(4, "0")}.json`);
       const report: Record<string, unknown> = {
@@ -335,6 +336,14 @@ export class TransactionService {
     if (!["staged", "modified", "validated"].includes(manifest.state)) throw new AppError("TRANSACTION_STATE", `Transaction is in state '${manifest.state}' and cannot be changed in this operation.`);
   }
 
+  private assertScriptDiffAllowed(projectId: string, diff: Record<string, unknown>): void {
+    // Team/region operations may regenerate an existing gameplay model too,
+    // including transactions created before script policy was disabled.
+    if ((diff.changes as Array<Record<string, unknown>>).some(change => change.component === "scripts")) {
+      this.projects.assertScriptMutationAllowed(projectId);
+    }
+  }
+
   private assertSourceUnchanged(project: ResolvedProject, manifest: TransactionManifest, stagedPath: string): void {
     if (!project.sourceMaps.some(source => source.toLowerCase() === manifest.source.path.toLowerCase())) {
       throw new AppError("SOURCE_CHANGED", "The transaction manifest does not point to an allowed source map.");
@@ -344,6 +353,14 @@ export class TransactionService {
     const staged = sha256File(stagedPath);
     if (staged.sha256 !== manifest.staged_copy_sha256 || staged.size_bytes !== manifest.source.size_bytes) throw new AppError("SOURCE_CHANGED", "The isolated transaction source copy changed after staging.", false, { expected_sha256: manifest.staged_copy_sha256, actual_sha256: staged.sha256 });
   }
+}
+
+/** Raw archive inspections have no logical team/source model to validate.
+ * Native players/forces and baseline invariants still run for those maps. */
+export function transactionValidationContext(project: ResolvedProject, canonicalPath: string): Record<string, string> {
+  const canonical = JSON.parse(readFileSync(canonicalPath, "utf8")) as Record<string, unknown>;
+  const hasProfileModel = canonical.profile !== undefined || canonical.teams !== undefined || canonical.gameplay_source !== undefined;
+  return { project_id: project.id, ...(hasProfileModel ? { profile: project.config.profile } : {}) };
 }
 
 function parseOperations(operations: unknown[], maxOperationCount: number, expectedRevision: number): OperationInput[] {
@@ -357,7 +374,9 @@ function parseOperations(operations: unknown[], maxOperationCount: number, expec
   }
   const ids = new Set<string>();
   for (const operation of parsed) {
-    if (!ids.add(operation.operation_id.toUpperCase())) throw new AppError("INVALID_ARGUMENT", `Operation '${operation.operation_id}' occurs more than once in the batch.`);
+    const id = operation.operation_id.toUpperCase();
+    if (ids.has(id)) throw new AppError("INVALID_ARGUMENT", `Operation '${operation.operation_id}' occurs more than once in the batch.`);
+    ids.add(id);
     if (operation.expected_revision !== undefined && operation.expected_revision !== expectedRevision) {
       throw new AppError("PRECONDITION_FAILED", `Operation '${operation.operation_id}' targets revision ${operation.expected_revision}, but the request expects revision ${expectedRevision}.`);
     }

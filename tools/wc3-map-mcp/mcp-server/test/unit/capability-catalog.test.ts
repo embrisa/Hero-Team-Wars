@@ -24,4 +24,18 @@ describe("Phase 5F capability catalog", () => {
     expect(report.profiles.full_6team.operations).toContain("create_region");
     expect(report.gui_trigger_compatibility.enabled).toBe(false);
   });
+
+  it("never advertises writable members or operations for a read-only project", () => {
+    const report = capabilityMatrix({ ...baseProject, write_policy: "read_only" }) as any;
+    expect(report.operations.every((item: any) => item.enabled === false)).toBe(true);
+    expect(report.members.every((item: any) => item.profile_status.mvp_2arena.enabled === false)).toBe(true);
+  });
+
+  it("gates every source-generating operation when scripts are disabled", () => {
+    const report = capabilityMatrix({ ...baseProject, script_policy: "disabled" }) as any;
+    for (const operation of ["set_script_source", "upsert_script_module", "create_trigger", "update_variable", "set_trigger_mode"]) {
+      expect(report.operations.find((item: any) => item.operation === operation).enabled).toBe(false);
+    }
+    expect(report.operations.find((item: any) => item.operation === "set_map_metadata").enabled).toBe(true);
+  });
 });

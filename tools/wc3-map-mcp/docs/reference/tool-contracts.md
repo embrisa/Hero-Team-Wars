@@ -163,6 +163,21 @@ noted otherwise. The original source map is never modified.
 | `wc3_validate_transaction` | `{ project_id, transaction_id, revision }` | Validates exactly that staged revision, writes a validation report, and sets state to `validated` only when `buildable=true`. Errors leave it `modified` and prevent building. |
 | `wc3_discard_transaction` | `{ project_id, transaction_id, expected_source_hash, confirmation: true }` | Destructively removes only the matching MCP-owned transaction directory beneath the configured staging root and retains an audit tombstone. It cannot delete the source map, an arbitrary directory, or an accepted build. |
 
+With `script_policy="disabled"`, begin preserves the inspected script/regions
+and does not invoke gameplay composition. Native archive validation still
+runs; logical profile validation is added when a staged profile/team/source
+model exists. With `mcp_owned_jass`, begin currently seeds the configured
+gameplay model and regenerated source into revision 0. That known limitation
+means revision 0 is not necessarily a no-op relative to the source archive;
+inspect its script hash before authoring expected values. See the
+[engineering audit](../engineering-audit.md).
+
+Duplicate operation IDs (case-insensitive) are rejected before worker execution.
+All source-generating module/trigger/variable operations require script policy,
+including dry runs. Diffs include generated script hashes and derived registry
+changes performed after the typed batch, attributed to its final operation
+with `provenance="derived"`; full source stays in revision artifacts.
+
 ### `wc3_apply_operations` envelope
 
 Every operation is a strict object with:
@@ -245,6 +260,11 @@ Important typed preconditions include:
 Build output, reinspection, and model scenarios do not prove Warcraft III
 runtime compatibility.
 
+A missing/non-array semantic comparison is `ENGINE_PROTOCOL_ERROR`, not an
+empty diff. Reports verify output size, hash and persisted reinspection identity.
+`engine_result.output_path` identifies the final artifact, not its removed
+temporary directory.
+
 ## Launch and evidence tools
 
 These tools do not automate user input inside World Editor or Warcraft III.
@@ -275,6 +295,26 @@ transaction, source-hash, revision, build, and evidence contracts.
 | `wc3_run_scenario_build` | `{ project_id, transaction_id, revision, expected_source_hash, chunk_id, scenario_ids?, profile? }`; chunk is `HTW-##`, profile is `mvp_2arena` or `full_6team`, default `mvp_2arena`. | Builds the exact validated revision and runs deterministic model-level scenarios tied to the build hash. Returns build and scenario-report artifacts with `evidence_level="static_only"` and `runtime_verified=false`. `HTW-06` requires `full_6team`. |
 | `wc3_record_chunk_result` | `{ project_id, chunk_id, scenario_id, transaction_id, revision, build_id, expected_build_hash, result, evidence_level?, test_session_id?, notes }`; evidence level defaults to `static_only` and may be `user_observed`. | Verifies the exact build/transaction/revision and writes linked chunk evidence. `user_observed` requires an exact `test_session_id` for that build; only then can `runtime_verified` be true. |
 
+Preparation forwards `expected_manifest_sha256` and `expected_module_hashes`;
+mismatches return `PRECONDITION_FAILED` before staging. It also compares current
+manifest/module-file identities to the hash-verified initial transaction
+revision and returns `SOURCE_CHANGED` for disk drift. Typed edits to staged
+modules/variables remain valid even after regenerated metadata drops the
+original manifest field. A stale requested revision is `PRECONDITION_FAILED`.
+
+User-observed chunk evidence requires an exact **game** session whose latest
+milestone is a matching pass/fail `user_observation` of `smoke_test` or
+`playtest`, or a failed `game_loaded` observation. Process-only sessions,
+editor sessions, successful load alone, log-only observations and conflicting
+results return `PRECONDITION_FAILED`. The service also rejects a missing
+session below the schema boundary with `PRECONDITION_REQUIRED`. A verified
+failed observation retains `result="fail"`; verification does not mean pass.
+
+Each result is a new artifact at
+`gameplay/results/<build_id>-<chunk_id>-<UUID>.json` beneath the artifact root.
+Use the returned artifact path; retries never replace earlier failures, and
+`scenario_id` is descriptive data rather than part of the filename.
+
 Composition and scenario artifacts are useful static evidence, but never
 upgrade themselves to editor-open, game-loaded, smoke, or playtest evidence.
 
@@ -288,6 +328,9 @@ upgrade themselves to editor-open, game-loaded, smoke, or playtest evidence.
   builds, launches, evidence mutation, promotion, and discard require a
   writes-enabled project configuration.
 - MCP-owned script changes require `script_policy="mcp_owned_jass"`.
+  Capability member/operation `enabled` flags reflect the write policy and
+  apply-tool allow-list; module/trigger/variable operations also reflect script
+  policy. Static parser capability is separate from permission to mutate.
   GUI-trigger compatibility is not enabled merely because a trigger is
   inspectable; `war3map.wtg` and `war3map.wct` remain opaque/gated.
 - Profile capability is explicit. `mvp_2arena` is the approved two-team
