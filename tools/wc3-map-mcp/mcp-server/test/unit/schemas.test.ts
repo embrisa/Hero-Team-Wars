@@ -3,6 +3,21 @@ import { operationSchema } from "../../src/schemas/operations.js";
 import { encodeNdjson, parseNdjsonLine } from "../../src/transport/ndjson.js";
 
 describe("operation schema", () => {
+  it("accepts a typed multiboard array without allowing arbitrary JASS types", () => {
+    const operation = {
+      operation_id: "c0a80101-0000-4000-8000-000000000026", type: "create_variable", target: { id: "boards" },
+      value: { id: "boards", name: "TestBoards", type: "multiboard", array: true, array_size: 5 }, rationale: "Declare synchronized presentation handles."
+    };
+    expect(operationSchema.safeParse(operation).success).toBe(true);
+    expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, type: "imaginaryboard" } }).success).toBe(false);
+    expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, array_size: undefined } }).success).toBe(false);
+    expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, array_size: 8192 } }).success).toBe(false);
+    for (const field of ["initial", "default_value", "value"]) {
+      expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, [field]: 0 } }).success).toBe(false);
+      expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, [field]: null } }).success).toBe(true);
+    }
+  });
+
   it("requires a rationale and a UUID operation id", () => {
     expect(operationSchema.safeParse({ type: "set_map_metadata", target: { field: "title" }, expected: "Before", value: "After" }).success).toBe(false);
     expect(operationSchema.safeParse({ operation_id: "c0a80101-0000-4000-8000-000000000001", type: "set_map_metadata", target: { field: "title" }, expected: "Before", value: "After", rationale: "Change title" }).success).toBe(true);

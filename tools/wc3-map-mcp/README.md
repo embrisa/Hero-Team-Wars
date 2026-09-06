@@ -1,5 +1,14 @@
 # WC3 Map MCP
 
+The [v26 implementation](docs/compatibility/v26-preparation-and-sends.md) adds
+personal Camp purchases, mixed send queues, frozen wave plans and multiboards.
+Typed array/multiboard variable support is aligned across MCP/engine/schema;
+grouped boolean JASS validation is repaired. Tool names and evidence gates are
+unchanged. `scripts/test.ps1` checks catalog generation and production JASS with
+mocked natives before engine/MCP suites; this is not Warcraft runtime evidence.
+Object definitions compare by stable identity across archive regrouping, while
+field values and modification order remain part of semantic comparison.
+
 The [v24 repair](docs/compatibility/v24-controller-load-repair.md) fixes native
 boolean object-field encoding. Authoring keeps logical `Bool`; binary output
 uses a four-byte integer. Byte-level tests supplement codec round-trip tests.

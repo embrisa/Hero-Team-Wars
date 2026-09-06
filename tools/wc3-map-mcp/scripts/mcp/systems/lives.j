@@ -22,7 +22,9 @@ function HTW_Lives_AccountDeath takes nothing returns nothing
             set HTW_TeamLives[teamIndex] = HTW_TeamLives[teamIndex] - HTW_AdditionalWipeCost
         endif
         if HTW_TeamLives[teamIndex] <= 0 then
+            set HTW_TeamLives[teamIndex] = 0
             set HTW_TeamLiving[teamIndex] = false
+            call HTW_Waves_ClearArena(teamIndex)
             call HTW_Elimination_Recalculate()
         endif
     endif

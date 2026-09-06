@@ -1,0 +1,419 @@
+[
+  {
+    "category": "unit",
+    "object_kind": "custom",
+    "base_rawcode": "hhou",
+    "custom_rawcode": "n26C",
+    "rawcode": "n26C",
+    "display_name": "War Camp",
+    "modifications": [
+      {
+        "field": "unitName",
+        "value": "War Camp"
+      },
+      {
+        "field": "normalAbilities",
+        "value": [
+          "Avul",
+          "A6F1",
+          "A6R1",
+          "A6K1"
+        ]
+      },
+      {
+        "field": "heroAbilities",
+        "value": []
+      },
+      {
+        "field": "castPoint",
+        "value": 0
+      },
+      {
+        "field": "castBackswing",
+        "value": 0
+      },
+      {
+        "field": "unitTooltip",
+        "value": "Select War Camp. Prepare only: Q: Footman (10 personal gold, 1 threat); W: Rifleman (20 personal gold, 2 threat); E: Knight (40 personal gold, 4 threat). Sends spend your personal gold during preparation only."
+      }
+    ]
+  },
+  {
+    "category": "ability",
+    "object_kind": "custom",
+    "base_rawcode": "ANcl",
+    "custom_rawcode": "A6F1",
+    "rawcode": "A6F1",
+    "display_name": "Send Footman",
+    "modifications": [
+      {
+        "field": "abilityName",
+        "value": "Send Footman",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "heroAbility",
+        "value": false,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "itemAbility",
+        "value": false,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "maximumLevels",
+        "value": 1,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "normalIcon",
+        "value": "ReplaceableTextures\\CommandButtons\\BTNDefend.blp",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "hotkey",
+        "value": "Q",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "buttonPositionX",
+        "value": 0,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "buttonPositionY",
+        "value": 0,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "abilityRequirements",
+        "value": "",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "manaCost",
+        "value": 0,
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "cooldown",
+        "value": 0,
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "channelFollowThroughTime",
+        "value": 0,
+        "level": 1,
+        "pointer": 1
+      },
+      {
+        "field": "channelTargetType",
+        "value": "instant",
+        "level": 1,
+        "pointer": 2
+      },
+      {
+        "field": "channelOptions",
+        "value": [
+          "visible"
+        ],
+        "level": 1,
+        "pointer": 3
+      },
+      {
+        "field": "channelDisableOtherAbilities",
+        "value": false,
+        "level": 1,
+        "pointer": 5
+      },
+      {
+        "field": "channelBaseOrder",
+        "value": "thunderbolt",
+        "level": 1,
+        "pointer": 6
+      },
+      {
+        "field": "allowedTargets",
+        "value": "",
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "tooltip",
+        "value": "Send Footman (|cffffcc00Q|r) - 10 personal gold",
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "extendedTooltip",
+        "value": "Frontline | 1 threat|nA melee body for the frontline.|n|nCost: 10 personal gold.|nPrepare only: purchase this send during preparation.",
+        "level": 1,
+        "pointer": 0
+      }
+    ]
+  },
+  {
+    "category": "ability",
+    "object_kind": "custom",
+    "base_rawcode": "ANcl",
+    "custom_rawcode": "A6R1",
+    "rawcode": "A6R1",
+    "display_name": "Send Rifleman",
+    "modifications": [
+      {
+        "field": "abilityName",
+        "value": "Send Rifleman",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "heroAbility",
+        "value": false,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "itemAbility",
+        "value": false,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "maximumLevels",
+        "value": 1,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "normalIcon",
+        "value": "ReplaceableTextures\\CommandButtons\\BTNFlare.blp",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "hotkey",
+        "value": "W",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "buttonPositionX",
+        "value": 1,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "buttonPositionY",
+        "value": 0,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "abilityRequirements",
+        "value": "",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "manaCost",
+        "value": 0,
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "cooldown",
+        "value": 0,
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "channelFollowThroughTime",
+        "value": 0,
+        "level": 1,
+        "pointer": 1
+      },
+      {
+        "field": "channelTargetType",
+        "value": "instant",
+        "level": 1,
+        "pointer": 2
+      },
+      {
+        "field": "channelOptions",
+        "value": [
+          "visible"
+        ],
+        "level": 1,
+        "pointer": 3
+      },
+      {
+        "field": "channelDisableOtherAbilities",
+        "value": false,
+        "level": 1,
+        "pointer": 5
+      },
+      {
+        "field": "channelBaseOrder",
+        "value": "blizzard",
+        "level": 1,
+        "pointer": 6
+      },
+      {
+        "field": "allowedTargets",
+        "value": "",
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "tooltip",
+        "value": "Send Rifleman (|cffffcc00W|r) - 20 personal gold",
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "extendedTooltip",
+        "value": "Ranged | 2 threat|nRanged rifle fire.|n|nCost: 20 personal gold.|nPrepare only: purchase this send during preparation.",
+        "level": 1,
+        "pointer": 0
+      }
+    ]
+  },
+  {
+    "category": "ability",
+    "object_kind": "custom",
+    "base_rawcode": "ANcl",
+    "custom_rawcode": "A6K1",
+    "rawcode": "A6K1",
+    "display_name": "Send Knight",
+    "modifications": [
+      {
+        "field": "abilityName",
+        "value": "Send Knight",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "heroAbility",
+        "value": false,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "itemAbility",
+        "value": false,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "maximumLevels",
+        "value": 1,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "normalIcon",
+        "value": "ReplaceableTextures\\CommandButtons\\BTNDivineIntervention.blp",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "hotkey",
+        "value": "E",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "buttonPositionX",
+        "value": 2,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "buttonPositionY",
+        "value": 0,
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "abilityRequirements",
+        "value": "",
+        "level": 0,
+        "pointer": 0
+      },
+      {
+        "field": "manaCost",
+        "value": 0,
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "cooldown",
+        "value": 0,
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "channelFollowThroughTime",
+        "value": 0,
+        "level": 1,
+        "pointer": 1
+      },
+      {
+        "field": "channelTargetType",
+        "value": "instant",
+        "level": 1,
+        "pointer": 2
+      },
+      {
+        "field": "channelOptions",
+        "value": [
+          "visible"
+        ],
+        "level": 1,
+        "pointer": 3
+      },
+      {
+        "field": "channelDisableOtherAbilities",
+        "value": false,
+        "level": 1,
+        "pointer": 5
+      },
+      {
+        "field": "channelBaseOrder",
+        "value": "banish",
+        "level": 1,
+        "pointer": 6
+      },
+      {
+        "field": "allowedTargets",
+        "value": "",
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "tooltip",
+        "value": "Send Knight (|cffffcc00E|r) - 40 personal gold",
+        "level": 1,
+        "pointer": 0
+      },
+      {
+        "field": "extendedTooltip",
+        "value": "Heavy | 4 threat|nDurable mounted melee.|n|nCost: 40 personal gold.|nPrepare only: purchase this send during preparation.",
+        "level": 1,
+        "pointer": 0
+      }
+    ]
+  }
+]

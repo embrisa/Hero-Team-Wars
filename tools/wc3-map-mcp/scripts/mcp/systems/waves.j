@@ -14,6 +14,7 @@ function HTW_Waves_Prepare takes nothing returns nothing
     endif
     set HTW_Phase = 1
     set HTW_Wave = HTW_Wave + 1
+    call HTW_Sending_ResetQueues()
     set HTW_RoutingLocked = false
     call HTW_Routing_Compute()
     set HTW_WaveActive = true
@@ -39,6 +40,7 @@ function HTW_Waves_Resolve takes nothing returns nothing
     endif
     set HTW_ResolutionApplied = true
     call HTW_Content_CleanupBaseWaves()
+    call HTW_Sending_ResetQueues()
     call HTW_Heroes_ReviveLiving()
     call HTW_Economy_GrantPersonalGold()
     set HTW_WaveActive = false
@@ -55,4 +57,5 @@ function HTW_Waves_Resolve takes nothing returns nothing
         call HTW_Events_FireWaveResolved()
     endif
     call HTW_Debug_LogText("wave resolved exactly once")
+    call HTW_Information_Display()
 endfunction

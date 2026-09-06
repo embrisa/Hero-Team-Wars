@@ -86,7 +86,20 @@ public static class SemanticDiff
                     continue;
                 }
 
-                projected[property.Key] = ProjectCanonical(property.Value, false);
+                // Object definitions are keyed records. Writers regroup them
+                // by archive member/category; list position is not gameplay
+                // identity. Preserve modification order and malformed records.
+                if (root && property.Key == "object_data" && property.Value is JsonArray definitions
+                    && definitions.All(item => item is JsonObject obj && obj["id"] is JsonValue id && id.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text))
+                    && definitions.Select(item => item!["id"]!.GetValue<string>()).Distinct(StringComparer.Ordinal).Count() == definitions.Count)
+                {
+                    projected[property.Key] = new JsonArray(definitions.OrderBy(item => item!["id"]!.GetValue<string>(), StringComparer.Ordinal)
+                        .Select(item => ProjectCanonical(item, false)).ToArray());
+                }
+                else
+                {
+                    projected[property.Key] = ProjectCanonical(property.Value, false);
+                }
             }
 
             return projected;

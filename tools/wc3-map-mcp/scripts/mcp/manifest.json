@@ -16,6 +16,8 @@
   ],
   "modules": [
     { "id": "main", "path": "main.j", "dependencies": ["config.tuning", "core.bootstrap", "core.state", "core.debug", "systems.phases", "systems.waves", "systems.routing", "systems.economy", "systems.sending", "systems.information", "systems.heroes", "systems.hero-selection", "content.base-waves", "content.send-units", "content.heroes", "content.items", "content.abilities", "tests.assertions", "tests.scenarios"] },
+    { "id": "content.send-catalog", "path": "content/send-catalog.j" },
+    { "id": "systems.wave-plan", "path": "systems/wave-plan.j", "dependencies": ["core.state", "content.send-catalog"] },
     { "id": "config.tuning", "path": "config/tuning.j" },
     { "id": "core.bootstrap", "path": "core/bootstrap.j", "dependencies": ["config.tuning", "config.teams", "config.regions", "config.objects"] },
     { "id": "core.state", "path": "core/state.j", "dependencies": ["config.tuning"] },
@@ -111,6 +113,8 @@
     "variables/round.variable.json",
     "variables/wave.variable.json",
     "variables/phase.variable.json",
-    "variables/runtime.variable.json"
+    "variables/runtime.variable.json",
+    "variables/sending.variable.json",
+    "variables/information.variable.json"
   ]
 }

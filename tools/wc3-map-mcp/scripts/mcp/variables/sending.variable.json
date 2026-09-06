@@ -1,0 +1,113 @@
+[
+  {
+    "capability": "mcp_native_jass",
+    "type": "integer",
+    "id": "v26_startinggold",
+    "name": "HTW_StartingGold",
+    "provenance": "source_of_truth"
+  },
+  {
+    "capability": "mcp_native_jass",
+    "type": "integer",
+    "id": "v26_sendbudgetstart",
+    "name": "HTW_SendBudgetStart",
+    "provenance": "source_of_truth"
+  },
+  {
+    "capability": "mcp_native_jass",
+    "type": "integer",
+    "id": "v26_sendbudgetgrowth",
+    "name": "HTW_SendBudgetGrowth",
+    "provenance": "source_of_truth"
+  },
+  {
+    "capability": "mcp_native_jass",
+    "type": "integer",
+    "id": "v26_sendbudgetmaximum",
+    "name": "HTW_SendBudgetMaximum",
+    "provenance": "source_of_truth"
+  },
+  {
+    "capability": "mcp_native_jass",
+    "type": "integer",
+    "id": "v26_basefootmen",
+    "name": "HTW_BaseFootmen",
+    "provenance": "source_of_truth"
+  },
+  {
+    "capability": "mcp_native_jass",
+    "type": "integer",
+    "id": "v26_fillerfootmen",
+    "name": "HTW_FillerFootmen",
+    "provenance": "source_of_truth"
+  },
+  {
+    "capability": "mcp_native_jass",
+    "type": "integer",
+    "id": "v26_fillerriflemen",
+    "name": "HTW_FillerRiflemen",
+    "provenance": "source_of_truth"
+  },
+  {
+    "provenance": "runtime_state",
+    "name": "HTW_PlayerThreatUsed",
+    "array_size": 256,
+    "type": "integer",
+    "array": true,
+    "capability": "mcp_native_jass",
+    "id": "v26_playerthreatused"
+  },
+  {
+    "provenance": "runtime_state",
+    "name": "HTW_PlayerQueueCount",
+    "array_size": 256,
+    "type": "integer",
+    "array": true,
+    "capability": "mcp_native_jass",
+    "id": "v26_playerqueuecount"
+  },
+  {
+    "provenance": "runtime_state",
+    "name": "HTW_PlanBase",
+    "array_size": 256,
+    "type": "integer",
+    "array": true,
+    "capability": "mcp_native_jass",
+    "id": "v26_planbase"
+  },
+  {
+    "provenance": "runtime_state",
+    "name": "HTW_PlanSends",
+    "array_size": 256,
+    "type": "integer",
+    "array": true,
+    "capability": "mcp_native_jass",
+    "id": "v26_plansends"
+  },
+  {
+    "provenance": "runtime_state",
+    "name": "HTW_PlanFiller",
+    "array_size": 256,
+    "type": "integer",
+    "array": true,
+    "capability": "mcp_native_jass",
+    "id": "v26_planfiller"
+  },
+  {
+    "provenance": "runtime_state",
+    "name": "HTW_PlanRemaining",
+    "array_size": 256,
+    "type": "integer",
+    "array": true,
+    "capability": "mcp_native_jass",
+    "id": "v26_planremaining"
+  },
+  {
+    "provenance": "runtime_state",
+    "name": "HTW_SendPlanLocked",
+    "type": "boolean",
+    "initial": false,
+    "capability": "mcp_native_jass",
+    "id": "v26_send_plan_locked"
+  }
+]

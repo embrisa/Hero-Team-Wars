@@ -7,6 +7,22 @@ namespace Wc3MapEngine.Tests;
 public sealed class SemanticDiffTests
 {
     [Fact]
+    public void DefinitionCategoryRegroupingIsNotAChangeButValuesAndModificationOrderAre()
+    {
+        var before = JsonNode.Parse("""{"object_data":[{"id":"unit:U001","modifications":[{"id":"unam","value":"Camp"},{"id":"utip","value":"Buy"}]},{"id":"ability:A001","modifications":[{"id":"amcs","value":0}]}]}""")!;
+        var after = JsonNode.Parse("""{"object_data":[{"id":"ability:A001","modifications":[{"id":"amcs","value":0}]},{"id":"unit:U001","modifications":[{"id":"unam","value":"Camp"},{"id":"utip","value":"Buy"}]}]}""")!;
+        Assert.Empty(SemanticDiff.CompareCanonical(before, after));
+        after["object_data"]![0]!["modifications"]![0]!["value"] = 1;
+        Assert.Single(SemanticDiff.CompareCanonical(before, after));
+        after["object_data"]![0]!["modifications"]![0]!["value"] = 0;
+        var modifications = after["object_data"]![1]!["modifications"]!.AsArray();
+        var first = modifications[0]!.DeepClone();
+        modifications.RemoveAt(0);
+        modifications.Add(first);
+        Assert.NotEmpty(SemanticDiff.CompareCanonical(before, after));
+    }
+
+    [Fact]
     public void CanonicalComparisonExcludesSourceAndArchiveContainerMetadata()
     {
         var before = Canonical("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");

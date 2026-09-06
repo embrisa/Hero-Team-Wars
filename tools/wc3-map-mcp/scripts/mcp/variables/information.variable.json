@@ -1,0 +1,4 @@
+[
+  { "id": "information_board", "name": "HTW_InformationBoard", "type": "multiboard", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "information_ready", "name": "HTW_InformationReady", "type": "boolean", "initial": false, "provenance": "runtime_state", "capability": "mcp_native_jass" }
+]

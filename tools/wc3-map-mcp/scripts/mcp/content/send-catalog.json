@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "description": "Standard Warcraft III units with unchanged combat mechanics. Costs use personal gold, charged by the send script during preparation only.",
+  "icon_order_evidence": {
+    "local_source": "builds/diagnostics/v25/HumanAbilityFunc.txt",
+    "upstream_url": "https://raw.githubusercontent.com/inwc3/wc3libs/66b637e38df68023dc94c7ed46210a28b52e0b12/src/test/resources/wc3data/Units/HumanAbilityFunc.txt",
+    "sha256": "30339592565E7415441A18B23B9F5EC90FE3304393A26B1EA88C61871A509AF6",
+    "note": "Existing command icons, not unit portraits or added combat abilities. Art and Order entries were verified in the local pinned file."
+  },
+  "sends": [
+    {
+      "kind": 1,
+      "unit_type": "hfoo",
+      "ability_id": "A6F1",
+      "name": "Footman",
+      "role": "Frontline",
+      "description": "A melee body for the frontline.",
+      "cost": 10,
+      "threat": 1,
+      "icon": "ReplaceableTextures\\CommandButtons\\BTNDefend.blp",
+      "icon_source_object": "Adef",
+      "base_order": "thunderbolt",
+      "order_source_object": "AHtb",
+      "hotkey": "Q",
+      "button_column": 0,
+      "button_row": 0
+    },
+    {
+      "kind": 2,
+      "unit_type": "hrif",
+      "ability_id": "A6R1",
+      "name": "Rifleman",
+      "role": "Ranged",
+      "description": "Ranged rifle fire.",
+      "cost": 20,
+      "threat": 2,
+      "icon": "ReplaceableTextures\\CommandButtons\\BTNFlare.blp",
+      "icon_source_object": "Afla",
+      "base_order": "blizzard",
+      "order_source_object": "AHbz",
+      "hotkey": "W",
+      "button_column": 1,
+      "button_row": 0
+    },
+    {
+      "kind": 3,
+      "unit_type": "hkni",
+      "ability_id": "A6K1",
+      "name": "Knight",
+      "role": "Heavy",
+      "description": "Durable mounted melee.",
+      "cost": 40,
+      "threat": 4,
+      "icon": "ReplaceableTextures\\CommandButtons\\BTNDivineIntervention.blp",
+      "icon_source_object": "AHds",
+      "base_order": "banish",
+      "order_source_object": "AHbn",
+      "hotkey": "E",
+      "button_column": 2,
+      "button_row": 0
+    }
+  ]
+}

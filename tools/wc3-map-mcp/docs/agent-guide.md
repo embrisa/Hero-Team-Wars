@@ -41,9 +41,11 @@ success as gameplay evidence.
 
 Take task scope from the current user request. Versioned compatibility reports
 describe individual artifacts; inspect Git, the current configuration and
-playable folders before choosing a baseline. The latest recorded repair is
-[v25](compatibility/v25-controller-qwer-spells.md), still runtime-unverified in
-that report. Old work items are historical evidence, not standing task orders.
+playable folders before choosing a baseline. The user confirmed general v25
+playability on 2026-09-06. The [v26 implementation](compatibility/v26-preparation-and-sends.md)
+builds on that exact artifact; new-build runtime verification is separate.
+The user authorized adding the missing send foundation and changing MVP units.
+Old work items are historical evidence, not standing task orders.
 
 Read the [engineering audit](engineering-audit.md) for remaining structural
 risks, including implicit gameplay seeding in script-enabled transactions,

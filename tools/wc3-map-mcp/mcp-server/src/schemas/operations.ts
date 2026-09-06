@@ -155,10 +155,20 @@ export const gameplayModuleSchema = z.object({
   enabled: z.boolean().optional(), dependencies: z.array(moduleIdentifier).default([]), public_symbols: z.array(identifier).default([]), provenance: z.string().optional(), capability: z.string().optional()
 }).strict();
 
-export const gameplayVariableSchema = z.object({
-  id: identifier, name: identifier, type: z.enum(["integer", "real", "boolean", "string", "handle", "timer", "trigger", "unit", "group", "region", "rect", "player", "force"]),
+const gameplayVariableBaseSchema = z.object({
+  id: identifier, name: identifier, type: z.enum(["integer", "real", "boolean", "string", "handle", "timer", "trigger", "unit", "group", "region", "rect", "player", "force", "fogmodifier", "multiboard"]),
+  array: z.boolean().optional(), array_size: z.number().int().min(1).max(8191).optional(),
   initial: z.unknown().optional(), default_value: z.unknown().optional(), value: z.unknown().optional(), dependencies: z.array(identifier).default([]), provenance: z.string().optional(), capability: z.string().optional()
 }).strict();
+
+export const gameplayVariableSchema = gameplayVariableBaseSchema.superRefine((value, context) => {
+  if (value.array === true) {
+    if (value.array_size === undefined) context.addIssue({ code: "custom", path: ["array_size"], message: "Array variables require array_size." });
+    for (const field of ["initial", "default_value", "value"] as const) {
+      if (value[field] != null) context.addIssue({ code: "custom", path: [field], message: "Array variables cannot declare a scalar initial value." });
+    }
+  }
+});
 
 export const gameplayTriggerSchema = z.object({
   id: identifier, name: z.string().min(1), folder_path: z.string().min(1), enabled: z.boolean().optional(), initially_on: z.boolean().optional(),
@@ -167,7 +177,9 @@ export const gameplayTriggerSchema = z.object({
 }).strict();
 
 const gameplayTriggerUpdateSchema = gameplayTriggerSchema.partial().omit({ id: true });
-const gameplayVariableUpdateSchema = gameplayVariableSchema.partial().omit({ id: true });
+// Partial updates are validated again by the engine after merging with the
+// exact expected record; an existing array_size need not be repeated.
+const gameplayVariableUpdateSchema = gameplayVariableBaseSchema.partial().omit({ id: true });
 
 export const operationSchema = z.object({
   operation_id: uuidSchema,

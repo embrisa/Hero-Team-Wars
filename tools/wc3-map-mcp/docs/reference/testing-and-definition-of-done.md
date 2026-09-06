@@ -2,6 +2,10 @@
 
 ## Test layers
 
+`scripts/test.ps1` also checks send-catalog generation drift and executes actual
+preparation/purchase/plan/deployment JASS under bounded mocked natives. These
+source execution tests do not prove Warcraft behavior or multiplayer sync.
+
 Run `scripts/test.ps1` for the complete automated check. It publishes the engine
 from the tested sources before MCP integration runs and checks the immutable
 source hash in a finally block. `npm test` by itself cannot refresh the engine.

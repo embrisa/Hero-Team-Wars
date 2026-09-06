@@ -7,6 +7,18 @@ namespace Wc3MapEngine.Tests.Jass;
 
 public sealed class JassApiTests
 {
+    [Fact]
+    public void GroupedBooleanOperatorsAreNotCallsButNestedCallsStillValidate()
+    {
+        var valid = Validator.ValidateSource("function Test takes nothing returns boolean\nreturn true or (false and (not false))\nendfunction\n");
+        Assert.True(valid.IsValid, JassValidationFailure.Format(valid));
+        var invalid = Validator.ValidateSource("function Test takes nothing returns boolean\nreturn true or (NoSuchJassFunction())\nendfunction\n");
+        Assert.False(invalid.IsValid);
+        Assert.Contains(invalid.Errors, issue => issue.Function == "NoSuchJassFunction");
+        var native = Validator.ValidateSource("function Test takes nothing returns boolexpr\nreturn Or(null)\nendfunction\n");
+        Assert.False(native.IsValid);
+    }
+
     private const string AddUnitToStockDeclaration =
         "native AddUnitToStock               takes unit whichUnit, integer unitId, integer currentStock, integer stockMax returns nothing";
 

@@ -67,7 +67,7 @@ function HTW_HeroSelection_Complete takes nothing returns nothing
 endfunction
 
 function HTW_HeroSelection_SelectUnitForPlayer takes integer playerId, integer heroType, unit heroUnit returns boolean
-    if playerId < 1 or playerId > HTW_ActivePlayerCount or not HTW_Content_IsHeroType(heroType) then
+    if not HTW_Players_IsActive(playerId) or not HTW_Content_IsHeroType(heroType) then
         return false
     endif
     if HTW_HeroSelectedByPlayer[playerId] or HTW_HeroSelection_PlayerHasTeammateHero(playerId, heroType) then
@@ -96,7 +96,7 @@ function HTW_HeroSelection_AllPlayersReady takes nothing returns boolean
     set playerId = 1
     loop
         exitwhen playerId > HTW_ActivePlayerCount
-        if not HTW_HeroSelectedByPlayer[playerId] then
+        if HTW_Players_IsActive(playerId) and not HTW_HeroSelectedByPlayer[playerId] then
             return false
         endif
         set playerId = playerId + 1
@@ -159,7 +159,7 @@ function HTW_HeroSelection_OnTimeout takes nothing returns nothing
     set playerId = 1
     loop
         exitwhen playerId > HTW_ActivePlayerCount
-        if not HTW_HeroSelectedByPlayer[playerId] then
+        if HTW_Players_IsActive(playerId) and not HTW_HeroSelectedByPlayer[playerId] then
             call HTW_HeroSelection_AutoPick(playerId)
         endif
         set playerId = playerId + 1
@@ -188,11 +188,13 @@ function HTW_HeroSelection_Begin takes nothing returns nothing
         // Tavern hero purchases require an owned nearby patron. Give each
         // player a temporary Circle of Power beside the shared altar for the
         // selection window; it is removed after that player buys a hero.
-        set patronX = 216. + I2R((playerId - 1) * 64)
-        set HTW_HeroSelectionPatronByPlayer[playerId] = CreateUnit(p, 'ncop', patronX, -336., 270.)
-        if GetLocalPlayer() == p then
-            call PanCameraToTimed(216., -336., 0.)
-            call SelectUnit(HTW_HeroSelectionBuilding, true)
+        if HTW_Players_IsActive(playerId) then
+            set patronX = 216. + I2R((playerId - 1) * 64)
+            set HTW_HeroSelectionPatronByPlayer[playerId] = CreateUnit(p, 'ncop', patronX, -336., 270.)
+            if GetLocalPlayer() == p then
+                call PanCameraToTimed(216., -336., 0.)
+                call SelectUnit(HTW_HeroSelectionBuilding, true)
+            endif
         endif
         set playerId = playerId + 1
     endloop

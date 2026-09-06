@@ -20,7 +20,8 @@ public sealed class GameplayComposerTests
         Assert.Equal(first["source"]!.GetValue<string>(), second["source"]!.GetValue<string>());
         Assert.Equal("static_only", first["static_validation"]!["evidence_level"]!.GetValue<string>());
         Assert.Equal(1, first["main_count"]!.GetValue<int>());
-        Assert.Equal(26, first["module_order"]!.AsArray().Count);
+        Assert.Equal(28, first["module_order"]!.AsArray().Count);
+        Assert.Contains("multiboard array HTW_InformationBoard", first["source"]!.GetValue<string>());
         Assert.Contains("function config takes nothing returns nothing", first["source"]!.GetValue<string>());
         Assert.Contains("call SetPlayers(4)", first["source"]!.GetValue<string>());
         Assert.DoesNotContain("SetUnitStock", first["source"]!.GetValue<string>());

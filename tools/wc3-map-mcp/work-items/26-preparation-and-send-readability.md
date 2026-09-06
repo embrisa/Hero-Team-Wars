@@ -1,13 +1,13 @@
 # v26 task: Preparation and send readability
 
-Status: Blocked by missing baseline prerequisites, verified on 2026-09-06.
-The exact v25 map has no purchasable creep catalog, War Camp purchase binding,
-threat budget, or filler selection. See the
-[baseline assessment](../docs/compatibility/v26-baseline-assessment.md).
-The requirements below remain the intended outcome; implementation needs
-either the missing implementation as a baseline or an explicitly expanded
-scope to add those systems and define their roster and tuning. This task file
-does not itself change the map.
+Status: Implemented and published as v26; Warcraft runtime verification remains
+pending. See [build and handoff evidence](../docs/compatibility/v26-preparation-and-sends.md).
+On 2026-09-06 the user clarified that the
+roster/balance restriction was another agent's oversight and explicitly
+authorized changing any MVP units to develop and exercise MCP capabilities.
+The [baseline assessment](../docs/compatibility/v26-baseline-assessment.md)
+remains historical evidence, not a blocker. This task now includes the missing
+send catalog, purchase controls, budgets, planned deployment, and readability.
 
 ## Goal
 
@@ -29,7 +29,7 @@ Retain four players, two teams of two, and two mirrored arenas. Build on existin
 
 ### 1. War Camp purchase information
 
-For each existing purchasable creep, show its personal gold cost, threat value, role, and a brief description of its contribution. Read values from the same definitions used by purchasing and spawning so displayed and actual costs cannot drift. Preserve existing creep mechanics and roster.
+For each purchasable creep, show its personal gold cost, threat value, role, and a brief description of its contribution. Read values from the same definitions used by purchasing and spawning so displayed and actual costs cannot drift. The user's clarification permits establishing the missing roster and tuning its units.
 
 ### 2. Personal attack queue
 
@@ -52,8 +52,8 @@ Give a concise reason when a purchase is rejected: insufficient personal gold, i
 ## Scope boundaries
 
 - No additional custom hero abilities or changes to the working Controller kit.
-- No talents, new heroes, new creep roster, camp-tier expansion, imported assets, terrain redesign, or six-team expansion.
-- No economy or difficulty rebalance; fix only defects necessary for accurate purchasing and information, and document them.
+- No talents, new heroes, camp-tier expansion, imported assets, terrain redesign, or six-team expansion.
+- The user's clarification authorizes the missing creep roster, prices, threat budgets, and necessary economy/deployment changes; document the selected MVP values.
 - Preserve 15 starting shared lives, hero-death-only life loss, personal gold, existing routing and elimination rules, and preparation-only purchases.
 - No cancel/refund system or elaborate custom interface is required.
 
@@ -91,7 +91,7 @@ User checklist:
 
 1. Load the new map and confirm existing hero selection and Controller behavior still work.
 2. During preparation, identify incoming composition, total threat, your queue, available gold, remaining send budget, and destination without debug commands.
-3. Buy different existing creeps with both teammates; confirm personal charges and queue updates and the corresponding enemy preview.
+3. Buy different creeps with both teammates; confirm personal charges and queue updates and the corresponding enemy preview.
 4. Attempt unaffordable, over-budget, and combat-phase purchases; check the rejection reason and unchanged resources.
 5. Watch the entire staggered wave arrive and compare it with the final preparation preview.
 6. Play five consecutive waves; check timer, lives, levels, queue resets, and readable updates through deaths and revival. Check elimination labels when a team is eliminated.

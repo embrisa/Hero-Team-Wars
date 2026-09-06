@@ -173,6 +173,12 @@ inspect its script hash before authoring expected values. See the
 [engineering audit](../engineering-audit.md).
 
 Duplicate operation IDs (case-insensitive) are rejected before worker execution.
+Gameplay variable types include `multiboard` and existing `fogmodifier`.
+Typed input accepts `array` (boolean) and `array_size` (1-8191), matching engine
+source manifests; arrays cannot have scalar initial values. JASS source
+validation recognizes grouped lowercase `and`/`or` expressions while still
+validating nested calls and canonical `And`/`Or` natives. These additions do not
+change tool names, source-hash gates, or runtime-evidence requirements.
 All source-generating module/trigger/variable operations require script policy,
 including dry runs. Diffs include generated script hashes and derived registry
 changes performed after the typed batch, attributed to its final operation
@@ -262,6 +268,10 @@ runtime compatibility.
 
 A missing/non-array semantic comparison is `ENGINE_PROTOCOL_ERROR`, not an
 empty diff. Reports verify output size, hash and persisted reinspection identity.
+Canonical object-definition lists compare by unique stable `id`, so regrouping
+units/abilities by archive member on reopen is not a semantic change. Object
+values and modification order still compare normally; missing/duplicate IDs
+retain positional comparison. Archive order remains in archive evidence.
 `engine_result.output_path` identifies the final artifact, not its removed
 temporary directory.
 

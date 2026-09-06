@@ -10,4 +10,11 @@ function HTW_Tuning_Load takes nothing returns nothing
     set HTW_WaveReward = 50
     set HTW_InterestGold = 10
     set HTW_HeroSelectionSeconds = 60
+    set HTW_StartingGold = 60
+    set HTW_SendBudgetStart = 6
+    set HTW_SendBudgetGrowth = 2
+    set HTW_SendBudgetMaximum = 20
+    set HTW_BaseFootmen = 3
+    set HTW_FillerFootmen = 2
+    set HTW_FillerRiflemen = 1
 endfunction

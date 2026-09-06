@@ -1,5 +1,9 @@
 # v26 baseline assessment
 
+Historical assessment: the user subsequently authorized implementing the
+missing foundation and changing any MVP units on 2026-09-06. The scope blocker
+below is resolved; see [v26 implementation](v26-preparation-and-sends.md).
+
 The 2026-09-06 implementation inspection found that the v26 work item's
 "existing" purchase catalog, threat budgets, and neutral filler are absent
 from the exact v25 playable map. The task cannot meet its full acceptance

@@ -386,7 +386,9 @@ public sealed class JassValidationService
     }
 
     private static bool IsNonCallWord(string name)
-        => new[] { "if", "elseif", "loop", "exitwhen", "not", "function", "takes", "returns", "native", "call", "local", "type", "globals", "endglobals" }.Contains(name, StringComparer.OrdinalIgnoreCase);
+        // Lowercase boolean operators may precede grouped expressions. Keep
+        // canonical Or()/And() (boolexpr natives) in the actual call scanner.
+        => name is "and" or "or" || new[] { "if", "elseif", "loop", "exitwhen", "not", "function", "takes", "returns", "native", "call", "local", "type", "globals", "endglobals" }.Contains(name, StringComparer.OrdinalIgnoreCase);
 
     private static List<string> SplitArguments(string text)
     {
