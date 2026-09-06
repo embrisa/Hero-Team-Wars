@@ -1,6 +1,13 @@
 # v26 task: Preparation and send readability
 
-Status: Ready for implementation. This task file does not itself change the map.
+Status: Blocked by missing baseline prerequisites, verified on 2026-09-06.
+The exact v25 map has no purchasable creep catalog, War Camp purchase binding,
+threat budget, or filler selection. See the
+[baseline assessment](../docs/compatibility/v26-baseline-assessment.md).
+The requirements below remain the intended outcome; implementation needs
+either the missing implementation as a baseline or an explicitly expanded
+scope to add those systems and define their roster and tuning. This task file
+does not itself change the map.
 
 ## Goal
 
