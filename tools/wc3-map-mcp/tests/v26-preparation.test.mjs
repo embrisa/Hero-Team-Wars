@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createJassRuntime, rawcode } from './jass-runtime-harness.mjs';
+import { fixture, frameConstants, list, key, counts, plans, mirrorCalls, cell, cellData, hudData, incomingData, rootOf, snapshot, reject, buy } from './v28-runtime-fixture.mjs';
 
 // Evidence: repository JASS bodies executed with mocked natives ONLY.
 // This suite does not verify Warcraft runtime, object spell wiring, or multiplayer.
@@ -93,300 +94,6 @@ endfunction`;
   assert.throws(() => build(source + '\nfunction Wrong takes nothing returns nothing\ncall Store(Unit)\nendfunction'), /Unsupported type conversion/);
   assert.throws(() => build(source.replace('return previous', 'return UnknownFrameNative()')), /Unbound function\/native/);
 });
-
-// Symbolic stand-ins for native enum constants, not a Warcraft enum implementation.
-const frameConstants = { ORIGIN_FRAME_GAME_UI: 0, FRAMEPOINT_TOPLEFT: 1,
-  FRAMEPOINT_TOPRIGHT: 2, FRAMEPOINT_BOTTOMRIGHT: 3, TEXT_JUSTIFY_TOP: 4, TEXT_JUSTIFY_LEFT: 5 };
-const iconPaths = new Map(['AHds', 'Adef', 'n26C', 'hfoo', 'hrif', 'hkni', 'H001', 'H002', 'H003', 'H004']
-  .map(code => [rawcode(code), `mock-icon:${code}`]));
-
-function fixture({ localPlayerId = 1, prepare = true } = {}) {
-  assert.ok(Number.isInteger(localPlayerId) && localPlayerId >= 1 && localPlayerId <= 4);
-  // Read fresh on every fixture. A missing production module is a test failure.
-  const modules = ['core/state.j', 'core/debug.j', 'core/events.j', 'config/tuning.j',
-    'config/teams.j', 'content/send-catalog.j', 'content/send-units.j', 'content/base-waves.j', 'content/heroes.j',
-    'systems/economy.j', 'systems/sending.j', 'systems/waves.j', 'systems/phases.j',
-    'systems/routing.j', 'systems/elimination.j', 'systems/lives.j', 'systems/heroes.j',
-    'systems/information.j', 'systems/wave-plan.j', 'systems/hero-selection.j'];
-  const sources = modules.map(path => ({ path, source: read(path),
-    // The composer-generated profile setup is outside this source harness.
-    // Use only the real lookup body from this module; fixture profile data below
-    // supplies the same environment boundary as generated global declarations.
-    ...(path === 'config/teams.j' ? { only: ['HTW_Teams_FindByPlayer'] } : {}),
-    ...(path === 'systems/hero-selection.j' ? { only: ['HTW_HeroSelection_AllPlayersReady', 'HTW_HeroSelection_Complete'] } : {}) }));
-  const variables = readdirSync(new URL('variables/', root)).filter(path => path.endsWith('.variable.json'))
-    .flatMap(path => JSON.parse(read(`variables/${path}`)));
-  const globals = [...variables];
-  const add = (name, type, initial, array = false) => {
-    if (!globals.some(value => value.name === name)) globals.push(definition(name, type, initial, array));
-  };
-  // Explicit composer/native environment. Never infer undeclared gameplay globals.
-  for (const name of ['ActivePlayerCount', 'TeamCount', 'ArenaCount', 'LivingTeamCount', 'RouteOffset', 'RouteDestinationTeam']) add(`HTW_${name}`, 'integer');
-  for (const name of ['TeamMemberA', 'TeamMemberB', 'TeamDestination', 'LivingTeamIds']) add(`HTW_${name}`, 'integer', undefined, true);
-  add('HTW_TeamLiving', 'boolean', undefined, true);
-  add('HTW_RoutingLocked', 'boolean');
-  add('HTW_ArenaRect', 'rect', undefined, true);
-  for (const name of ['round_start', 'wave_resolved']) add(`HTW_Event_${name}`, 'real');
-  for (const [name, value] of Object.entries({ PLAYER_NEUTRAL_AGGRESSIVE: 12, MAP_CONTROL_USER: 1,
-    MAP_CONTROL_COMPUTER: 2, PLAYER_SLOT_STATE_PLAYING: 1, PLAYER_STATE_RESOURCE_GOLD: 1,
-    EVENT_PLAYER_UNIT_SPELL_EFFECT: 1, EVENT_GAME_LOADED: 3,
-    UNIT_STATE_LIFE: 0, UNIT_TYPE_DEAD: 1, PLAYER_STATE_GIVES_BOUNTY: 2,
-    ...frameConstants })) {
-    add(name, 'integer', value);
-    globals.find(global => global.name === name).constant = true;
-  }
-  const players = Array.from({ length: 25 }, (_, id) => ({ id, controller: 1, slot: 1, gold: 0 }));
-  const units = [];
-  const timers = [];
-  const frames = [];
-  const allocations = [];
-  const tooltipBindings = [];
-  const messages = [];
-  let enumUnit = null;
-  let triggerUnit = null;
-  let abilityId = 0;
-  let failedCreates = 0;
-  let handleId = 0;
-  const handle = (type, values = {}) => ({ handleId: ++handleId, handleType: type, ...values });
-  let gameUI = handle('framehandle', { name: 'gameUI' });
-  const requireFrame = frame => {
-    assert.ok(frame === gameUI || frames.includes(frame), 'native requires an allocated frame from this client');
-    assert.ok(!frame.invalid, 'native must not use a stale saved framehandle');
-    return frame;
-  };
-  const createFrame = (frameType, name, parent, inherits, priority, context, creationNative) => {
-    requireFrame(parent);
-    const frame = handle('framehandle', { frameType, name, parent, inherits, priority, context,
-      points: [], visible: true, enabled: true, text: '', texture: null });
-    frames.push(frame);
-    allocations.push({ creationNative, handleId: frame.handleId, frameType, name,
-      parent: parent.handleId, inherits, priority, context });
-    return frame;
-  };
-  const frameNative = (type, params, fn) => ({ ...native(type, params.length, fn),
-    params: params.map(type => ({ type })) });
-  const makeUnit = (owner, unitType, x, y, facing) => {
-    if (failedCreates > 0) { failedCreates--; return null; }
-    const unit = handle('unit', { owner, unitType, x, y, facing, life: 100, removed: false, orders: [] });
-    units.push(unit);
-    return unit;
-  };
-  const natives = {
-    Player: native('player', 1, id => { assert.ok(players[id], `unknown native player ${id}`); return players[id]; }),
-    GetPlayerId: native('integer', 1, player => player.id),
-    GetPlayerController: native('integer', 1, player => player.controller),
-    GetPlayerSlotState: native('integer', 1, player => player.slot),
-    GetOwningPlayer: native('player', 1, unit => unit.owner),
-    GetTriggerUnit: native('unit', 0, () => triggerUnit),
-    GetSpellAbilityId: native('integer', 0, () => abilityId),
-    SetPlayerState: native('nothing', 3, (player, state, value) => {
-      if (state === 1) player.gold = value;
-      else { assert.equal(state, 2); player.bounty = value; }
-    }),
-    GetPlayerState: native('integer', 2, (player, state) => { assert.equal(state, 1); return player.gold; }),
-    I2R: native('real', 1, value => value), I2S: native('string', 1, String),
-    R2I: native('integer', 1, Math.trunc), R2S: native('string', 1, String),
-    SubString: native('string', 3, (value, start, end) => value.substring(start, end)),
-    StringLength: native('integer', 1, value => value.length),
-    ModuloInteger: native('integer', 2, (a, b) => ((a % b) + b) % b),
-    GetRectCenterX: native('real', 1, rect => (rect.min_x + rect.max_x) / 2),
-    GetRectCenterY: native('real', 1, rect => (rect.min_y + rect.max_y) / 2),
-    CreateUnit: native('unit', 5, makeUnit),
-    CreateGroup: native('group', 0, () => handle('group', { units: new Set(), destroyed: false })),
-    GroupAddUnit: native('nothing', 2, (group, unit) => { assert.ok(unit); assert.equal(group.destroyed, false); group.units.add(unit); }),
-    GroupRemoveUnit: native('nothing', 2, (group, unit) => group.units.delete(unit)),
-    FirstOfGroup: native('unit', 1, group => [...group.units].find(unit => !unit.removed) ?? null),
-    ForGroup: native('nothing', 2, (group, callback) => {
-      const previous = enumUnit;
-      try { for (const unit of [...group.units]) { enumUnit = unit; callback(); } }
-      finally { enumUnit = previous; }
-    }),
-    GetEnumUnit: native('unit', 0, () => enumUnit),
-    DestroyGroup: native('nothing', 1, group => { group.destroyed = true; group.units.clear(); }),
-    GroupClear: native('nothing', 1, group => group.units.clear()),
-    RemoveUnit: native('nothing', 1, unit => { assert.ok(unit); unit.removed = true; }),
-    IssuePointOrder: native('boolean', 4, (unit, order, x, y) => { unit.orders.push({ order, x, y }); return true; }),
-    GetUnitState: native('real', 2, (unit, state) => { assert.equal(state, 0); return unit.life; }),
-    GetWidgetLife: native('real', 1, unit => unit.life),
-    GetHeroLevel: native('integer', 1, unit => unit.level ?? 1),
-    GetUnitTypeId: native('integer', 1, unit => unit?.removed ? 0 : unit?.unitType ?? 0),
-    IsUnitType: native('boolean', 2, (unit, type) => { assert.equal(type, 1); return unit.life <= 0 || unit.removed; }),
-    ReviveHero: native('boolean', 4, (unit, x, y, eyeCandy) => { assert.ok(unit); unit.life = 100; unit.x = x; unit.y = y; return true; }),
-    CreateTimer: native('timer', 0, () => { const timer = handle('timer', { active: false, remaining: 0 }); timers.push(timer); return timer; }),
-    TimerStart: native('nothing', 4, (timer, duration, periodic, callback) => {
-      assert.equal(typeof callback, 'function'); assert.ok(duration > 0);
-      Object.assign(timer, { active: true, duration, remaining: duration, periodic, callback });
-    }),
-    PauseTimer: native('nothing', 1, timer => { timer.active = false; }),
-    TimerGetRemaining: native('real', 1, timer => timer.remaining),
-    DestroyTimer: native('nothing', 1, timer => { timer.active = false; timer.destroyed = true; }),
-    GetPlayersAll: native('force', 0, () => players),
-    DisplayTextToForce: native('nothing', 2, (force, message) => messages.push({ audience: force, message })),
-    DisplayTimedTextToPlayer: native('nothing', 5, (player, x, y, seconds, message) => messages.push({ audience: player, message })),
-    DisplayTextToPlayer: native('nothing', 4, (player, x, y, message) => messages.push({ audience: player, message })),
-    GetLocalPlayer: native('player', 0, () => players[localPlayerId - 1]),
-    GetPlayerName: native('string', 1, player => `Player ${player.id + 1}`),
-    CreateTrigger: native('trigger', 0, () => handle('trigger', { events: [], actions: [] })),
-    TriggerRegisterPlayerUnitEvent: native('nothing', 4, (trigger, player, event, filter) => trigger.events.push({ player, event, filter })),
-    TriggerRegisterGameEvent: native('nothing', 2, (trigger, event) => {
-      assert.equal(trigger.handleType, 'trigger'); assert.equal(event, 3); trigger.events.push({ event });
-    }),
-    TriggerAddAction: native('nothing', 2, (trigger, callback) => trigger.actions.push(callback)),
-    DisableTrigger: native('nothing', 1, trigger => { trigger.disabled = true; }),
-    DestroyTrigger: native('nothing', 1, trigger => { trigger.destroyed = true; }),
-    BlzGetOriginFrame: frameNative('framehandle', ['integer', 'integer'], (origin, index) => {
-      assert.equal(origin, frameConstants.ORIGIN_FRAME_GAME_UI); assert.equal(index, 0); return gameUI;
-    }),
-    BlzCreateFrame: frameNative('framehandle', ['string', 'framehandle', 'integer', 'integer'], (name, parent, priority, context) => {
-      assert.equal(name, 'QuestButtonBaseTemplate');
-      return createFrame('BACKDROP', name, parent, name, priority, context, 'BlzCreateFrame');
-    }),
-    BlzCreateFrameByType: frameNative('framehandle', ['string', 'string', 'framehandle', 'string', 'integer'], (type, name, parent, inherits, context) => {
-      assert.ok(['TEXT', 'BUTTON', 'BACKDROP'].includes(type), `unsupported frame type ${type}`);
-      assert.ok(['', 'QuestButtonBaseTemplate'].includes(inherits), `unsupported frame template ${inherits}`);
-      return createFrame(type, name, parent, inherits, 0, context, 'BlzCreateFrameByType');
-    }),
-    BlzFrameSetPoint: frameNative('nothing', ['framehandle', 'integer', 'framehandle', 'integer', 'real', 'real'], (frame, point, relative, relativePoint, x, y) => {
-      requireFrame(frame); requireFrame(relative);
-      assert.ok([1, 2, 3].includes(point)); assert.ok([1, 2, 3].includes(relativePoint));
-      frame.points.push({ point, relative, relativePoint, x, y });
-    }),
-    BlzFrameSetAbsPoint: frameNative('nothing', ['framehandle', 'integer', 'real', 'real'], (frame, point, x, y) => {
-      requireFrame(frame); assert.ok([1, 2, 3].includes(point)); frame.points.push({ point, x, y });
-    }),
-    BlzFrameSetSize: frameNative('nothing', ['framehandle', 'real', 'real'], (frame, width, height) => {
-      assert.ok(width >= 0 && height >= 0); Object.assign(requireFrame(frame), { width, height });
-    }),
-    BlzFrameSetTextAlignment: frameNative('nothing', ['framehandle', 'integer', 'integer'], (frame, vertical, horizontal) => {
-      assert.equal(vertical, frameConstants.TEXT_JUSTIFY_TOP); assert.equal(horizontal, frameConstants.TEXT_JUSTIFY_LEFT);
-      requireFrame(frame).alignment = { vertical, horizontal };
-    }),
-    BlzFrameSetScale: frameNative('nothing', ['framehandle', 'real'], (frame, scale) => {
-      assert.ok(scale > 0); requireFrame(frame).scale = scale;
-    }),
-    BlzFrameSetEnable: frameNative('nothing', ['framehandle', 'boolean'], (frame, enabled) => { requireFrame(frame).enabled = enabled; }),
-    BlzFrameSetVisible: frameNative('nothing', ['framehandle', 'boolean'], (frame, visible) => { requireFrame(frame).visible = visible; }),
-    BlzFrameSetText: frameNative('nothing', ['framehandle', 'string'], (frame, text) => {
-      assert.equal(requireFrame(frame).frameType, 'TEXT'); frame.text = text;
-    }),
-    BlzFrameSetTexture: frameNative('nothing', ['framehandle', 'string', 'integer', 'boolean'], (frame, texture, flag, blend) => {
-      assert.equal(requireFrame(frame).frameType, 'BACKDROP'); assert.equal(flag, 0); assert.equal(blend, true);
-      frame.texture = texture;
-    }),
-    BlzFrameSetTooltip: frameNative('nothing', ['framehandle', 'framehandle'], (frame, tooltip) => {
-      requireFrame(frame); requireFrame(tooltip);
-      frame.tooltip = tooltip;
-      tooltipBindings.push({ frame: frame.handleId, tooltip: tooltip.handleId });
-    }),
-    BlzGetAbilityIcon: frameNative('string', ['integer'], code => {
-      assert.ok(iconPaths.has(code), `unmocked icon rawcode ${code}`); return iconPaths.get(code);
-    }),
-  };
-  const runtime = createJassRuntime({ sources, globals, natives });
-  const s = runtime.state;
-  const profile = JSON.parse(read('manifest.json')).profiles.mvp_2arena;
-  s.HTW_ActivePlayerCount = profile.active_player_ids.length;
-  s.HTW_TeamCount = profile.team_definitions.length;
-  s.HTW_ArenaCount = profile.arena_ids.length;
-  for (const [index, team] of profile.team_definitions.entries()) {
-    s.HTW_TeamMemberA[index + 1] = team.member_player_ids[0];
-    s.HTW_TeamMemberB[index + 1] = team.member_player_ids[1];
-    s.HTW_TeamLiving[index + 1] = true;
-    s.HTW_ArenaRect[index + 1] = JSON.parse(read('manifest.json')).regions.filter(region => /^Arena_[AB]$/.test(region.name))[index];
-  }
-  runtime.call('HTW_Tuning_Load');
-  runtime.call('HTW_State_Reset');
-  for (const playerId of profile.active_player_ids) {
-    if (prepare) {
-      const heroType = runtime.call('HTW_Content_HeroTypeForSlot', playerId);
-      s.HTW_HeroSelectedByPlayer[playerId] = true;
-      s.HTW_HeroAliveByPlayer[playerId] = true;
-      s.HTW_HeroTypeByPlayer[playerId] = heroType;
-      s.HTW_HeroUnitByPlayer[playerId] = makeUnit(players[playerId - 1], heroType, 0, 0, 0);
-    }
-    s.HTW_WarCampByPlayer[playerId] = makeUnit(players[playerId - 1], rawcode('hhou'), 0, 0, 0);
-    s.HTW_PlayerGold[playerId] = 200;
-    players[playerId - 1].gold = 200;
-  }
-  if (prepare) {
-    s.HTW_HeroSelectionComplete = true;
-    runtime.call('HTW_Waves_Prepare');
-    s.HTW_AliveHeroCount = profile.active_player_ids.length;
-  }
-  return { ...runtime, s, players, units, timers, messages, frames, allocations, tooltipBindings,
-    get gameUI() { return gameUI; },
-    simulateGameLoad() {
-      // Explicit environment boundary only; this does not emulate save files.
-      const trigger = s.HTW_HudLoadTrigger;
-      assert.deepEqual(trigger.events, [{ event: 3 }]);
-      assert.equal(trigger.actions.length, 1);
-      for (const frame of [...frames, gameUI]) frame.invalid = true;
-      gameUI = handle('framehandle', { name: 'gameUI' });
-      runtime.invoke(trigger.actions[0]);
-    },
-    creeps: () => units.filter(unit => unit.owner === players[12]),
-    failCreates: count => { failedCreates = count; },
-    spell(unit, ability) { triggerUnit = unit; abilityId = ability; runtime.call('HTW_Sending_OnPurchaseSpell'); },
-    death(unit) { triggerUnit = unit; runtime.call('HTW_Lives_AccountDeath'); },
-    fire(timer) {
-      assert.ok(timer?.active, 'timer must be active');
-      timer.remaining = 0;
-      if (!timer.periodic) timer.active = false;
-      runtime.invoke(timer.callback);
-      if (timer.periodic && timer.active) timer.remaining = timer.duration;
-    },
-  };
-}
-
-const list = (array, count, start = 1) => Array.from({ length: count }, (_, i) => array[i + start]);
-const key = (f, owner, kind) => f.call('HTW_PlanKey', owner, kind);
-const counts = (f, name, owner) => [1, 2, 3].map(kind => f.s[name][key(f, owner, kind)]);
-const plans = f => ['HTW_PlanBase', 'HTW_PlanSends', 'HTW_PlanFiller', 'HTW_PlanRemaining']
-  .map(name => Array.from({ length: 6 }, (_, team) => counts(f, name, team + 1)));
-const mirrorCalls = f => f.nativeCalls.filter(call => call.name === 'SetPlayerState');
-// Use the contract key independently of HTW_Information_Key so a stride/slot bug
-// cannot make both the implementation and its assertions agree accidentally.
-const cell = (f, viewer, slot) => {
-  const key = viewer * 32 + slot;
-  const icon = f.s.HTW_HudIcon[key];
-  const value = f.s.HTW_HudValue[key];
-  const tooltip = f.s.HTW_HudTooltipText[key];
-  assert.ok(icon && value && tooltip, `missing HUD cell ${viewer}:${slot}`);
-  return { icon, value, tooltip, hover: icon.parent };
-};
-const cellData = (f, viewer, slot) => {
-  const c = cell(f, viewer, slot);
-  return { icon: c.icon.texture, value: c.value.text, tooltip: c.tooltip.text };
-};
-const hudData = f => [1, 2, 3, 4].map(viewer => ({ title: f.s.HTW_HudTitle[viewer].text,
-  incoming: f.s.HTW_HudIncoming[viewer].text,
-  cells: Array.from({ length: 15 }, (_, slot) => cellData(f, viewer, slot + 1)) }));
-const incomingData = (f, viewer) => ({ summary: f.s.HTW_HudIncoming[viewer].text,
-  cells: [13, 14, 15].map(slot => cellData(f, viewer, slot)) });
-const rootOf = (f, frame) => {
-  while (frame.parent !== f.gameUI) { assert.ok(frame.parent); frame = frame.parent; }
-  return frame;
-};
-function snapshot(f) {
-  return { gold: list(f.s.HTW_PlayerGold, 24), nativeGold: f.players.map(player => player.gold),
-    threat: list(f.s.HTW_PlayerThreatUsed, 24), destination: list(f.s.HTW_PlayerQueueDestination, 24),
-    queues: Array.from({ length: 24 }, (_, p) => counts(f, 'HTW_PlayerQueueCount', p + 1)),
-    plans: plans(f), locked: f.s.HTW_SendPlanLocked, mirrors: mirrorCalls(f).length };
-}
-function reject(f, args, name = 'HTW_Economy_TryPurchase') {
-  const before = snapshot(f);
-  const traceStart = f.functionCalls.length;
-  assert.equal(f.call(name, ...args), false);
-  assert.equal(f.functionCalls.slice(traceStart).filter(name => name === 'HTW_Economy_Reject').length, 1, 'rejection invokes source feedback helper once');
-  assert.deepEqual(snapshot(f), before, `rejected ${name}(${args}) mutated purchase state`);
-}
-function buy(f, player, kind, quantity = 1) {
-  const start = f.functionCalls.length;
-  assert.equal(f.call('HTW_Economy_TryPurchase', player, kind, quantity), true);
-  for (const name of ['HTW_Economy_SyncGold', 'HTW_Waves_RefreshPlan', 'HTW_Information_Display']) {
-    assert.equal(f.functionCalls.slice(start).filter(called => called === name).length, 1, `${name} executes once per accepted purchase`);
-  }
-}
 
 test('catalog has three distinct purchase types with stable cost/threat and readable details', () => {
   const f = fixture();
@@ -711,6 +418,9 @@ test('HUD: source wiring defers allocation to the first runtime tick during sele
       .map(([, name, body]) => [name, body])));
   const init = JSON.parse(read('triggers/map-init.trigger.json'));
   assert.deepEqual(init.events, [{ type: 'map_initialization' }]);
+  for (const name of ['HTW_Dev_Initialize', 'HTW_DevMenu_Initialize']) {
+    assert.equal(init.actions.filter(action => action.type === 'call_function' && action.function === name).length, 1);
+  }
   const pending = init.actions.filter(action => action.type === 'call_function').map(action => action.function);
   const visited = new Set();
   while (pending.length) {
@@ -729,8 +439,15 @@ test('HUD: source wiring defers allocation to the first runtime tick during sele
   assert.equal(tick.initially_on, true);
   assert.deepEqual(tick.events, [{ type: 'periodic_timer', period: 1, repeat: true }]);
   assert.deepEqual(tick.conditions, [{ type: 'always' }]);
-  assert.equal(tick.actions.at(-1).function, 'HTW_Information_Display');
+  assert.deepEqual(tick.actions.slice(-2).map(action => action.function), ['HTW_Information_Display', 'HTW_DevMenu_Display']);
+  assert.ok(tick.actions.findIndex(action => action.function === 'HTW_Dev_Tick') >= 0);
+  assert.ok(tick.actions.findIndex(action => action.function === 'HTW_Dev_Tick') <
+    tick.actions.findIndex(action => action.function === 'HTW_Phases_Tick'));
   const f = fixture({ prepare: false });
+  f.call('HTW_Dev_Initialize');
+  f.call('HTW_DevMenu_Initialize');
+  assert.equal(f.nativeCalls.filter(call => call.name === 'TriggerRegisterPlayerChatEvent').length, 4);
+  assert.equal(f.nativeCalls.filter(call => call.name === 'TriggerRegisterGameEvent').length, 1);
   assert.equal(f.s.HTW_Phase, 0);
   assert.equal(f.s.HTW_InformationReady, false);
   assert.equal(f.frames.length, 0);

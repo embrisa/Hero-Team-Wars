@@ -4,6 +4,9 @@ The [v26 implementation](docs/compatibility/v26-preparation-and-sends.md) adds
 personal Camp purchases, mixed send queues, frozen wave plans and multiboards.
 The [v27 HUD](docs/compatibility/v27-icon-hud.md) replaces those large boards
 with compact icons, counters and hover tooltips while preserving v26 gameplay.
+The [v28 solo dev menu](docs/compatibility/v28-solo-dev-menu.md) adds collapsible
+buttons and `-dev` commands for phases, timer holds, gold, XP, levels, healing,
+lives and practice resets when only one human is playing the MVP.
 Typed variables additionally support `framehandle` alongside `multiboard` and
 `fogmodifier`, aligned across MCP, engine and versioned schema. Arrays require
 `array_size` (1-8191), reject scalar initial values and emit JASS declarations

@@ -13,6 +13,9 @@ function HTW_Phases_BeginCombat takes nothing returns nothing
     if HTW_MatchOver or HTW_Phase != 1 or HTW_TransitionGuard then
         return
     endif
+    if HTW_DevClockHeld and HTW_DevClockPhase == HTW_Phase then
+        return
+    endif
     set HTW_TransitionGuard = true
     call HTW_Waves_LockPlan()
     set HTW_Phase = 2
@@ -34,6 +37,9 @@ function HTW_Phases_BeginResolution takes nothing returns nothing
     if HTW_Phase != 2 or HTW_TransitionGuard then
         return
     endif
+    if HTW_DevClockHeld and HTW_DevClockPhase == HTW_Phase and not HTW_MatchOver then
+        return
+    endif
     set HTW_TransitionGuard = true
     set HTW_Phase = 3
     set HTW_TransitionGuard = false
@@ -42,6 +48,11 @@ endfunction
 
 function HTW_Phases_Tick takes nothing returns nothing
     if HTW_MatchOver and not (HTW_WaveActive and HTW_Phase == 2) then
+        return
+    endif
+    if HTW_DevClockHeld and HTW_DevClockPhase == HTW_Phase and not HTW_MatchOver then
+        // A paused timer may read zero; preparation purchases still update plans.
+        call HTW_Waves_RefreshPlan()
         return
     endif
     if HTW_Phase == 0 and HTW_HeroSelection_AllPlayersReady() then

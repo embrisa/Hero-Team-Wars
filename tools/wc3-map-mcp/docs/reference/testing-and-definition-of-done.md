@@ -9,6 +9,12 @@ visibility, and preview lifecycle with explicit mocked frame natives. These
 source execution tests do not prove Warcraft rendering, hover/click behavior or
 multiplayer sync.
 
+Solo dev-control tests also execute the production JASS for eligibility, strict
+numeric/chat parsing, gold/hero changes, hold/resume callbacks, phase/reward
+behavior, cleanup and resets. Mocked chat and synchronized frame events exercise
+the shared handler, frame ownership and rebuilding after load. This evidence
+does not establish native event synchronization or in-game button behavior.
+
 Run `scripts/test.ps1` for the complete automated check. It publishes the engine
 from the tested sources before MCP integration runs and checks the immutable
 source hash in a finally block. `npm test` by itself cannot refresh the engine.

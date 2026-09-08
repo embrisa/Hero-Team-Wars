@@ -20,7 +20,7 @@ public sealed class GameplayComposerTests
         Assert.Equal(first["source"]!.GetValue<string>(), second["source"]!.GetValue<string>());
         Assert.Equal("static_only", first["static_validation"]!["evidence_level"]!.GetValue<string>());
         Assert.Equal(1, first["main_count"]!.GetValue<int>());
-        Assert.Equal(28, first["module_order"]!.AsArray().Count);
+        Assert.Equal(30, first["module_order"]!.AsArray().Count);
         Assert.Matches(@"(?m)^    framehandle array HTW_HudRoot\r?$", first["source"]!.GetValue<string>());
         var hudRoot = first["canonical_model"]!["gameplay_variables"]!.AsArray().OfType<JsonObject>().Single(variable => variable["name"]!.GetValue<string>() == "HTW_HudRoot");
         Assert.True(hudRoot["array"]!.GetValue<bool>());

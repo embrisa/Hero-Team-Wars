@@ -1,0 +1,10 @@
+[
+  { "id": "dev_enabled", "name": "HTW_DevEnabled", "type": "boolean", "initial": true, "provenance": "source_of_truth", "capability": "mcp_native_jass" },
+  { "id": "dev_used", "name": "HTW_DevUsed", "type": "boolean", "initial": false, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_menu_open", "name": "HTW_DevMenuOpen", "type": "boolean", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_clock_held", "name": "HTW_DevClockHeld", "type": "boolean", "initial": false, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_clock_phase", "name": "HTW_DevClockPhase", "type": "integer", "initial": 0, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_clock_remaining", "name": "HTW_DevClockRemaining", "type": "real", "initial": 0, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_clock_player", "name": "HTW_DevClockPlayer", "type": "integer", "initial": 0, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_chat_trigger", "name": "HTW_DevChatTrigger", "type": "trigger", "provenance": "runtime_state", "capability": "mcp_native_jass" }
+]

@@ -254,7 +254,7 @@ function jassArray(type) {
 
 // Each native is explicit: { type: JASS return type, arity, fn }. HTW_* mocks
 // are forbidden so tests cannot quietly substitute a second gameplay model.
-export function createJassRuntime({ sources, globals = [], natives = {}, timeout = 100, maxSteps = 10000 }) {
+export function createJassRuntime({ sources, globals = [], natives = {}, variableEvents = [], timeout = 100, maxSteps = 10000 }) {
   if (!Number.isSafeInteger(maxSteps) || maxSteps < 1 || !Number.isSafeInteger(timeout) || timeout < 1) throw new Error('Invalid execution bounds');
   const functions = parseSources(sources);
   const symbols = new Map();
@@ -286,6 +286,39 @@ export function createJassRuntime({ sources, globals = [], natives = {}, timeout
     function __integer(value) { if (!Number.isSafeInteger(value) || value < -2147483648 || value > 2147483647) throw new Error("Unsupported JASS integer overflow"); return value; }
     function __integerDivide(a,b) { if (b === 0) throw new Error("JASS division by zero"); return __integer(Math.trunc(a/b)); }
     ${compiled}`, { filename: 'repository-jass.mocked.js' }).runInContext(context, { timeout });
+  // Explicit native variable-event boundary. Run the registered source actions
+  // synchronously on an unequal -> equal transition, within the SAME bounded
+  // invocation. This models the composer's TriggerRegisterVariableEvent wiring,
+  // including nested wave_resolved -> Waves_Prepare calls, without HTW mocks.
+  const eventCalls = [];
+  const registrations = new Map();
+  for (const event of variableEvents) {
+    const symbol = symbols.get(event.name);
+    if (!symbol || symbol.array || !numeric(symbol.type) || symbol.constant ||
+        !Number.isFinite(event.equals) || !Array.isArray(event.actions)) throw new Error('Invalid variable event');
+    for (const action of event.actions) {
+      if (!functions.has(action) || signatures.get(action).arity !== 0 || signatures.get(action).type !== 'nothing') {
+        throw new Error(`Invalid variable event action ${action}`);
+      }
+    }
+    if (!registrations.has(event.name)) registrations.set(event.name, []);
+    registrations.get(event.name).push(event);
+  }
+  for (const [name, events] of registrations) {
+    let value = sandbox[jsName(name)];
+    Object.defineProperty(sandbox, jsName(name), {
+      get: () => value,
+      set(next) {
+        const previous = value;
+        value = next;
+        for (const event of events) if (previous !== event.equals && next === event.equals) {
+          eventCalls.push({ name, value: next, actions: [...event.actions] });
+          for (const action of event.actions) sandbox[jsName(action)]();
+        }
+      },
+      configurable: false,
+    });
+  }
   const state = new Proxy(Object.create(null), {
     get(_target, name) {
       if (!symbols.has(name)) throw new Error(`Unknown global ${String(name)}`);
@@ -305,7 +338,7 @@ export function createJassRuntime({ sources, globals = [], natives = {}, timeout
       return new vm.Script('__steps = 0; __callback(...__args)', { filename: 'jass-test-entry.js' }).runInContext(context, { timeout });
     } finally { delete sandbox.__callback; delete sandbox.__args; }
   }
-  return { state, nativeCalls, functionCalls, functions: [...functions.keys()],
+  return { state, nativeCalls, functionCalls, eventCalls, functions: [...functions.keys()],
     call(name, ...args) {
       if (!functions.has(name)) throw new Error(`Missing repository JASS function ${name}`);
       if (args.length !== signatures.get(name).arity) throw new Error(`Wrong argument count for ${name}`);

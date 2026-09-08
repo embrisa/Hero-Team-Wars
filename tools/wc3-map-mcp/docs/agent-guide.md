@@ -54,6 +54,13 @@ All frame allocation and data updates are synchronized; only root visibility
 is local. Visual, hover and multiplayer behavior still need exact-build user
 verification.
 
+The [v28 solo dev menu](compatibility/v28-solo-dev-menu.md) adds synchronized
+buttons and strict `-dev` commands for solo practice. It rechecks the sole
+active human on each action; only frame visibility is local. Use the documented
+v28 driver to preserve the exact v27 map and all unrelated gameplay. Timer
+holds, phase jumps and practice resets have source tests; game behavior remains
+unverified until the user reports the exact build. No MCP contract changed.
+
 Read the [engineering audit](engineering-audit.md) for remaining structural
 risks, including implicit gameplay seeding in script-enabled transactions,
 stale object fixtures and scenarios that model rules without executing JASS.

@@ -33,8 +33,14 @@ function HTW_Information_Phase takes nothing returns string
     elseif HTW_Phase == 0 then
         return "Hero selection | " + HTW_Information_Seconds(HTW_HeroSelectionTimer)
     elseif HTW_Phase == 1 then
+        if HTW_DevClockHeld and HTW_DevClockPhase == 1 then
+            return "Preparation | " + HTW_Information_Seconds(HTW_PreparationTimer) + " HELD"
+        endif
         return "Preparation | " + HTW_Information_Seconds(HTW_PreparationTimer)
     elseif HTW_Phase == 2 then
+        if HTW_DevClockHeld and HTW_DevClockPhase == 2 then
+            return "Combat | " + HTW_Information_Seconds(HTW_CombatTimer) + " HELD"
+        endif
         return "Combat | " + HTW_Information_Seconds(HTW_CombatTimer)
     endif
     return "Resolution"

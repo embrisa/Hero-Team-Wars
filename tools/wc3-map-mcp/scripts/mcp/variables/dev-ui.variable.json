@@ -1,0 +1,9 @@
+[
+  { "id": "dev_ui_ready", "name": "HTW_DevUIReady", "type": "boolean", "initial": false, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_ui_root", "name": "HTW_DevUIRoot", "type": "framehandle", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_ui_panel", "name": "HTW_DevUIPanel", "type": "framehandle", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_ui_title", "name": "HTW_DevUITitle", "type": "framehandle", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_ui_button", "name": "HTW_DevUIButton", "type": "framehandle", "array": true, "array_size": 81, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_ui_click", "name": "HTW_DevUIClick", "type": "trigger", "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "dev_ui_load", "name": "HTW_DevUILoad", "type": "trigger", "provenance": "runtime_state", "capability": "mcp_native_jass" }
+]

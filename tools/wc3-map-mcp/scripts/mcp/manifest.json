@@ -36,6 +36,8 @@
     { "id": "systems.sending", "path": "systems/sending.j", "dependencies": ["systems.economy", "systems.waves", "content.send-units"] },
     { "id": "systems.routing", "path": "systems/routing.j", "dependencies": ["core.state", "systems.elimination"] },
     { "id": "systems.information", "path": "systems/information.j", "dependencies": ["core.debug", "systems.routing"] },
+    { "id": "systems.dev-tools", "path": "systems/dev-tools.j", "dependencies": ["systems.information", "systems.waves", "systems.hero-selection"] },
+    { "id": "systems.dev-menu", "path": "systems/dev-menu.j", "dependencies": ["systems.dev-tools", "systems.information"] },
     { "id": "content.base-waves", "path": "content/base-waves.j", "dependencies": ["core.state", "config.regions", "config.objects"] },
     { "id": "content.send-units", "path": "content/send-units.j", "dependencies": ["core.state", "config.regions"] },
     { "id": "content.heroes", "path": "content/heroes.j", "dependencies": ["core.state", "config.regions"] },
@@ -115,6 +117,8 @@
     "variables/phase.variable.json",
     "variables/runtime.variable.json",
     "variables/sending.variable.json",
-    "variables/information.variable.json"
+    "variables/information.variable.json",
+    "variables/dev.variable.json",
+    "variables/dev-ui.variable.json"
   ]
 }
