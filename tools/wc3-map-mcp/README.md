@@ -2,10 +2,16 @@
 
 The [v26 implementation](docs/compatibility/v26-preparation-and-sends.md) adds
 personal Camp purchases, mixed send queues, frozen wave plans and multiboards.
-Typed array/multiboard variable support is aligned across MCP/engine/schema;
-grouped boolean JASS validation is repaired. Tool names and evidence gates are
-unchanged. `scripts/test.ps1` checks catalog generation and production JASS with
-mocked natives before engine/MCP suites; this is not Warcraft runtime evidence.
+The [v27 HUD](docs/compatibility/v27-icon-hud.md) replaces those large boards
+with compact icons, counters and hover tooltips while preserving v26 gameplay.
+Typed variables additionally support `framehandle` alongside `multiboard` and
+`fogmodifier`, aligned across MCP, engine and versioned schema. Arrays require
+`array_size` (1-8191), reject scalar initial values and emit JASS declarations
+without an inline size, such as `framehandle array HTW_HudRoot`.
+The type allow-list remains closed; grouped boolean JASS validation is repaired.
+Tool names and evidence gates are unchanged. `scripts/test.ps1` checks catalog
+generation and production JASS with mocked natives before engine/MCP suites;
+this is not Warcraft runtime evidence.
 Object definitions compare by stable identity across archive regrouping, while
 field values and modification order remain part of semantic comparison.
 

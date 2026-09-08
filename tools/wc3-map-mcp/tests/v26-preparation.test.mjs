@@ -72,7 +72,36 @@ test('harness: unsupported/unbound syntax fails closed and execution is bounded'
   assert.throws(() => build('set Value = 7 / 0', { globals }).call('Probe'), /division by zero/);
 });
 
-function fixture() {
+test('harness: framehandle locals, parameters, returns and arrays retain strict handle typing', () => {
+  const source = `function Store takes framehandle frame returns framehandle
+    local framehandle previous = Frames[1]
+    set Frames[1] = frame
+    return previous
+endfunction`;
+  const globals = [definition('Frames', 'framehandle', undefined, true), definition('Unit', 'unit')];
+  const build = source => createJassRuntime({ sources: [{ path: 'frame-self-test.j', source }], globals });
+  const f = build(source);
+  const frame = { handleType: 'framehandle' };
+  assert.equal(f.state.Frames[1], null);
+  assert.equal(f.call('Store', frame), null);
+  assert.equal(f.state.Frames[1], frame);
+  assert.equal(f.call('Store', null), frame);
+  assert.equal(f.state.Frames[1], null);
+  for (const value of ['1', 'true', 'Unit']) {
+    assert.throws(() => build(source.replace('set Frames[1] = frame', `set Frames[1] = ${value}`)), /Unsupported type conversion/);
+  }
+  assert.throws(() => build(source + '\nfunction Wrong takes nothing returns nothing\ncall Store(Unit)\nendfunction'), /Unsupported type conversion/);
+  assert.throws(() => build(source.replace('return previous', 'return UnknownFrameNative()')), /Unbound function\/native/);
+});
+
+// Symbolic stand-ins for native enum constants, not a Warcraft enum implementation.
+const frameConstants = { ORIGIN_FRAME_GAME_UI: 0, FRAMEPOINT_TOPLEFT: 1,
+  FRAMEPOINT_TOPRIGHT: 2, FRAMEPOINT_BOTTOMRIGHT: 3, TEXT_JUSTIFY_TOP: 4, TEXT_JUSTIFY_LEFT: 5 };
+const iconPaths = new Map(['AHds', 'Adef', 'n26C', 'hfoo', 'hrif', 'hkni', 'H001', 'H002', 'H003', 'H004']
+  .map(code => [rawcode(code), `mock-icon:${code}`]));
+
+function fixture({ localPlayerId = 1, prepare = true } = {}) {
+  assert.ok(Number.isInteger(localPlayerId) && localPlayerId >= 1 && localPlayerId <= 4);
   // Read fresh on every fixture. A missing production module is a test failure.
   const modules = ['core/state.j', 'core/debug.j', 'core/events.j', 'config/tuning.j',
     'config/teams.j', 'content/send-catalog.j', 'content/send-units.j', 'content/base-waves.j', 'content/heroes.j',
@@ -100,14 +129,18 @@ function fixture() {
   for (const name of ['round_start', 'wave_resolved']) add(`HTW_Event_${name}`, 'real');
   for (const [name, value] of Object.entries({ PLAYER_NEUTRAL_AGGRESSIVE: 12, MAP_CONTROL_USER: 1,
     MAP_CONTROL_COMPUTER: 2, PLAYER_SLOT_STATE_PLAYING: 1, PLAYER_STATE_RESOURCE_GOLD: 1,
-    EVENT_PLAYER_UNIT_SPELL_EFFECT: 1, UNIT_STATE_LIFE: 0, UNIT_TYPE_DEAD: 1, PLAYER_STATE_GIVES_BOUNTY: 2 })) {
+    EVENT_PLAYER_UNIT_SPELL_EFFECT: 1, EVENT_GAME_LOADED: 3,
+    UNIT_STATE_LIFE: 0, UNIT_TYPE_DEAD: 1, PLAYER_STATE_GIVES_BOUNTY: 2,
+    ...frameConstants })) {
     add(name, 'integer', value);
     globals.find(global => global.name === name).constant = true;
   }
   const players = Array.from({ length: 25 }, (_, id) => ({ id, controller: 1, slot: 1, gold: 0 }));
   const units = [];
   const timers = [];
-  const boards = [];
+  const frames = [];
+  const allocations = [];
+  const tooltipBindings = [];
   const messages = [];
   let enumUnit = null;
   let triggerUnit = null;
@@ -115,6 +148,23 @@ function fixture() {
   let failedCreates = 0;
   let handleId = 0;
   const handle = (type, values = {}) => ({ handleId: ++handleId, handleType: type, ...values });
+  let gameUI = handle('framehandle', { name: 'gameUI' });
+  const requireFrame = frame => {
+    assert.ok(frame === gameUI || frames.includes(frame), 'native requires an allocated frame from this client');
+    assert.ok(!frame.invalid, 'native must not use a stale saved framehandle');
+    return frame;
+  };
+  const createFrame = (frameType, name, parent, inherits, priority, context, creationNative) => {
+    requireFrame(parent);
+    const frame = handle('framehandle', { frameType, name, parent, inherits, priority, context,
+      points: [], visible: true, enabled: true, text: '', texture: null });
+    frames.push(frame);
+    allocations.push({ creationNative, handleId: frame.handleId, frameType, name,
+      parent: parent.handleId, inherits, priority, context });
+    return frame;
+  };
+  const frameNative = (type, params, fn) => ({ ...native(type, params.length, fn),
+    params: params.map(type => ({ type })) });
   const makeUnit = (owner, unitType, x, y, facing) => {
     if (failedCreates > 0) { failedCreates--; return null; }
     const unit = handle('unit', { owner, unitType, x, y, facing, life: 100, removed: false, orders: [] });
@@ -174,30 +224,63 @@ function fixture() {
     DisplayTextToForce: native('nothing', 2, (force, message) => messages.push({ audience: force, message })),
     DisplayTimedTextToPlayer: native('nothing', 5, (player, x, y, seconds, message) => messages.push({ audience: player, message })),
     DisplayTextToPlayer: native('nothing', 4, (player, x, y, message) => messages.push({ audience: player, message })),
-    GetLocalPlayer: native('player', 0, () => players[0]),
+    GetLocalPlayer: native('player', 0, () => players[localPlayerId - 1]),
     GetPlayerName: native('string', 1, player => `Player ${player.id + 1}`),
     CreateTrigger: native('trigger', 0, () => handle('trigger', { events: [], actions: [] })),
     TriggerRegisterPlayerUnitEvent: native('nothing', 4, (trigger, player, event, filter) => trigger.events.push({ player, event, filter })),
+    TriggerRegisterGameEvent: native('nothing', 2, (trigger, event) => {
+      assert.equal(trigger.handleType, 'trigger'); assert.equal(event, 3); trigger.events.push({ event });
+    }),
     TriggerAddAction: native('nothing', 2, (trigger, callback) => trigger.actions.push(callback)),
     DisableTrigger: native('nothing', 1, trigger => { trigger.disabled = true; }),
     DestroyTrigger: native('nothing', 1, trigger => { trigger.destroyed = true; }),
-    CreateMultiboard: native('multiboard', 0, () => {
-      const board = handle('multiboard', { rows: [], rowCount: 0, columnCount: 0, visible: false, items: [] });
-      boards.push(board); return board;
+    BlzGetOriginFrame: frameNative('framehandle', ['integer', 'integer'], (origin, index) => {
+      assert.equal(origin, frameConstants.ORIGIN_FRAME_GAME_UI); assert.equal(index, 0); return gameUI;
     }),
-    MultiboardSetTitleText: native('nothing', 2, (board, title) => { board.title = title; }),
-    MultiboardSetColumnCount: native('nothing', 2, (board, count) => { board.columnCount = count; }),
-    MultiboardSetRowCount: native('nothing', 2, (board, count) => { board.rowCount = count; }),
-    MultiboardGetItem: native('multiboarditem', 3, (board, row, column) => {
-      assert.ok(row >= 0 && row < board.rowCount); assert.ok(column >= 0 && column < board.columnCount);
-      const item = handle('multiboarditem', { board, row, column, released: false });
-      board.items.push(item); return item;
+    BlzCreateFrame: frameNative('framehandle', ['string', 'framehandle', 'integer', 'integer'], (name, parent, priority, context) => {
+      assert.equal(name, 'QuestButtonBaseTemplate');
+      return createFrame('BACKDROP', name, parent, name, priority, context, 'BlzCreateFrame');
     }),
-    MultiboardSetItemValue: native('nothing', 2, (item, value) => { assert.equal(item.released, false); item.board.rows[item.row] = value; }),
-    MultiboardSetItemStyle: native('nothing', 3, (item, text, icon) => { item.style = { text, icon }; }),
-    MultiboardSetItemWidth: native('nothing', 2, (item, width) => { item.width = width; }),
-    MultiboardReleaseItem: native('nothing', 1, item => { assert.equal(item.released, false); item.released = true; }),
-    MultiboardDisplay: native('nothing', 2, (board, visible) => { board.visible = visible; }),
+    BlzCreateFrameByType: frameNative('framehandle', ['string', 'string', 'framehandle', 'string', 'integer'], (type, name, parent, inherits, context) => {
+      assert.ok(['TEXT', 'BUTTON', 'BACKDROP'].includes(type), `unsupported frame type ${type}`);
+      assert.ok(['', 'QuestButtonBaseTemplate'].includes(inherits), `unsupported frame template ${inherits}`);
+      return createFrame(type, name, parent, inherits, 0, context, 'BlzCreateFrameByType');
+    }),
+    BlzFrameSetPoint: frameNative('nothing', ['framehandle', 'integer', 'framehandle', 'integer', 'real', 'real'], (frame, point, relative, relativePoint, x, y) => {
+      requireFrame(frame); requireFrame(relative);
+      assert.ok([1, 2, 3].includes(point)); assert.ok([1, 2, 3].includes(relativePoint));
+      frame.points.push({ point, relative, relativePoint, x, y });
+    }),
+    BlzFrameSetAbsPoint: frameNative('nothing', ['framehandle', 'integer', 'real', 'real'], (frame, point, x, y) => {
+      requireFrame(frame); assert.ok([1, 2, 3].includes(point)); frame.points.push({ point, x, y });
+    }),
+    BlzFrameSetSize: frameNative('nothing', ['framehandle', 'real', 'real'], (frame, width, height) => {
+      assert.ok(width >= 0 && height >= 0); Object.assign(requireFrame(frame), { width, height });
+    }),
+    BlzFrameSetTextAlignment: frameNative('nothing', ['framehandle', 'integer', 'integer'], (frame, vertical, horizontal) => {
+      assert.equal(vertical, frameConstants.TEXT_JUSTIFY_TOP); assert.equal(horizontal, frameConstants.TEXT_JUSTIFY_LEFT);
+      requireFrame(frame).alignment = { vertical, horizontal };
+    }),
+    BlzFrameSetScale: frameNative('nothing', ['framehandle', 'real'], (frame, scale) => {
+      assert.ok(scale > 0); requireFrame(frame).scale = scale;
+    }),
+    BlzFrameSetEnable: frameNative('nothing', ['framehandle', 'boolean'], (frame, enabled) => { requireFrame(frame).enabled = enabled; }),
+    BlzFrameSetVisible: frameNative('nothing', ['framehandle', 'boolean'], (frame, visible) => { requireFrame(frame).visible = visible; }),
+    BlzFrameSetText: frameNative('nothing', ['framehandle', 'string'], (frame, text) => {
+      assert.equal(requireFrame(frame).frameType, 'TEXT'); frame.text = text;
+    }),
+    BlzFrameSetTexture: frameNative('nothing', ['framehandle', 'string', 'integer', 'boolean'], (frame, texture, flag, blend) => {
+      assert.equal(requireFrame(frame).frameType, 'BACKDROP'); assert.equal(flag, 0); assert.equal(blend, true);
+      frame.texture = texture;
+    }),
+    BlzFrameSetTooltip: frameNative('nothing', ['framehandle', 'framehandle'], (frame, tooltip) => {
+      requireFrame(frame); requireFrame(tooltip);
+      frame.tooltip = tooltip;
+      tooltipBindings.push({ frame: frame.handleId, tooltip: tooltip.handleId });
+    }),
+    BlzGetAbilityIcon: frameNative('string', ['integer'], code => {
+      assert.ok(iconPaths.has(code), `unmocked icon rawcode ${code}`); return iconPaths.get(code);
+    }),
   };
   const runtime = createJassRuntime({ sources, globals, natives });
   const s = runtime.state;
@@ -214,17 +297,33 @@ function fixture() {
   runtime.call('HTW_Tuning_Load');
   runtime.call('HTW_State_Reset');
   for (const playerId of profile.active_player_ids) {
-    s.HTW_HeroSelectedByPlayer[playerId] = true;
-    s.HTW_HeroAliveByPlayer[playerId] = true;
-    s.HTW_HeroUnitByPlayer[playerId] = makeUnit(players[playerId - 1], rawcode('Hpal'), 0, 0, 0);
+    if (prepare) {
+      const heroType = runtime.call('HTW_Content_HeroTypeForSlot', playerId);
+      s.HTW_HeroSelectedByPlayer[playerId] = true;
+      s.HTW_HeroAliveByPlayer[playerId] = true;
+      s.HTW_HeroTypeByPlayer[playerId] = heroType;
+      s.HTW_HeroUnitByPlayer[playerId] = makeUnit(players[playerId - 1], heroType, 0, 0, 0);
+    }
     s.HTW_WarCampByPlayer[playerId] = makeUnit(players[playerId - 1], rawcode('hhou'), 0, 0, 0);
     s.HTW_PlayerGold[playerId] = 200;
     players[playerId - 1].gold = 200;
   }
-  s.HTW_HeroSelectionComplete = true;
-  runtime.call('HTW_Waves_Prepare');
-  s.HTW_AliveHeroCount = profile.active_player_ids.length;
-  return { ...runtime, s, players, units, timers, messages, boards,
+  if (prepare) {
+    s.HTW_HeroSelectionComplete = true;
+    runtime.call('HTW_Waves_Prepare');
+    s.HTW_AliveHeroCount = profile.active_player_ids.length;
+  }
+  return { ...runtime, s, players, units, timers, messages, frames, allocations, tooltipBindings,
+    get gameUI() { return gameUI; },
+    simulateGameLoad() {
+      // Explicit environment boundary only; this does not emulate save files.
+      const trigger = s.HTW_HudLoadTrigger;
+      assert.deepEqual(trigger.events, [{ event: 3 }]);
+      assert.equal(trigger.actions.length, 1);
+      for (const frame of [...frames, gameUI]) frame.invalid = true;
+      gameUI = handle('framehandle', { name: 'gameUI' });
+      runtime.invoke(trigger.actions[0]);
+    },
     creeps: () => units.filter(unit => unit.owner === players[12]),
     failCreates: count => { failedCreates = count; },
     spell(unit, ability) { triggerUnit = unit; abilityId = ability; runtime.call('HTW_Sending_OnPurchaseSpell'); },
@@ -245,6 +344,29 @@ const counts = (f, name, owner) => [1, 2, 3].map(kind => f.s[name][key(f, owner,
 const plans = f => ['HTW_PlanBase', 'HTW_PlanSends', 'HTW_PlanFiller', 'HTW_PlanRemaining']
   .map(name => Array.from({ length: 6 }, (_, team) => counts(f, name, team + 1)));
 const mirrorCalls = f => f.nativeCalls.filter(call => call.name === 'SetPlayerState');
+// Use the contract key independently of HTW_Information_Key so a stride/slot bug
+// cannot make both the implementation and its assertions agree accidentally.
+const cell = (f, viewer, slot) => {
+  const key = viewer * 32 + slot;
+  const icon = f.s.HTW_HudIcon[key];
+  const value = f.s.HTW_HudValue[key];
+  const tooltip = f.s.HTW_HudTooltipText[key];
+  assert.ok(icon && value && tooltip, `missing HUD cell ${viewer}:${slot}`);
+  return { icon, value, tooltip, hover: icon.parent };
+};
+const cellData = (f, viewer, slot) => {
+  const c = cell(f, viewer, slot);
+  return { icon: c.icon.texture, value: c.value.text, tooltip: c.tooltip.text };
+};
+const hudData = f => [1, 2, 3, 4].map(viewer => ({ title: f.s.HTW_HudTitle[viewer].text,
+  incoming: f.s.HTW_HudIncoming[viewer].text,
+  cells: Array.from({ length: 15 }, (_, slot) => cellData(f, viewer, slot + 1)) }));
+const incomingData = (f, viewer) => ({ summary: f.s.HTW_HudIncoming[viewer].text,
+  cells: [13, 14, 15].map(slot => cellData(f, viewer, slot)) });
+const rootOf = (f, frame) => {
+  while (frame.parent !== f.gameUI) { assert.ok(frame.parent); frame = frame.parent; }
+  return frame;
+};
 function snapshot(f) {
   return { gold: list(f.s.HTW_PlayerGold, 24), nativeGold: f.players.map(player => player.gold),
     threat: list(f.s.HTW_PlayerThreatUsed, 24), destination: list(f.s.HTW_PlayerQueueDestination, 24),
@@ -582,36 +704,352 @@ test('real life-loss handler performs arena cleanup once and terminal resolution
   assert.equal(f.s.HTW_WaveActive, false);
 });
 
-test('information board source renders personal receipts and full locked plans, then hides stale rows', () => {
+test('HUD: source wiring defers allocation to the first runtime tick during selection', () => {
+  const manifest = JSON.parse(read('manifest.json'));
+  const functions = new Map(manifest.modules.flatMap(module =>
+    [...read(module.path).matchAll(/^function (HTW_\w+) takes[^\n]*\n([\s\S]*?)^endfunction/gm)]
+      .map(([, name, body]) => [name, body])));
+  const init = JSON.parse(read('triggers/map-init.trigger.json'));
+  assert.deepEqual(init.events, [{ type: 'map_initialization' }]);
+  const pending = init.actions.filter(action => action.type === 'call_function').map(action => action.function);
+  const visited = new Set();
+  while (pending.length) {
+    const name = pending.pop();
+    if (visited.has(name)) continue;
+    visited.add(name);
+    assert.ok(functions.has(name), `initialization source missing ${name}`);
+    assert.doesNotMatch(name, /^HTW_Information_/);
+    const body = functions.get(name).replace(/\/\/[^\n]*/g, '');
+    assert.doesNotMatch(body, /\bBlzCreateFrame(?:ByType)?\s*\(/);
+    // Follow synchronous calls; scheduled callbacks are not initialization work.
+    pending.push(...[...body.matchAll(/\b(HTW_\w+)\s*\(/g)].map(match => match[1]));
+  }
+  const tick = JSON.parse(read('triggers/runtime-tick.trigger.json'));
+  assert.equal(tick.enabled, true);
+  assert.equal(tick.initially_on, true);
+  assert.deepEqual(tick.events, [{ type: 'periodic_timer', period: 1, repeat: true }]);
+  assert.deepEqual(tick.conditions, [{ type: 'always' }]);
+  assert.equal(tick.actions.at(-1).function, 'HTW_Information_Display');
+  const f = fixture({ prepare: false });
+  assert.equal(f.s.HTW_Phase, 0);
+  assert.equal(f.s.HTW_InformationReady, false);
+  assert.equal(f.frames.length, 0);
+  for (const action of tick.actions) {
+    assert.equal(action.type, 'call_function'); f.call(action.function);
+  }
+  assert.equal(f.s.HTW_Phase, 0, 'unselected heroes keep the selection phase open');
+  assert.equal(f.s.HTW_InformationReady, true);
+  assert.equal(f.functionCalls.filter(name => name === 'HTW_Information_CreateHud').length, 1);
+  for (const viewer of [1, 2, 3, 4]) {
+    assert.match(f.s.HTW_HudTitle[viewer].text, /Hero selection/);
+    for (const slot of [2, 3, 5, 6]) assert.match(cell(f, viewer, slot).tooltip.text, /Unselected/);
+  }
+});
+
+test('HUD: compact roots and cells fit the regular 4:3 frame area', () => {
+  const f = fixture();
+  f.call('HTW_Information_Display');
+  for (const viewer of [1, 2, 3, 4]) {
+    const root = f.s.HTW_HudRoot[viewer];
+    assert.equal(root.parent, f.gameUI);
+    assert.equal(root.points.length, 1);
+    const anchor = root.points[0];
+    assert.equal(anchor.point, frameConstants.FRAMEPOINT_TOPLEFT);
+    assert.equal(anchor.relative, undefined);
+    assert.ok(root.width > 0 && root.width <= 0.26);
+    assert.ok(root.height > 0 && root.height <= 0.20);
+    assert.ok(anchor.x >= 0 && anchor.x + root.width <= 0.8);
+    assert.ok(anchor.y <= 0.6 && anchor.y - root.height >= 0);
+    const bounds = [];
+    for (let slot = 1; slot <= 15; slot++) {
+      const { hover, icon, value, tooltip } = cell(f, viewer, slot);
+      assert.equal(hover.parent, root);
+      assert.equal(hover.context, viewer * 32 + slot);
+      assert.equal(value.parent, hover);
+      assert.equal(hover.points.length, 1);
+      const point = hover.points[0];
+      assert.equal(point.relative, root);
+      assert.equal(point.point, frameConstants.FRAMEPOINT_TOPLEFT);
+      assert.equal(point.relativePoint, frameConstants.FRAMEPOINT_TOPLEFT);
+      const box = { left: point.x, right: point.x + hover.width, top: -point.y, bottom: -point.y + hover.height };
+      assert.ok(box.left >= 0 && box.right <= root.width + 1e-9);
+      assert.ok(box.top >= 0 && box.bottom <= root.height + 1e-9);
+      bounds.push(box);
+      for (const child of [icon, value]) {
+        const p = child.points[0];
+        assert.equal(p.relative, hover);
+        assert.ok(p.x >= 0 && p.x + child.width <= hover.width + 1e-9);
+        assert.ok(-p.y >= 0 && -p.y + child.height <= hover.height + 1e-9);
+      }
+      assert.equal(icon.width, 0.024);
+      assert.equal(icon.height, 0.024);
+      const tipAnchor = tooltip.points[0];
+      assert.equal(tipAnchor.point, frameConstants.FRAMEPOINT_TOPRIGHT);
+      assert.equal(tipAnchor.relative, undefined);
+      assert.ok(tipAnchor.x + 0.008 <= 0.8 && tipAnchor.x - tooltip.width - 0.008 >= 0);
+      assert.ok(tipAnchor.y > 0 && tipAnchor.y + 0.008 < anchor.y - root.height);
+      // Auto-height wrapping is recorded, not emulated or certified as unclipped.
+      assert.equal(tooltip.height, 0);
+    }
+    for (let a = 0; a < bounds.length; a++) for (let b = a + 1; b < bounds.length; b++) {
+      const x = bounds[a], y = bounds[b];
+      assert.ok(x.right <= y.left || y.right <= x.left || x.bottom <= y.top || y.bottom <= x.top,
+        `HUD cells ${a + 1} and ${b + 1} overlap`);
+    }
+  }
+});
+
+test('HUD: four clients allocate identical roots/data even for inactive viewers; only their own root is visible', () => {
+  const clients = [1, 2, 3, 4].map(localPlayerId => {
+    const f = fixture({ localPlayerId });
+    f.players[1].slot = 0;
+    f.players[2].controller = 2;
+    f.players[3].slot = 0;
+    f.call('HTW_Waves_RefreshPlan');
+    const before = snapshot(f);
+    f.call('HTW_Information_Display');
+    assert.deepEqual(snapshot(f), before, 'presentation must not alter purchase/plan state');
+    assert.equal(f.frames.length, 4 * 79);
+    for (const viewer of [1, 2, 3, 4]) {
+      const root = f.s.HTW_HudRoot[viewer];
+      assert.equal(root.visible, viewer === localPlayerId, `client ${localPlayerId}, viewer ${viewer}`);
+      const owned = f.frames.filter(frame => rootOf(f, frame) === root);
+      assert.equal(owned.length, 79, 'inactive roots get the same complete allocation');
+      assert.deepEqual(['BACKDROP', 'BUTTON', 'TEXT'].map(type => owned.filter(frame => frame.frameType === type).length), [31, 15, 33]);
+      const positions = new Map(owned.map((frame, index) => [frame, index]));
+      const shape = owned.map(frame => ({ type: frame.frameType, name: frame.name, inherits: frame.inherits,
+        context: frame.context < 32 ? frame.context - viewer : frame.context - viewer * 32,
+        parent: positions.get(frame.parent) ?? -1 }));
+      if (viewer === 1) f.rootShape = shape;
+      else assert.deepEqual(shape, f.rootShape);
+    }
+    const rootShows = f.nativeCalls.filter(call => call.name === 'BlzFrameSetVisible' && call.args[1]);
+    assert.deepEqual(rootShows.map(call => call.args[0]), [f.s.HTW_HudRoot[localPlayerId]]);
+    const writes = f.nativeCalls.filter(call => ['BlzFrameSetText', 'BlzFrameSetTexture'].includes(call.name))
+      .map(call => ({ name: call.name, frame: call.args[0].handleId, values: call.args.slice(1) }));
+    return { allocations: f.allocations, bindings: f.tooltipBindings, writes, data: hudData(f), state: snapshot(f) };
+  });
+  for (const client of clients.slice(1)) assert.deepEqual(client, clients[0], 'local player must not affect allocations, bindings or synchronized data');
+});
+
+test('HUD: every disabled hover/icon/label has one tooltip binding, reused across refreshes and phases', () => {
+  const f = fixture();
+  f.call('HTW_Information_Display');
+  assert.equal(f.tooltipBindings.length, 60);
+  assert.equal(new Set(f.tooltipBindings.map(binding => binding.frame)).size, 60);
+  assert.equal(new Set(f.tooltipBindings.map(binding => binding.tooltip)).size, 60);
+  for (const viewer of [1, 2, 3, 4]) for (let slot = 1; slot <= 15; slot++) {
+    const c = cell(f, viewer, slot);
+    assert.equal(c.hover.frameType, 'BUTTON');
+    assert.equal(c.hover.tooltip, c.tooltip.parent);
+    assert.equal(c.hover.tooltip.parent, c.hover);
+    assert.equal(c.hover.tooltip.visible, false, 'regular tooltip begins hidden');
+    assert.deepEqual(f.tooltipBindings.filter(binding => binding.frame === c.hover.handleId),
+      [{ frame: c.hover.handleId, tooltip: c.tooltip.parent.handleId }]);
+    assert.equal(c.hover.enabled, false);
+    assert.equal(c.icon.enabled, false);
+  }
+  assert.ok(f.frames.filter(frame => frame.frameType === 'TEXT').every(frame => frame.enabled === false));
+  const allocations = [...f.allocations], bindings = [...f.tooltipBindings];
+  const refreshStart = f.nativeCalls.length;
+  for (let tick = 0; tick < 10; tick++) f.call('HTW_Information_Display');
+  buy(f, 1, 2, 2);
+  f.fire(f.s.HTW_PreparationTimer);
+  drain(f);
+  f.call('HTW_Information_Display');
+  f.fire(f.s.HTW_CombatTimer);
+  f.call('HTW_Waves_Prepare');
+  f.call('HTW_Information_Display');
+  assert.deepEqual(f.allocations, allocations);
+  assert.deepEqual(f.tooltipBindings, bindings);
+  assert.equal(f.nativeCalls.slice(refreshStart).filter(call => /^(BlzCreateFrame|BlzCreateFrameByType|BlzFrameSetTooltip|BlzFrameSetVisible)$/.test(call.name)).length, 0);
+  assert.ok(f.frames.filter(frame => ['TEXT', 'BUTTON'].includes(frame.frameType) || frame.name === 'HTWIcon').every(frame => !frame.enabled));
+});
+
+test('HUD: load callback defers rebuilding and the next display replaces all stale handles exactly once', () => {
+  const clients = [1, 2, 3, 4].map(localPlayerId => {
+    const f = fixture({ localPlayerId });
+    buy(f, 1, 2, 2); buy(f, 3, 3);
+    f.fire(f.s.HTW_PreparationTimer);
+    const data = hudData(f), before = snapshot(f), roots = list(f.s.HTW_HudRoot, 4);
+    const oldFrames = [...f.frames], oldOrigin = f.gameUI, loadTrigger = f.s.HTW_HudLoadTrigger;
+    const nativeStart = f.nativeCalls.length;
+    f.simulateGameLoad();
+    assert.equal(f.s.HTW_InformationReady, false);
+    assert.equal(f.nativeCalls.length, nativeStart, 'load event must not touch or allocate frames');
+    assert.deepEqual(list(f.s.HTW_HudRoot, 4), roots, 'replacement is deferred to elapsed display');
+    assert.equal(f.allocations.length, 316);
+    assert.equal(f.tooltipBindings.length, 60);
+    f.call('HTW_Information_Display');
+    assert.equal(f.s.HTW_InformationReady, true);
+    assert.notEqual(f.gameUI, oldOrigin);
+    assert.ok(oldFrames.every(frame => frame.invalid));
+    assert.equal(f.allocations.length, 632);
+    assert.equal(f.tooltipBindings.length, 120);
+    assert.equal(f.s.HTW_HudLoadTrigger, loadTrigger);
+    assert.equal(f.nativeCalls.filter(call => call.name === 'TriggerRegisterGameEvent').length, 1);
+    for (const viewer of [1, 2, 3, 4]) {
+      const root = f.s.HTW_HudRoot[viewer];
+      assert.notEqual(root, roots[viewer - 1]);
+      assert.equal(root.parent, f.gameUI);
+      assert.equal(root.visible, viewer === localPlayerId);
+      assert.ok(!oldFrames.includes(f.s.HTW_HudTitle[viewer]));
+      assert.ok(!oldFrames.includes(f.s.HTW_HudIncoming[viewer]));
+      for (let slot = 1; slot <= 15; slot++) {
+        const c = cell(f, viewer, slot);
+        for (const frame of [c.icon, c.value, c.tooltip, c.hover, c.hover.tooltip]) assert.ok(!oldFrames.includes(frame));
+      }
+    }
+    assert.deepEqual(hudData(f), data);
+    assert.deepEqual(snapshot(f), before);
+    f.call('HTW_Information_Display');
+    assert.equal(f.allocations.length, 632);
+    assert.equal(f.tooltipBindings.length, 120);
+    return { allocations: f.allocations, bindings: f.tooltipBindings, data: hudData(f) };
+  });
+  for (const client of clients.slice(1)) assert.deepEqual(client, clients[0]);
+});
+
+test('HUD: all six public life/hero cells expose the same team identities and status to every viewer', () => {
+  const f = fixture();
+  f.s.HTW_TeamLives[1] = 12;
+  f.s.HTW_TeamLives[2] = 9;
+  for (const playerId of [1, 2, 3, 4]) f.s.HTW_HeroUnitByPlayer[playerId].level = playerId + 2;
+  f.call('HTW_Information_Display');
+  const expected = [
+    ['T1 12', 'AHds', /Team 1 - shared lives.*12 lives \| Active/],
+    ['P1 L3', 'H001', /Team 1 hero.*P1: Guardian Lv 3/],
+    ['P2 L4', 'H002', /Team 1 hero.*P2: Striker Lv 4/],
+    ['T2 9', 'AHds', /Team 2 - shared lives.*9 lives \| Active/],
+    ['P3 L5', 'H003', /Team 2 hero.*P3: Controller Lv 5/],
+    ['P4 L6', 'H004', /Team 2 hero.*P4: Support Lv 6/],
+  ];
+  for (const viewer of [1, 2, 3, 4]) for (const [index, [value, icon, tooltip]] of expected.entries()) {
+    const c = cellData(f, viewer, index + 1);
+    assert.equal(c.value, value); assert.equal(c.icon, `mock-icon:${icon}`); assert.match(c.tooltip, tooltip);
+  }
+  f.s.HTW_HeroAliveByPlayer[1] = false;
+  f.s.HTW_HeroSelectedByPlayer[2] = false;
+  f.players[2].slot = 0;
+  f.s.HTW_TeamLiving[2] = false;
+  f.call('HTW_Information_Display');
+  for (const viewer of [1, 2, 3, 4]) {
+    assert.equal(cell(f, viewer, 2).value.text, 'P1 X'); assert.match(cell(f, viewer, 2).tooltip.text, /Down/);
+    assert.equal(cell(f, viewer, 3).value.text, 'P2 -'); assert.match(cell(f, viewer, 3).tooltip.text, /Unselected/);
+    assert.equal(cell(f, viewer, 5).value.text, 'P3 -'); assert.match(cell(f, viewer, 5).tooltip.text, /Inactive/);
+    assert.equal(cell(f, viewer, 6).value.text, 'P4 X'); assert.match(cell(f, viewer, 6).tooltip.text, /Eliminated/);
+    assert.match(cell(f, viewer, 4).tooltip.text, /Eliminated/);
+  }
+  f.s.HTW_HeroTypeByPlayer[1] = rawcode('BAD!');
+  assert.throws(() => f.call('HTW_Information_Display'), /unmocked icon rawcode/, 'unknown icon natives are never permissively mocked');
+});
+
+test('HUD: personal gold/budget/sends and receiving-team previews isolate all four owners across clients', () => {
+  const clients = [1, 2, 3, 4].map(localPlayerId => {
+    const f = fixture({ localPlayerId });
+    buy(f, 1, 1, 1); buy(f, 2, 2, 2); buy(f, 3, 3, 1); buy(f, 4, 1, 3);
+    const queues = [[1, 0, 0], [0, 2, 0], [0, 0, 1], [3, 0, 0]];
+    const gold = [190, 160, 160, 170], remaining = [5, 2, 2, 3];
+    for (const viewer of [1, 2, 3, 4]) {
+      assert.equal(cell(f, viewer, 7).value.text, String(gold[viewer - 1]));
+      assert.match(cell(f, viewer, 7).tooltip.text, new RegExp(`Personal gold - P${viewer}`));
+      assert.equal(cell(f, viewer, 8).value.text, `${remaining[viewer - 1]} left`);
+      assert.match(cell(f, viewer, 8).tooltip.text, new RegExp(`${6 - remaining[viewer - 1]} used.*${remaining[viewer - 1]} left.*6 total`));
+      const sourceTeam = viewer <= 2 ? 2 : 1;
+      assert.equal(cell(f, viewer, 9).value.text, `T${sourceTeam}`);
+      assert.match(cell(f, viewer, 9).tooltip.text, new RegExp(`Send to: Team ${sourceTeam}.*Receive from: Team ${sourceTeam}`));
+      const incoming = viewer <= 2 ? [6, 0, 1] : [4, 2, 0];
+      const sends = viewer <= 2 ? [3, 0, 1] : [1, 2, 0];
+      for (const kind of [1, 2, 3]) {
+        const send = cellData(f, viewer, 9 + kind), wave = cellData(f, viewer, 12 + kind);
+        assert.equal(send.value, String(queues[viewer - 1][kind - 1]));
+        assert.match(send.tooltip, new RegExp(`P${viewer} queued: ${send.value}\\|nSend to: Team ${sourceTeam}`));
+        assert.equal(wave.value, String(incoming[kind - 1]));
+        assert.match(wave.tooltip, new RegExp(`From: Team ${sourceTeam}.*Base: ${kind === 1 ? 3 : 0} \\| Enemy sends: ${sends[kind - 1]} \\| Filler: 0`));
+        assert.equal(send.icon, wave.icon);
+      }
+      assert.equal(f.s.HTW_HudIncoming[viewer].text, `|cff90e8bfIN|n${viewer <= 2 ? 10 : 8} th|r`);
+    }
+    const before = snapshot(f), data = hudData(f);
+    f.call('HTW_Information_Display');
+    assert.deepEqual(snapshot(f), before);
+    assert.deepEqual(hudData(f), data);
+    return { allocations: f.allocations, bindings: f.tooltipBindings, data, state: before };
+  });
+  for (const client of clients.slice(1)) assert.deepEqual(client, clients[0]);
+});
+
+test('HUD: full incoming tooltip composition freezes at lock and survives staggered spawns and disconnects', () => {
   const f = fixture();
   buy(f, 1, 2, 2);
   buy(f, 3, 3);
-  const board = f.s.HTW_InformationBoard[1];
-  assert.equal(f.boards.length, 4);
-  assert.equal(board.visible, true);
-  assert.equal(f.s.HTW_InformationBoard[2].visible, false);
-  assert.equal(board.rowCount, 27);
-  assert.match(board.rows[12], /Gold: 160/);
-  assert.match(board.rows[13], /4 used.*2 left/);
-  assert.match(board.rows[14], /Team 2/);
-  assert.match(board.rows.slice(15, 18).join('\n'), /Rifleman.*2/);
-  assert.match(board.rows[26], /Total incoming threat: 7/);
+  const preview = incomingData(f, 1);
+  assert.deepEqual(preview.cells.map(c => c.value), ['3', '0', '1']);
+  assert.match(preview.summary, /IN\|n7 th/);
+  assert.match(preview.cells[2].tooltip, /Base: 0 \| Enemy sends: 1 \| Filler: 0.*Total: 1 \| Threat: 4.*Whole wave threat: 7/);
+  f.call('HTW_Waves_LockPlan');
+  f.players[2].slot = 0; f.players[3].slot = 0;
+  f.call('HTW_Waves_RefreshPlan');
+  f.call('HTW_Information_Display');
+  assert.deepEqual(incomingData(f, 1), preview, 'disconnect cannot replace the accepted locked plan with filler');
   f.fire(f.s.HTW_PreparationTimer);
-  assert.match(board.rows[19], /Locked full wave/);
-  const fullRows = board.rows.slice(20, 27);
+  const locked = incomingData(f, 1);
+  assert.deepEqual(locked.cells.map(c => c.value), preview.cells.map(c => c.value));
+  for (const c of locked.cells) assert.match(c.tooltip, /Locked full wave - includes later arrivals/);
+  f.call('HTW_Sending_ProcessQueues');
+  f.call('HTW_Information_Display');
+  assert.deepEqual(incomingData(f, 1), locked, 'first emission must not decrement displayed totals');
   drain(f);
   f.call('HTW_Information_Display');
-  assert.deepEqual(board.rows.slice(20, 27), fullRows, 'full plan remains displayed after pending drains');
-  assert.equal(f.boards.length, 4, 'board refresh reuses handles');
-  assert.ok(f.boards.flatMap(board => board.items).every(item => item.released));
-  f.s.HTW_TeamLiving[1] = false;
-  f.call('HTW_Waves_ClearArena', 1);
-  f.call('HTW_Information_Display');
-  assert.match(board.rows[13], /Eliminated/);
-  assert.ok(board.rows.slice(14, 27).every(value => value === ''));
-  f.s.HTW_MatchOver = true;
-  f.call('HTW_Information_Display');
-  assert.match(board.rows[13], /Match over/);
+  assert.deepEqual(counts(f, 'HTW_PlanRemaining', 1), [0, 0, 0]);
+  assert.deepEqual(incomingData(f, 1), locked, 'full tooltip remains after all pending arrivals drain');
+  assert.equal(cell(f, 1, 11).value.text, '2', 'sender receipt remains through combat');
+});
+
+function assertPreviewUnavailable(f, viewer, status) {
+  for (let slot = 8; slot <= 15; slot++) {
+    const c = cellData(f, viewer, slot);
+    assert.equal(c.value, '-', `viewer ${viewer} stale slot ${slot}`);
+    assert.match(c.tooltip, status);
+    assert.doesNotMatch(c.tooltip, /P\d queued:|Base: \d|Enemy sends: \d|Filler: \d|Total: \d|Whole wave threat:|From: Team|Send to: Team|Receive from: Team/);
+    if (slot >= 13) assert.match(c.tooltip, /Wave preview unavailable/);
+  }
+  assert.equal(f.s.HTW_HudIncoming[viewer].text, '|cffaaaaaaIN|n-|r');
+}
+
+test('HUD: elimination, resolution, inactivity and terminal states remove stale previews and receipts', () => {
+  const cases = [
+    ['elimination', f => { f.s.HTW_TeamLiving[1] = false; f.call('HTW_Waves_ClearArena', 1); }, [1, 2], /Eliminated/],
+    ['resolution', f => f.fire(f.s.HTW_CombatTimer), [1, 2, 3, 4], /Purchases closed outside preparation/],
+    ['match over', f => { f.s.HTW_MatchOver = true; }, [1, 2, 3, 4], /Match over/],
+    ['victory', f => { f.s.HTW_TerminalState = 1; f.s.HTW_Phase = 4; }, [1, 2, 3, 4], /Match over/],
+    ['draw', f => { f.s.HTW_TerminalState = 2; f.s.HTW_Phase = 5; }, [1, 2, 3, 4], /Match over/],
+    ['inactive viewer', f => { f.players[0].slot = 0; }, [1], /Inactive player/],
+  ];
+  for (const [name, arrange, viewers, status] of cases) {
+    const f = fixture();
+    buy(f, 1, 2, 2); buy(f, 3, 3);
+    f.fire(f.s.HTW_PreparationTimer);
+    const allocations = [...f.allocations], bindings = [...f.tooltipBindings];
+    assert.equal(cell(f, 1, 15).value.text, '1', `${name} starts with a nonempty preview`);
+    arrange(f);
+    f.call('HTW_Information_Display');
+    for (const viewer of viewers) assertPreviewUnavailable(f, viewer, status);
+    assert.deepEqual(f.allocations, allocations);
+    assert.deepEqual(f.tooltipBindings, bindings);
+    if (name === 'elimination') assert.deepEqual([13, 14, 15].map(slot => cell(f, 3, slot).value.text), ['3', '2', '0'], 'surviving arena keeps its own locked composition');
+    if (name === 'inactive viewer') assert.deepEqual(incomingData(f, 2).cells.map(c => c.value), ['3', '0', '1'], 'active teammate retains the same receiving plan');
+    if (name === 'resolution') {
+      assert.equal(f.s.HTW_Phase, 3);
+      f.call('HTW_Waves_Prepare');
+      f.call('HTW_Information_Display');
+      for (const viewer of [1, 2, 3, 4]) {
+        assert.deepEqual([10, 11, 12].map(slot => cell(f, viewer, slot).value.text), ['0', '0', '0']);
+        assert.deepEqual(incomingData(f, viewer).cells.map(c => c.value), ['3', '0', '0']);
+        assert.doesNotMatch(incomingData(f, viewer).cells[0].tooltip, /Locked full wave/);
+      }
+    }
+  }
 });
 
 test('five complete timer-driven waves retain full plans, resolve once, grant/mirror once, and reset without carryover', () => {

@@ -3,8 +3,11 @@
 ## Test layers
 
 `scripts/test.ps1` also checks send-catalog generation drift and executes actual
-preparation/purchase/plan/deployment JASS under bounded mocked natives. These
-source execution tests do not prove Warcraft behavior or multiplayer sync.
+preparation/purchase/plan/deployment JASS under bounded mocked natives. Icon HUD
+checks cover tooltip contents, frame reuse and allocation order, viewer-specific
+visibility, and preview lifecycle with explicit mocked frame natives. These
+source execution tests do not prove Warcraft rendering, hover/click behavior or
+multiplayer sync.
 
 Run `scripts/test.ps1` for the complete automated check. It publishes the engine
 from the tested sources before MCP integration runs and checks the immutable

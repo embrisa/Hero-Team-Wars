@@ -5,7 +5,7 @@ import vm from 'node:vm';
 // No eval of JASS text, property access, native auto-stubs, or skipped statements.
 const types = new Set(['nothing', 'integer', 'real', 'boolean', 'string', 'code',
   'unit', 'player', 'timer', 'trigger', 'group', 'force', 'rect', 'location',
-  'effect', 'texttag', 'multiboard', 'multiboarditem', 'timerdialog', 'boolexpr']);
+  'effect', 'texttag', 'multiboard', 'multiboarditem', 'timerdialog', 'boolexpr', 'framehandle']);
 const id = '[A-Za-z_][A-Za-z0-9_]*';
 const jsName = name => `__j_${name}`;
 const defaults = type => type === 'boolean' ? false :

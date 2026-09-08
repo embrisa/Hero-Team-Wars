@@ -1,4 +1,10 @@
 [
-  { "id": "information_board", "name": "HTW_InformationBoard", "type": "multiboard", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "hud_root", "name": "HTW_HudRoot", "type": "framehandle", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "hud_title", "name": "HTW_HudTitle", "type": "framehandle", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "hud_incoming", "name": "HTW_HudIncoming", "type": "framehandle", "array": true, "array_size": 5, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "hud_icon", "name": "HTW_HudIcon", "type": "framehandle", "array": true, "array_size": 161, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "hud_value", "name": "HTW_HudValue", "type": "framehandle", "array": true, "array_size": 161, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "hud_tooltip_text", "name": "HTW_HudTooltipText", "type": "framehandle", "array": true, "array_size": 161, "provenance": "runtime_state", "capability": "mcp_native_jass" },
+  { "id": "hud_load_trigger", "name": "HTW_HudLoadTrigger", "type": "trigger", "provenance": "runtime_state", "capability": "mcp_native_jass" },
   { "id": "information_ready", "name": "HTW_InformationReady", "type": "boolean", "initial": false, "provenance": "runtime_state", "capability": "mcp_native_jass" }
 ]

@@ -1,14 +1,20 @@
 # MCP Server
 
-Typed variables support `multiboard`, `fogmodifier`, and bounded `array` /
-`array_size` inputs, aligned with the engine and versioned operation schema.
+Typed variables support `framehandle` alongside `multiboard` and `fogmodifier`,
+with bounded `array` / `array_size` inputs aligned with the engine and versioned
+operation schema.
 The JASS scanner handles grouped boolean operators without skipping validation
 of nested calls. All 30 tool names, policy gates and allow-lists remain unchanged.
-Array creations require a size and reject scalar initial values. Reopen
+The type allow-list remains closed. Array creations require `array_size`
+(1-8191) and reject scalar initial values. `framehandle` uses existing handle
+validation for scalar and array declarations; a size-5 HUD root emits
+`framehandle array HTW_HudRoot`, with no inline `[5]` or initializer. Reopen
 comparison uses object identity across category regrouping without ignoring
 field values or modification order.
 See [v26 preparation and sends](../docs/compatibility/v26-preparation-and-sends.md)
 for catalog generation, source-executed tests and separate manual verification.
+The [v27 icon HUD](../docs/compatibility/v27-icon-hud.md) exercises frame handles,
+hover tooltips, synchronized allocation and save/load recreation.
 
 The worker's [v24 repair](../docs/compatibility/v24-controller-load-repair.md)
 writes logical object-field `Bool` as native four-byte Int 0/1 and exposes

@@ -156,7 +156,7 @@ export const gameplayModuleSchema = z.object({
 }).strict();
 
 const gameplayVariableBaseSchema = z.object({
-  id: identifier, name: identifier, type: z.enum(["integer", "real", "boolean", "string", "handle", "timer", "trigger", "unit", "group", "region", "rect", "player", "force", "fogmodifier", "multiboard"]),
+  id: identifier, name: identifier, type: z.enum(["integer", "real", "boolean", "string", "handle", "timer", "trigger", "unit", "group", "region", "rect", "player", "force", "fogmodifier", "multiboard", "framehandle"]),
   array: z.boolean().optional(), array_size: z.number().int().min(1).max(8191).optional(),
   initial: z.unknown().optional(), default_value: z.unknown().optional(), value: z.unknown().optional(), dependencies: z.array(identifier).default([]), provenance: z.string().optional(), capability: z.string().optional()
 }).strict();

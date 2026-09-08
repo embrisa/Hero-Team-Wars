@@ -173,10 +173,14 @@ inspect its script hash before authoring expected values. See the
 [engineering audit](../engineering-audit.md).
 
 Duplicate operation IDs (case-insensitive) are rejected before worker execution.
-Gameplay variable types include `multiboard` and existing `fogmodifier`.
+Gameplay variable types include `framehandle` alongside `multiboard` and
+`fogmodifier`; the supported JASS type allow-list remains closed.
 Typed input accepts `array` (boolean) and `array_size` (1-8191), matching engine
-source manifests; arrays cannot have scalar initial values. JASS source
-validation recognizes grouped lowercase `and`/`or` expressions while still
+source manifests; arrays cannot have scalar initial values. `framehandle`
+supports scalar and array declarations under the existing handle validation
+rules. Array size is manifest metadata: a size-5 HUD root emits
+`framehandle array HTW_HudRoot`, without an inline `[5]` or initializer.
+JASS source validation recognizes grouped lowercase `and`/`or` expressions while still
 validating nested calls and canonical `And`/`Or` natives. These additions do not
 change tool names, source-hash gates, or runtime-evidence requirements.
 All source-generating module/trigger/variable operations require script policy,

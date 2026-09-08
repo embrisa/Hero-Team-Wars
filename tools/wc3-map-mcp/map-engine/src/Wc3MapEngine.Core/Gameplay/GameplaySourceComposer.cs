@@ -738,7 +738,7 @@ public static class GameplaySourceComposer
         foreach (var variable in variables.Where(x => x["initial"] is not null))
         {
             var type = GameplayModelValidator.RequiredString(variable, "type").ToLowerInvariant();
-            if (type is not ("handle" or "timer" or "trigger" or "unit" or "group" or "region" or "rect" or "player" or "force" or "multiboard")) builder.AppendLine($"    set {GameplayModelValidator.RequiredString(variable, "name")} = {Literal(variable["initial"]!, type)}");
+            if (type is not ("handle" or "timer" or "trigger" or "unit" or "group" or "region" or "rect" or "player" or "force" or "multiboard" or "framehandle")) builder.AppendLine($"    set {GameplayModelValidator.RequiredString(variable, "name")} = {Literal(variable["initial"]!, type)}");
         }
         foreach (var regionId in regions.Select(region => GameplayModelValidator.RequiredString(region, "id")))
         {

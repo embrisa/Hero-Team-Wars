@@ -47,6 +47,13 @@ builds on that exact artifact; new-build runtime verification is separate.
 The user authorized adding the missing send foundation and changing MVP units.
 Old work items are historical evidence, not standing task orders.
 
+The user subsequently found v26's text HUD too large. The
+[v27 icon HUD](compatibility/v27-icon-hud.md) replaces that presentation with
+compact counters and hover tooltips, using typed `framehandle` variables.
+All frame allocation and data updates are synchronized; only root visibility
+is local. Visual, hover and multiplayer behavior still need exact-build user
+verification.
+
 Read the [engineering audit](engineering-audit.md) for remaining structural
 risks, including implicit gameplay seeding in script-enabled transactions,
 stale object fixtures and scenarios that model rules without executing JASS.

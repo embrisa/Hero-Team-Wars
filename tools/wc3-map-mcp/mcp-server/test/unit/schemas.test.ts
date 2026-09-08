@@ -1,21 +1,48 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { operationSchema } from "../../src/schemas/operations.js";
+import { gameplayVariableSchema, operationSchema } from "../../src/schemas/operations.js";
 import { encodeNdjson, parseNdjsonLine } from "../../src/transport/ndjson.js";
 
 describe("operation schema", () => {
-  it("accepts a typed multiboard array without allowing arbitrary JASS types", () => {
+  it.each(["multiboard", "framehandle"])("accepts a typed %s array without allowing arbitrary JASS types", (type) => {
     const operation = {
       operation_id: "c0a80101-0000-4000-8000-000000000026", type: "create_variable", target: { id: "boards" },
-      value: { id: "boards", name: "TestBoards", type: "multiboard", array: true, array_size: 5 }, rationale: "Declare synchronized presentation handles."
+      value: { id: "boards", name: "TestBoards", type, array: true, array_size: 5 }, rationale: "Declare synchronized presentation handles."
     };
     expect(operationSchema.safeParse(operation).success).toBe(true);
     expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, type: "imaginaryboard" } }).success).toBe(false);
-    expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, array_size: undefined } }).success).toBe(false);
-    expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, array_size: 8192 } }).success).toBe(false);
+    for (const array_size of [1, 5, 8191]) {
+      expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, array_size } }).success).toBe(true);
+    }
+    for (const array_size of [undefined, null, 0, 8192, 1.5, "5"]) {
+      expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, array_size } }).success).toBe(false);
+    }
+    expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, array: "true" } }).success).toBe(false);
+    expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, unexpected: true } }).success).toBe(false);
     for (const field of ["initial", "default_value", "value"]) {
       expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, [field]: 0 } }).success).toBe(false);
       expect(operationSchema.safeParse({ ...operation, value: { ...operation.value, [field]: null } }).success).toBe(true);
     }
+  });
+
+  it.each(["multiboard", "framehandle"])("accepts %s scalar creation and typed partial updates with expected records", (type) => {
+    const scalar = { id: "hud", name: "TestHud", type, initial: null };
+    const operation = {
+      operation_id: "c0a80101-0000-4000-8000-000000000027", type: "create_variable", target: { id: "hud" },
+      value: scalar, rationale: "Declare a presentation handle."
+    };
+    expect(operationSchema.safeParse(operation).success).toBe(true);
+    const update = { ...operation, type: "update_variable", expected: scalar, value: { type } };
+    expect(operationSchema.safeParse(update).success).toBe(true);
+    expect(operationSchema.safeParse({ ...update, expected: undefined }).success).toBe(false);
+    expect(operationSchema.safeParse({ ...update, value: { type: "imaginaryframehandle" } }).success).toBe(false);
+    expect(operationSchema.safeParse({ ...update, value: { type, unexpected: true } }).success).toBe(false);
+  });
+
+  it("keeps the closed gameplay variable type enum aligned with the versioned contract", () => {
+    const contract = JSON.parse(readFileSync(new URL("../../../contracts/schemas/change-operation.schema.json", import.meta.url), "utf8"));
+    expect(contract.$defs.variable.properties.type.enum).toEqual([...gameplayVariableSchema.shape.type.options]);
+    expect(contract.$defs.variable.additionalProperties).toBe(false);
   });
 
   it("requires a rationale and a UUID operation id", () => {

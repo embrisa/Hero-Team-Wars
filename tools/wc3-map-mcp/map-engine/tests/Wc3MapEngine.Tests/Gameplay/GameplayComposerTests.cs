@@ -21,7 +21,10 @@ public sealed class GameplayComposerTests
         Assert.Equal("static_only", first["static_validation"]!["evidence_level"]!.GetValue<string>());
         Assert.Equal(1, first["main_count"]!.GetValue<int>());
         Assert.Equal(28, first["module_order"]!.AsArray().Count);
-        Assert.Contains("multiboard array HTW_InformationBoard", first["source"]!.GetValue<string>());
+        Assert.Matches(@"(?m)^    framehandle array HTW_HudRoot\r?$", first["source"]!.GetValue<string>());
+        var hudRoot = first["canonical_model"]!["gameplay_variables"]!.AsArray().OfType<JsonObject>().Single(variable => variable["name"]!.GetValue<string>() == "HTW_HudRoot");
+        Assert.True(hudRoot["array"]!.GetValue<bool>());
+        Assert.Equal(5, hudRoot["array_size"]!.GetValue<int>());
         Assert.Contains("function config takes nothing returns nothing", first["source"]!.GetValue<string>());
         Assert.Contains("call SetPlayers(4)", first["source"]!.GetValue<string>());
         Assert.DoesNotContain("SetUnitStock", first["source"]!.GetValue<string>());
@@ -30,6 +33,88 @@ public sealed class GameplayComposerTests
         Assert.Contains("call FogEnable(false)", first["source"]!.GetValue<string>());
         Assert.Contains("call FogMaskEnable(false)", first["source"]!.GetValue<string>());
         Assert.DoesNotContain("FogModifier", first["source"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData("multiboard")]
+    [InlineData("framehandle")]
+    public void ComposerPreservesTypedHandleScalarsAndArrayMetadata(string type)
+    {
+        var canonical = GameplaySourceComposer.Compose(FindManifest())["canonical_model"]!.AsObject();
+        canonical["gameplay_variables"]!.AsArray().Add(new JsonObject
+        {
+            ["id"] = "test_hud_root", ["name"] = "TestHudRoot", ["type"] = type, ["array"] = true, ["array_size"] = 5
+        });
+        canonical["gameplay_variables"]!.AsArray().Add(new JsonObject
+        {
+            ["id"] = "test_hud_scalar", ["name"] = "TestHudScalar", ["type"] = type, ["initial"] = null
+        });
+
+        var composed = GameplaySourceComposer.ComposeCanonical(canonical);
+        var source = composed["source"]!.GetValue<string>();
+
+        Assert.Matches($@"(?m)^    {type} array TestHudRoot\r?$", source);
+        Assert.Matches($@"(?m)^    {type} TestHudScalar\r?$", source);
+        Assert.DoesNotContain("set TestHudRoot", source);
+        Assert.DoesNotContain("set TestHudScalar", source);
+        var variables = composed["canonical_model"]!["gameplay_variables"]!.AsArray().OfType<JsonObject>();
+        var array = variables.Single(variable => variable["id"]!.GetValue<string>() == "test_hud_root");
+        Assert.Equal(type, array["type"]!.GetValue<string>());
+        Assert.True(array["array"]!.GetValue<bool>());
+        Assert.Equal(5, array["array_size"]!.GetValue<int>());
+    }
+
+    [Theory]
+    [InlineData("multiboard")]
+    [InlineData("framehandle")]
+    public void GameplayHandleVariablesKeepScalarAndArrayValidation(string type)
+    {
+        var scalar = new JsonObject { ["id"] = "hud", ["name"] = "TestHud", ["type"] = type };
+        GameplayModelValidator.ValidateVariable(scalar);
+        foreach (var field in new[] { "initial", "default_value", "value" })
+        {
+            var candidate = scalar.DeepClone().AsObject();
+            candidate[field] = null;
+            GameplayModelValidator.ValidateVariable(candidate);
+            foreach (var literal in new[] { "0", "true", "\"null\"", "{}", "[]" })
+            {
+                candidate[field] = JsonNode.Parse(literal);
+                Assert.Equal("INVALID_ARGUMENT", Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateVariable(candidate)).Code);
+            }
+        }
+
+        var array = scalar.DeepClone().AsObject();
+        array["array"] = true;
+        foreach (var size in new[] { 1, 5, 8191 })
+        {
+            array["array_size"] = size;
+            GameplayModelValidator.ValidateVariable(array);
+        }
+        foreach (var size in new[] { "null", "0", "8192", "1.5", "\"5\"" })
+        {
+            array["array_size"] = JsonNode.Parse(size);
+            Assert.Equal("INVALID_ARGUMENT", Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateVariable(array)).Code);
+        }
+        array.Remove("array_size");
+        Assert.Equal("INVALID_ARGUMENT", Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateVariable(array)).Code);
+        array["array_size"] = 5;
+        foreach (var field in new[] { "initial", "default_value", "value" })
+        {
+            array[field] = null;
+            GameplayModelValidator.ValidateVariable(array);
+            array[field] = new JsonObject { ["variable_id"] = "hud" };
+            var exception = Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateVariable(array));
+            Assert.Equal("INVALID_ARGUMENT", exception.Code);
+            Assert.Contains("cannot declare a scalar initial value", exception.Message);
+            array.Remove(field);
+        }
+        array["array"] = "true";
+        Assert.Equal("INVALID_ARGUMENT", Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateVariable(array)).Code);
+        scalar["unexpected"] = true;
+        Assert.Equal("INVALID_ARGUMENT", Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateVariable(scalar)).Code);
+        scalar.Remove("unexpected");
+        scalar["type"] = "imaginaryframehandle";
+        Assert.Equal("INVALID_ARGUMENT", Assert.Throws<EngineException>(() => GameplayModelValidator.ValidateVariable(scalar)).Code);
     }
 
     [Fact]
