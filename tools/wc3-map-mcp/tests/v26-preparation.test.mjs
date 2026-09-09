@@ -42,7 +42,7 @@ endfunction`;
   let callback;
   let message;
   const runtime = createJassRuntime({ sources: [{ path: 'control-flow-self-test.j', source }],
-    globals: [definition('Flag', 'boolean'), definition('Values', 'integer', undefined, true), definition('TypeId', 'integer')],
+    globals: [definition('Flag', 'boolean', false), definition('Values', 'integer', undefined, true), definition('TypeId', 'integer', 0)],
     natives: { Schedule: native('nothing', 1, fn => { callback = fn; }), Message: native('nothing', 1, text => { message = text; }) } });
   assert.equal(runtime.call('Flow', 3), 12);
   assert.equal(runtime.state.Values[2], 4);
@@ -65,7 +65,7 @@ test('harness: unsupported/unbound syntax fails closed and execution is bounded'
   assert.throws(() => build('loop\nendloop', { maxSteps: Number.MAX_SAFE_INTEGER, timeout: 10 }).call('Probe'), /timed out/);
   assert.throws(() => build('call Probe()', { maxSteps: 20 }).call('Probe'), /step limit/);
   assert.throws(() => build('', { natives: { HTW_Fake: native('nothing', 0, () => {}) } }), /Cannot mock repository/);
-  const globals = [definition('Value', 'integer')];
+  const globals = [definition('Value', 'integer', 0)];
   for (const body of ['set Value = "wrong type"', 'set Value = true + 1', 'if 1 then\nreturn\nendif', 'call Probe(1)']) {
     assert.throws(() => build(body, { globals }), undefined, body);
   }
@@ -79,7 +79,7 @@ test('harness: framehandle locals, parameters, returns and arrays retain strict 
     set Frames[1] = frame
     return previous
 endfunction`;
-  const globals = [definition('Frames', 'framehandle', undefined, true), definition('Unit', 'unit')];
+  const globals = [definition('Frames', 'framehandle', undefined, true), definition('Unit', 'unit', null)];
   const build = source => createJassRuntime({ sources: [{ path: 'frame-self-test.j', source }], globals });
   const f = build(source);
   const frame = { handleType: 'framehandle' };
@@ -93,6 +93,64 @@ endfunction`;
   }
   assert.throws(() => build(source + '\nfunction Wrong takes nothing returns nothing\ncall Store(Unit)\nendfunction'), /Unsupported type conversion/);
   assert.throws(() => build(source.replace('return previous', 'return UnknownFrameNative()')), /Unbound function\/native/);
+});
+
+test('harness: scalar globals and locals are fail-closed while explicit null, assignments, arrays and short circuit work', () => {
+  const source = `
+function BooleanGuard takes nothing returns nothing
+    if Guard then
+        set Count = 1
+    endif
+endfunction
+function NullComparison takes nothing returns boolean
+    return Trigger == null
+endfunction
+function NativeArgument takes nothing returns nothing
+    call Consume(Trigger)
+endfunction
+function LocalRead takes nothing returns boolean
+    local trigger value
+    return value == null
+endfunction
+function LocalNull takes nothing returns boolean
+    local trigger value
+    set value = null
+    return value == null
+endfunction
+function ShortCircuit takes nothing returns boolean
+    if Guard and MissingGuard then
+        return true
+    endif
+    return false
+endfunction
+function Initialize takes nothing returns nothing
+    set Guard = false
+    set Trigger = null
+    set Count = 7
+    set Values[4] = 9
+endfunction`;
+  const globals = [
+    { name: 'Guard', type: 'boolean' }, { name: 'MissingGuard', type: 'boolean' },
+    { name: 'Trigger', type: 'trigger' }, { name: 'Count', type: 'integer' },
+    { name: 'Values', type: 'integer', array: true },
+  ];
+  const runtime = createJassRuntime({ sources: [{ path: 'strict-initialization-self-test.j', source }], globals,
+    natives: { Consume: { type: 'nothing', arity: 1, params: [{ type: 'trigger' }], fn: () => {} } } });
+  assert.throws(() => runtime.call('BooleanGuard'), /uninitialized global 'Guard'/);
+  assert.throws(() => runtime.call('NullComparison'), /uninitialized global 'Trigger'/);
+  assert.throws(() => runtime.call('NativeArgument'), /uninitialized global 'Trigger'/);
+  assert.throws(() => runtime.call('LocalRead'), /uninitialized local in LocalRead 'value'/);
+  assert.equal(runtime.state.Values[3], 0, 'array slots retain native defaults');
+
+  runtime.call('Initialize');
+  assert.equal(runtime.state.Guard, false);
+  assert.equal(runtime.state.Trigger, null, 'explicit null is initialized, not absent');
+  assert.equal(runtime.state.Count, 7);
+  assert.equal(runtime.state.Values[4], 9);
+  assert.equal(runtime.call('NullComparison'), true);
+  assert.equal(runtime.call('LocalNull'), true, 'local assignment of null remains readable');
+  assert.equal(runtime.call('ShortCircuit'), false, 'short circuit skips an uninitialized RHS');
+  runtime.call('NativeArgument');
 });
 
 test('catalog has three distinct purchase types with stable cost/threat and readable details', () => {

@@ -7,6 +7,10 @@ with compact icons, counters and hover tooltips while preserving v26 gameplay.
 The [v28 solo dev menu](docs/compatibility/v28-solo-dev-menu.md) adds collapsible
 buttons and `-dev` commands for phases, timer holds, gold, XP, levels, healing,
 lives and practice resets when only one human is playing the MVP.
+The user reported that v28's dev HUD/commands did not work while the regular HUD worked. The
+[v29 startup repair](docs/compatibility/v29-startup-initialization.md) initializes
+generated scalar globals explicitly and tests actual generated startup with
+uninitialized-read failures enabled. The repaired runtime needs user verification.
 Typed variables additionally support `framehandle` alongside `multiboard` and
 `fogmodifier`, aligned across MCP, engine and versioned schema. Arrays require
 `array_size` (1-8191), reject scalar initial values and emit JASS declarations

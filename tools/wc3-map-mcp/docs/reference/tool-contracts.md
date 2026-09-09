@@ -180,6 +180,14 @@ source manifests; arrays cannot have scalar initial values. `framehandle`
 supports scalar and array declarations under the existing handle validation
 rules. Array size is manifest metadata: a size-5 HUD root emits
 `framehandle array HTW_HudRoot`, without an inline `[5]` or initializer.
+Every generated scalar global has a safe literal initializer: integer `0`,
+real `0.`, boolean `false`, string `""`, or supported handle `null`. This includes
+built-in/profile scalars and custom-event state. Authored scalar initial values
+are still applied by `HTW_MCP_InitializeVariables` before bootstrap. No native
+calls or handle creation run in global initializers. This changes composed
+source/hash, not input schemas, handle input rules or transaction gates. Arrays
+retain their existing declaration syntax and native default elements. See the
+[v29 startup repair](../compatibility/v29-startup-initialization.md).
 JASS source validation recognizes grouped lowercase `and`/`or` expressions while still
 validating nested calls and canonical `And`/`Or` natives. These additions do not
 change tool names, source-hash gates, or runtime-evidence requirements.

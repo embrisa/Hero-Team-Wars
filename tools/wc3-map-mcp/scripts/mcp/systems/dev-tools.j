@@ -343,7 +343,10 @@ function HTW_Dev_Run takes integer playerId, string command returns boolean
     endif
     if verb == "menu" then
         set HTW_DevMenuOpen[playerId] = not HTW_DevMenuOpen[playerId]
-        return HTW_Dev_Success(playerId, "", false)
+        if HTW_DevMenuOpen[playerId] then
+            return HTW_Dev_Success(playerId, "Menu opened. Use -dev help for text commands.", false)
+        endif
+        return HTW_Dev_Success(playerId, "Menu closed. Text commands remain available.", false)
     elseif verb == "help" then
         call HTW_Dev_Help(playerId)
         return HTW_Dev_Success(playerId, "", false)
@@ -512,4 +515,12 @@ function HTW_Dev_Initialize takes nothing returns nothing
         set playerId = playerId + 1
     endloop
     call TriggerAddAction(HTW_DevChatTrigger, function HTW_Dev_OnChat)
+    set playerId = 1
+    loop
+        exitwhen playerId > 4
+        if HTW_Dev_CanUse(playerId) then
+            call HTW_Dev_Feedback(playerId, "v29 controls ready. Click DEV or type -dev help.")
+        endif
+        set playerId = playerId + 1
+    endloop
 endfunction

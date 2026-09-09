@@ -61,6 +61,14 @@ v28 driver to preserve the exact v27 map and all unrelated gameplay. Timer
 holds, phase jumps and practice resets have source tests; game behavior remains
 unverified until the user reports the exact build. No MCP contract changed.
 
+The user reported that v28's dev HUD/commands did not work. The
+[v29 repair](compatibility/v29-startup-initialization.md) initializes every
+generated scalar global before first-use guards; array syntax is unchanged.
+Do not rely on JavaScript-style defaults in the JASS harness. Use the v29
+driver's checks of actual generated startup and publish the tested engine before
+staging. Generated source/hash changes, but tools, schemas and evidence gates
+do not. The repaired map still requires separate user runtime verification.
+
 Read the [engineering audit](engineering-audit.md) for remaining structural
 risks, including implicit gameplay seeding in script-enabled transactions,
 stale object fixtures and scenarios that model rules without executing JASS.

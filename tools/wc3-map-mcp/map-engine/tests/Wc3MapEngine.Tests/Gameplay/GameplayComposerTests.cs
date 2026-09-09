@@ -54,7 +54,7 @@ public sealed class GameplayComposerTests
         var source = composed["source"]!.GetValue<string>();
 
         Assert.Matches($@"(?m)^    {type} array TestHudRoot\r?$", source);
-        Assert.Matches($@"(?m)^    {type} TestHudScalar\r?$", source);
+        Assert.Matches($@"(?m)^    {type} TestHudScalar = null\r?$", source);
         Assert.DoesNotContain("set TestHudRoot", source);
         Assert.DoesNotContain("set TestHudScalar", source);
         var variables = composed["canonical_model"]!["gameplay_variables"]!.AsArray().OfType<JsonObject>();
@@ -62,6 +62,102 @@ public sealed class GameplayComposerTests
         Assert.Equal(type, array["type"]!.GetValue<string>());
         Assert.True(array["array"]!.GetValue<bool>());
         Assert.Equal(5, array["array_size"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public void ComposerInitializesEverySupportedScalarTypeButLeavesArraysBare()
+    {
+        var scalarTypes = new (string Type, string Initializer)[]
+        {
+            ("integer", "0"),
+            ("real", "0."),
+            ("boolean", "false"),
+            ("string", "\"\""),
+            ("handle", "null"),
+            ("timer", "null"),
+            ("trigger", "null"),
+            ("unit", "null"),
+            ("group", "null"),
+            ("region", "null"),
+            ("rect", "null"),
+            ("player", "null"),
+            ("force", "null"),
+            ("fogmodifier", "null"),
+            ("multiboard", "null"),
+            ("framehandle", "null")
+        };
+        var canonical = GameplaySourceComposer.Compose(FindManifest())["canonical_model"]!.AsObject();
+        foreach (var (type, _) in scalarTypes)
+        {
+            canonical["gameplay_variables"]!.AsArray().Add(new JsonObject
+            {
+                ["id"] = $"scalar_{type}", ["name"] = $"TestScalar_{type}", ["type"] = type
+            });
+            canonical["gameplay_variables"]!.AsArray().Add(new JsonObject
+            {
+                ["id"] = $"array_{type}", ["name"] = $"TestArray_{type}", ["type"] = type, ["array"] = true, ["array_size"] = 3
+            });
+        }
+
+        var source = GameplaySourceComposer.ComposeCanonical(canonical)["source"]!.GetValue<string>();
+        var globals = GlobalsBlock(source);
+        foreach (var (type, initializer) in scalarTypes)
+        {
+            Assert.Contains($"    {type} TestScalar_{type} = {initializer}\n", globals);
+            Assert.Contains($"    {type} array TestArray_{type}\n", globals);
+            Assert.DoesNotContain($"TestArray_{type} =", globals);
+        }
+    }
+
+    [Fact]
+    public void ComposerInitializesBuiltInEventAndDevHudHandleScalars()
+    {
+        var source = GameplaySourceComposer.Compose(FindManifest())["source"]!.GetValue<string>();
+        var globals = GlobalsBlock(source);
+
+        foreach (var declaration in new[]
+        {
+            "integer HTW_Round = 0",
+            "integer HTW_Wave = 0",
+            "integer HTW_Phase = 0",
+            "integer HTW_TeamCount = 0",
+            "integer HTW_ActivePlayerCount = 0",
+            "integer HTW_ArenaCount = 0",
+            "integer HTW_LivingTeamCount = 0",
+            "integer HTW_RouteOffset = 0",
+            "integer HTW_RouteDestinationTeam = 0",
+            "boolean HTW_RoutingLocked = false",
+            "rect HTW_ArenaRectA = null",
+            "rect HTW_ArenaRectB = null",
+            "real HTW_Event_round_start = 0.",
+            "real HTW_Event_wave_resolved = 0.",
+            "trigger HTW_DevChatTrigger = null",
+            "trigger HTW_DevUILoad = null",
+            "trigger HTW_HudLoadTrigger = null"
+        }) Assert.Contains($"    {declaration}\n", globals);
+
+        Assert.DoesNotContain("call ", globals);
+        Assert.Contains("    framehandle array HTW_HudRoot\n", globals);
+        Assert.DoesNotContain("HTW_HudRoot =", globals);
+    }
+
+    [Fact]
+    public void ComposerRetainsManifestInitialValuesInInitializationFunction()
+    {
+        var source = GameplaySourceComposer.Compose(FindManifest())["source"]!.GetValue<string>();
+        var start = source.IndexOf("function HTW_MCP_InitializeVariables", StringComparison.Ordinal);
+        var end = source.IndexOf("endfunction", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var initializer = source[start..end];
+
+        Assert.Contains("set HTW_DevEnabled = true", initializer);
+        Assert.Contains("set HTW_DevUsed = false", initializer);
+        Assert.Contains("set HTW_DevClockPhase = 0", initializer);
+        Assert.Contains("set HTW_DevClockRemaining = 0", initializer);
+        Assert.Contains("set HTW_InformationReady = false", initializer);
+        Assert.DoesNotContain("set HTW_DevChatTrigger", initializer);
+        Assert.DoesNotContain("set HTW_DevUILoad", initializer);
+        Assert.DoesNotContain("set HTW_HudLoadTrigger", initializer);
     }
 
     [Theory]
@@ -468,5 +564,13 @@ public sealed class GameplayComposerTests
         }
 
         throw new FileNotFoundException("The local Hero Team Wars source map was not found.");
+    }
+
+    private static string GlobalsBlock(string source)
+    {
+        var start = source.IndexOf("globals\n", StringComparison.Ordinal);
+        var end = source.IndexOf("endglobals", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        return source[start..end];
     }
 }

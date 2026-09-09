@@ -1,5 +1,10 @@
 # v28 solo developer controls
 
+**2026-09-09 user playtest: failed.** The user reports no DEV HUD and no working
+commands. The [v29 startup repair](v29-startup-initialization.md) addresses missing
+generated scalar initialization that the v28 test harness masked. The automated
+results below describe the original checks, not a successful Warcraft playtest.
+
 Solo testing now has a collapsible **DEV** button beside the icon HUD. It is
 available automatically when exactly one of the four MVP slots is a playing
 human. Open it with the button or `-dev`; hover buttons for their effects and

@@ -5,9 +5,10 @@ import vm from 'node:vm';
 // No eval of JASS text, property access, native auto-stubs, or skipped statements.
 const types = new Set(['nothing', 'integer', 'real', 'boolean', 'string', 'code',
   'unit', 'player', 'timer', 'trigger', 'group', 'force', 'rect', 'location',
-  'effect', 'texttag', 'multiboard', 'multiboarditem', 'timerdialog', 'boolexpr', 'framehandle']);
+  'region', 'effect', 'texttag', 'multiboard', 'multiboarditem', 'timerdialog', 'boolexpr', 'framehandle']);
 const id = '[A-Za-z_][A-Za-z0-9_]*';
 const jsName = name => `__j_${name}`;
+const uninitialized = Object.freeze({ __jassUninitialized: true });
 const defaults = type => type === 'boolean' ? false :
   type === 'integer' || type === 'real' ? 0 : null;
 const numeric = type => type === 'integer' || type === 'real';
@@ -40,7 +41,7 @@ const precedence = { or: 1, and: 2, '==': 3, '!=': 3, '<': 4, '>': 4,
   '<=': 4, '>=': 4, '+': 5, '-': 5, '*': 6, '/': 6 };
 const operators = { or: '||', and: '&&', '==': '===', '!=': '!==' };
 
-function expression(input, symbols, signatures) {
+function expression(input, symbols, signatures, { writeTarget = false } = {}) {
   const list = Array.isArray(input) ? input : tokens(input);
   let position = 0;
   const take = expected => {
@@ -98,6 +99,9 @@ function expression(input, symbols, signatures) {
           code += `[${index.code}]`;
           take(']');
         } else if (symbol.array) throw new Error(`Array requires index: ${token}`);
+        if (!symbol.array && !(writeTarget && position === 1)) {
+          code = `__read(${code}, ${JSON.stringify(symbol.scope ?? 'global')}, ${JSON.stringify(token)})`;
+        }
         node = { code, type: symbol.type };
       }
     } else throw new Error(`Unsupported expression ${list.join(' ')}`);
@@ -178,9 +182,9 @@ function compileFunction(fn, globals, signatures) {
         const [, type, name, initial] = match;
         if (statements || !types.has(type) || type === 'nothing' || locals.has(name)) throw new Error('Unsupported/duplicate local declaration');
         if (initial) requireType(type, expr(initial).type);
-        const value = initial ? expr(initial).code : JSON.stringify(defaults(type));
+        const value = initial !== undefined ? expr(initial).code : '__j_uninitialized';
         locals.add(name);
-        symbols.set(name, { type });
+        symbols.set(name, { type, scope: `local in ${fn.name}` });
         code.push(`let ${jsName(name)} = ${value};`);
         continue;
       }
@@ -190,8 +194,10 @@ function compileFunction(fn, globals, signatures) {
         if (!new RegExp(`^${id}$`).test(lhs[0]) ||
           !(lhs.length === 1 || lhs[1] === '[' && lhs.at(-1) === ']')) throw new Error('Unsupported assignment target');
         if (symbols.get(lhs[0])?.constant) throw new Error('Assignment to constant');
-        requireType(expr(lhs).type, expr(match[2]).type);
-        code.push(`${expr(lhs).code} = ${expr(match[2]).code};`);
+        const target = expression(lhs, symbols, signatures, { writeTarget: true });
+        const value = expr(match[2]);
+        requireType(target.type, value.type);
+        code.push(`${target.code} = ${value.code};`);
       } else if ((match = /^call (.+)$/.exec(line))) {
         if (!new RegExp(`^${id} \\(`).test(match[1])) throw new Error('Call requires a function');
         const call = expr(match[1]);
@@ -263,8 +269,11 @@ export function createJassRuntime({ sources, globals = [], natives = {}, variabl
   for (const global of globals) {
     if (!new RegExp(`^${id}$`).test(global.name) || !types.has(global.type) || global.type === 'nothing') throw new Error(`Unsupported global ${global.name}`);
     if (symbols.has(global.name)) throw new Error(`Duplicate global ${global.name}`);
-    symbols.set(global.name, global);
-    sandbox[jsName(global.name)] = global.array ? jassArray(global.type) : global.initial ?? defaults(global.type);
+    const symbol = { ...global, scope: 'global' };
+    symbols.set(global.name, symbol);
+    const hasInitial = Object.hasOwn(global, 'initial') && global.initial !== undefined;
+    sandbox[jsName(global.name)] = global.array ? jassArray(global.type) :
+      hasInitial ? global.initial : uninitialized;
   }
   const nativeCalls = [];
   for (const [name, native] of Object.entries(natives)) {
@@ -280,7 +289,9 @@ export function createJassRuntime({ sources, globals = [], natives = {}, variabl
   const functionCalls = [];
   sandbox.__functionCalls = functionCalls;
   const compiled = [...functions.values()].map(fn => compileFunction(fn, symbols, signatures)).join('\n');
+  sandbox.__j_uninitialized = uninitialized;
   new vm.Script(`"use strict"; let __steps = 0; function __step() { if (++__steps > ${maxSteps}) throw new Error("JASS execution step limit"); }
+    function __read(value, scope, name) { if (value === __j_uninitialized) throw new Error("JASS read of uninitialized " + scope + " '" + name + "'"); return value; }
     // Overflow is outside this subset; fail instead of using JavaScript doubles
     // as an accidental replacement for Warcraft signed integer behavior.
     function __integer(value) { if (!Number.isSafeInteger(value) || value < -2147483648 || value > 2147483647) throw new Error("Unsupported JASS integer overflow"); return value; }
@@ -322,11 +333,13 @@ export function createJassRuntime({ sources, globals = [], natives = {}, variabl
   const state = new Proxy(Object.create(null), {
     get(_target, name) {
       if (!symbols.has(name)) throw new Error(`Unknown global ${String(name)}`);
-      return sandbox[jsName(name)];
+      const symbol = symbols.get(name);
+      const value = sandbox[jsName(name)];
+      return symbol.array ? value : vm.runInContext(`__read(${jsName(name)}, ${JSON.stringify(symbol.scope)}, ${JSON.stringify(name)})`, context);
     },
     set(_target, name, value) {
       if (!symbols.has(name)) throw new Error(`Unknown global ${String(name)}`);
-      sandbox[jsName(name)] = value;
+      sandbox[jsName(name)] = value === undefined ? uninitialized : value;
       return true;
     },
   });

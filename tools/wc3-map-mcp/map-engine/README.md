@@ -2,6 +2,13 @@
 
 Buildable .NET 10 solution using War3Net 6.0.3 for MPQ access, WC3 map-info/region parsing, typed canonical operations, JASS static validation, and conservative archive rebuilding.
 
+The JASS composer emits safe literal initializers for all scalar globals,
+including trigger/frame handles, while arrays remain declaration-only.
+Authored scalar initial values still run before bootstrap. This prevents
+uninitialized first-use guards from aborting startup; canonical symbol/type
+validation alone does not prove definite assignment. See the
+[v29 repair](../docs/compatibility/v29-startup-initialization.md).
+
 Expected projects:
 
 ```text

@@ -15,6 +15,13 @@ behavior, cleanup and resets. Mocked chat and synchronized frame events exercise
 the shared handler, frame ownership and rebuilding after load. This evidence
 does not establish native event synchronization or in-game button behavior.
 
+The v29 regression rejects reads of uninitialized scalar globals and locals;
+explicit `null` remains an initialized value, and array slots keep native
+defaults. Generated startup checks consume actual staged/reopened declarations
+and initialization. They check chat registration, regular/dev roots and command
+dispatch under explicit native mocks, including a negative missing-initializer
+case. Earlier v28 mocks supplied scalar defaults and masked this failure.
+
 Run `scripts/test.ps1` for the complete automated check. It publishes the engine
 from the tested sources before MCP integration runs and checks the immutable
 source hash in a finally block. `npm test` by itself cannot refresh the engine.

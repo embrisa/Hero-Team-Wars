@@ -44,6 +44,12 @@ member, category, field, and project profile.
 - Do not infer teams from player color.
 - Do not rewrite protected region names without explicit reference migration.
 - Never treat parser, build, or process-start evidence as gameplay success.
+- Initialize every generated scalar JASS global with a safe literal before any
+  first-use guard. Leave arrays declaration-only and apply authored scalar
+  values before bootstrap. Source harnesses must reject uninitialized scalar
+  reads rather than invent defaults; verify actual generated startup as well
+  as individual modules. See the v29 startup repair for the user-reported failure
+  that established this requirement.
 
 ## Implementation references
 

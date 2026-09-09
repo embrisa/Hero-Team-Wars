@@ -73,6 +73,14 @@ stricter changed-field validation policy.
 
 ## Versioning
 
+Generated JASS assigns safe literals to every scalar global at declaration:
+integer `0`, real `0.`, boolean `false`, string `""`, and supported handles
+`null`. Arrays remain bare declarations. Authored initial values are applied
+by `HTW_MCP_InitializeVariables` before bootstrap; no functions execute in the
+global initializer block. This is composer/source versioning, not a typed
+variable wire-schema change. Missing scalar values must not be treated as
+implicit defaults by source-execution tests.
+
 Version the MCP tool schema, engine protocol, canonical map schema, transaction manifest, and compatibility report independently. Reject incompatible major versions with a clear upgrade message.
 
 ## Canonical map example

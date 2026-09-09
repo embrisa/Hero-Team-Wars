@@ -7,6 +7,28 @@ const read = path => readFileSync(new URL(path, root), 'utf8').replace(/^\uFEFF/
 const definition = (name, type, initial, array = false) => ({ name, type, initial, array });
 const native = (type, arity, fn) => ({ type, arity, fn });
 
+// The composer emits an explicit literal for every scalar global. Keep the
+// source-fixture boundary equally explicit; the strict harness must never
+// turn an omitted fixture value into a native default.
+const composerScalarDefaults = Object.freeze({
+  HTW_DevUIClick: null, HTW_DevUILoad: null, HTW_DevChatTrigger: null,
+  HTW_HudLoadTrigger: null, HTW_HeroSelectionBuilding: null,
+  HTW_HeroSelectionTrigger: null, HTW_HeroSelectionTimer: null,
+  HTW_PreparationTimer: null, HTW_CombatTimer: null, HTW_SendTimer: null,
+  HTW_CleanupGroup: null, HTW_ArenaRectA: null, HTW_ArenaRectB: null,
+  HTW_StartingGold: 0, HTW_SendBudgetStart: 0, HTW_SendBudgetGrowth: 0,
+  HTW_SendBudgetMaximum: 0, HTW_BaseFootmen: 0, HTW_FillerFootmen: 0,
+  HTW_FillerRiflemen: 0,
+});
+const explicitComposerGlobals = variables => variables.map(variable => {
+  if (variable.array || (Object.hasOwn(variable, 'initial') && variable.initial !== undefined)) {
+    return { ...variable };
+  }
+  assert.ok(Object.hasOwn(composerScalarDefaults, variable.name),
+    `missing explicit fixture default for scalar ${variable.name}`);
+  return { ...variable, initial: composerScalarDefaults[variable.name] };
+});
+
 // Symbolic stand-ins for native enum constants, not a Warcraft enum implementation.
 const frameConstants = { ORIGIN_FRAME_GAME_UI: 0, FRAMEPOINT_TOPLEFT: 1,
   FRAMEPOINT_TOPRIGHT: 2, FRAMEPOINT_BOTTOMRIGHT: 3, TEXT_JUSTIFY_TOP: 4, TEXT_JUSTIFY_LEFT: 5,
@@ -14,7 +36,8 @@ const frameConstants = { ORIGIN_FRAME_GAME_UI: 0, FRAMEPOINT_TOPLEFT: 1,
 const iconPaths = new Map(['AHds', 'Adef', 'n26C', 'hfoo', 'hrif', 'hkni', 'H001', 'H002', 'H003', 'H004']
   .map(code => [rawcode(code), `mock-icon:${code}`]));
 
-function fixture({ localPlayerId = 1, prepare = true, manifestEvents = false, activeHumanIds = [1, 2, 3, 4] } = {}) {
+function fixture({ localPlayerId = 1, prepare = true, manifestEvents = false, activeHumanIds = [1, 2, 3, 4],
+  globalDefinitions, initializationSource, initializationFunction = 'HTW_MCP_InitializeVariables', sourceOverrides = {} } = {}) {
   assert.ok(Number.isInteger(localPlayerId) && localPlayerId >= 1 && localPlayerId <= 4);
   // Read fresh on every fixture. A missing production module is a test failure.
   const modules = ['core/state.j', 'core/debug.j', 'core/events.j', 'config/tuning.j',
@@ -23,27 +46,36 @@ function fixture({ localPlayerId = 1, prepare = true, manifestEvents = false, ac
     'systems/routing.j', 'systems/elimination.j', 'systems/lives.j', 'systems/heroes.j',
     'systems/information.j', 'systems/wave-plan.j', 'systems/hero-selection.j',
     'systems/dev-tools.j', 'systems/dev-menu.j'];
-  const sources = modules.map(path => ({ path, source: read(path),
+  const sources = modules.map(path => ({ path, source: sourceOverrides[path] ?? read(path),
     // The composer-generated profile setup is outside this source harness.
     // Use only the real lookup body from this module; fixture profile data below
     // supplies the same environment boundary as generated global declarations.
     ...(path === 'config/teams.j' ? { only: ['HTW_Teams_FindByPlayer'] } : {}),
-    ...(path === 'systems/hero-selection.j' ? { only: ['HTW_HeroSelection_AllPlayersReady', 'HTW_HeroSelection_Complete',
+      ...(path === 'systems/hero-selection.j' ? { only: ['HTW_HeroSelection_AllPlayersReady', 'HTW_HeroSelection_Complete',
       'HTW_HeroSelection_OnTimeout', 'HTW_HeroSelection_AutoPick', 'HTW_HeroSelection_PlayerHasTeammateHero',
       'HTW_HeroSelection_SelectForPlayer', 'HTW_HeroSelection_SelectUnitForPlayer', 'HTW_HeroSelection_DeployHero'] } : {}) }));
+  if (initializationSource) sources.unshift({ path: 'generated/war3map.j', source: initializationSource,
+    only: [initializationFunction] });
   const variables = readdirSync(new URL('variables/', root)).filter(path => path.endsWith('.variable.json'))
     .flatMap(path => JSON.parse(read(`variables/${path}`)));
-  const globals = [...variables];
+  const globals = globalDefinitions ? globalDefinitions.map(global => ({ ...global })) : explicitComposerGlobals(variables);
+  const nativeConstantNames = new Set(['PLAYER_NEUTRAL_AGGRESSIVE', 'MAP_CONTROL_USER', 'MAP_CONTROL_COMPUTER',
+    'PLAYER_SLOT_STATE_PLAYING', 'PLAYER_STATE_RESOURCE_GOLD', 'EVENT_PLAYER_UNIT_SPELL_EFFECT',
+    'EVENT_GAME_LOADED', 'UNIT_STATE_LIFE', 'UNIT_TYPE_DEAD', 'PLAYER_STATE_GIVES_BOUNTY',
+    'UNIT_STATE_MANA', 'UNIT_STATE_MAX_LIFE', 'UNIT_STATE_MAX_MANA', 'UNIT_TYPE_HERO', ...Object.keys(frameConstants)]);
   const add = (name, type, initial, array = false) => {
+    if (globalDefinitions && !globals.some(value => value.name === name)) {
+      assert.ok(nativeConstantNames.has(name), `generated source missing required global ${name}`);
+    }
     if (!globals.some(value => value.name === name)) globals.push(definition(name, type, initial, array));
   };
   // Explicit composer/native environment. Never infer undeclared gameplay globals.
-  for (const name of ['ActivePlayerCount', 'TeamCount', 'ArenaCount', 'LivingTeamCount', 'RouteOffset', 'RouteDestinationTeam']) add(`HTW_${name}`, 'integer');
+  for (const name of ['ActivePlayerCount', 'TeamCount', 'ArenaCount', 'LivingTeamCount', 'RouteOffset', 'RouteDestinationTeam']) add(`HTW_${name}`, 'integer', 0);
   for (const name of ['TeamMemberA', 'TeamMemberB', 'TeamDestination', 'LivingTeamIds']) add(`HTW_${name}`, 'integer', undefined, true);
   add('HTW_TeamLiving', 'boolean', undefined, true);
-  add('HTW_RoutingLocked', 'boolean');
+  add('HTW_RoutingLocked', 'boolean', false);
   add('HTW_ArenaRect', 'rect', undefined, true);
-  for (const name of ['round_start', 'wave_resolved']) add(`HTW_Event_${name}`, 'real');
+  for (const name of ['round_start', 'wave_resolved']) add(`HTW_Event_${name}`, 'real', 0.);
   for (const [name, value] of Object.entries({ PLAYER_NEUTRAL_AGGRESSIVE: 12, MAP_CONTROL_USER: 1,
     MAP_CONTROL_COMPUTER: 2, PLAYER_SLOT_STATE_PLAYING: 1, PLAYER_STATE_RESOURCE_GOLD: 1,
     EVENT_PLAYER_UNIT_SPELL_EFFECT: 1, EVENT_GAME_LOADED: 3,
@@ -119,6 +151,9 @@ function fixture({ localPlayerId = 1, prepare = true, manifestEvents = false, ac
       return /^[0-9]$/.test(value) ? Number(value) : 0;
     }),
     ModuloInteger: native('integer', 2, (a, b) => ((a % b) + b) % b),
+    Rect: native('rect', 4, (minX, minY, maxX, maxY) => ({ min_x: minX, min_y: minY, max_x: maxX, max_y: maxY })),
+    CreateRegion: native('region', 0, () => handle('region', { rects: [] })),
+    RegionAddRect: native('nothing', 2, (region, rect) => { assert.equal(region.handleType, 'region'); region.rects.push(rect); }),
     GetRectCenterX: native('real', 1, rect => (rect.min_x + rect.max_x) / 2),
     GetRectCenterY: native('real', 1, rect => (rect.min_y + rect.max_y) / 2),
     CreateUnit: native('unit', 5, makeUnit),
@@ -263,6 +298,7 @@ function fixture({ localPlayerId = 1, prepare = true, manifestEvents = false, ac
     }) };
   }) : [];
   const runtime = createJassRuntime({ sources, globals, natives, variableEvents });
+  if (initializationSource) runtime.call(initializationFunction);
   const s = runtime.state;
   const profile = JSON.parse(read('manifest.json')).profiles.mvp_2arena;
   s.HTW_ActivePlayerCount = profile.active_player_ids.length;

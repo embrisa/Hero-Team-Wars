@@ -3,6 +3,11 @@
 Typed variables support `framehandle` alongside `multiboard` and `fogmodifier`,
 with bounded `array` / `array_size` inputs aligned with the engine and versioned
 operation schema.
+Generated JASS initializes every scalar global with a safe literal (`0`, `0.`,
+`false`, `""`, or handle `null`) before any first-use guard. Arrays remain bare;
+authored scalar values are still applied by `HTW_MCP_InitializeVariables`.
+This changes composed source/hash, not typed inputs or any tool/evidence gate.
+See the [v29 startup repair](../docs/compatibility/v29-startup-initialization.md).
 The JASS scanner handles grouped boolean operators without skipping validation
 of nested calls. All 30 tool names, policy gates and allow-lists remain unchanged.
 The type allow-list remains closed. Array creations require `array_size`

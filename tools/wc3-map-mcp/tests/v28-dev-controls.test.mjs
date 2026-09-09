@@ -75,7 +75,7 @@ function Fire takes nothing returns nothing
     set Event = 0.
 endfunction`;
   const config = { sources: [{ path: 'variable-event-boundary.j', source }], globals: [
-    { name: 'Event', type: 'real' }, { name: 'Count', type: 'integer' }, { name: 'Observed', type: 'integer' }],
+    { name: 'Event', type: 'real', initial: 0. }, { name: 'Count', type: 'integer', initial: 0 }, { name: 'Observed', type: 'integer', initial: 0 }],
   variableEvents: [{ name: 'Event', equals: 1, actions: ['OnEvent'] }] };
   const f = createJassRuntime(config);
   f.call('Fire'); assert.equal(f.state.Observed, 1); assert.equal(f.state.Count, 1);

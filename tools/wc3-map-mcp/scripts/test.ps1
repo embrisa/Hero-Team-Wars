@@ -15,7 +15,7 @@ if (-not (Test-Path -LiteralPath $jassApiData -PathType Leaf)) {
 try {
     & node (Join-Path $PSScriptRoot "generate-v26-send-content.mjs") --check
     if ($LASTEXITCODE -ne 0) { throw "Send catalog generated files drifted." }
-    & node --test (Join-Path $mcpRoot "tests/v26-preparation.test.mjs") (Join-Path $mcpRoot "tests/v28-dev-controls.test.mjs")
+    & node --test (Join-Path $mcpRoot "tests/v26-preparation.test.mjs") (Join-Path $mcpRoot "tests/v28-dev-controls.test.mjs") (Join-Path $mcpRoot "tests/v29-startup.test.mjs")
     if ($LASTEXITCODE -ne 0) { throw "JASS preparation/send/HUD/dev behavioral checks failed." }
     Push-Location $engineRoot
     try {

@@ -15,7 +15,7 @@ namespace Wc3MapEngine.Core.Gameplay;
 /// </summary>
 public static class GameplaySourceComposer
 {
-    public const string ComposerVersion = "mcp-jass-composer-2.4";
+    public const string ComposerVersion = "mcp-jass-composer-2.5";
     private const int MaxManifestBytes = 2 * 1024 * 1024;
     private const int MaxModuleBytes = 2 * 1024 * 1024;
     private static readonly Regex Function = new("(?im)^\\s*function\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+takes\\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -650,7 +650,7 @@ public static class GameplaySourceComposer
         var declaredGlobals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         void DeclareGlobal(string type, string name, bool array = false)
         {
-            if (declaredGlobals.Add(name)) builder.AppendLine($"    {type}{(array ? " array" : string.Empty)} {name}");
+            if (declaredGlobals.Add(name)) builder.AppendLine($"    {type}{(array ? " array" : string.Empty)} {name}{(array ? string.Empty : $" = {ScalarInitializer(type)}")}");
         }
         DeclareGlobal("integer", "HTW_Round");
         DeclareGlobal("integer", "HTW_Wave");
@@ -679,8 +679,8 @@ public static class GameplaySourceComposer
             var array = variable["array"]?.GetValue<bool>() == true;
             DeclareGlobal(type, GameplayModelValidator.RequiredString(variable, "name"), array);
         }
-        foreach (var region in regions) builder.AppendLine($"    region {RegionHandle(GameplayModelValidator.RequiredString(region, "id"))}");
-        foreach (var eventName in customEvents) builder.AppendLine($"    real {EventHandle(eventName)}");
+        foreach (var region in regions) builder.AppendLine($"    region {RegionHandle(GameplayModelValidator.RequiredString(region, "id"))} = null");
+        foreach (var eventName in customEvents) DeclareGlobal("real", EventHandle(eventName));
         builder.AppendLine("endglobals");
         builder.AppendLine();
 
@@ -1220,6 +1220,17 @@ public static class GameplaySourceComposer
         if (node is JsonValue text && text.TryGetValue<string>(out var stringValue)) return Quote(stringValue);
         throw new EngineException("INVALID_ARGUMENT", $"Unsupported literal for JASS type '{type}'.");
     }
+
+    private static string ScalarInitializer(string type)
+        => type.ToLowerInvariant() switch
+        {
+            "integer" => "0",
+            "real" => "0.",
+            "boolean" => "false",
+            "string" => "\"\"",
+            "handle" or "timer" or "trigger" or "unit" or "group" or "region" or "rect" or "player" or "force" or "fogmodifier" or "multiboard" or "framehandle" => "null",
+            _ => throw new EngineException("INVALID_ARGUMENT", $"Unsupported scalar JASS type '{type}'.")
+        };
 
     private static string Operator(string value) => value switch { "equal" => "==", "not_equal" => "!=", "less" => "<", "less_equal" => "<=", "greater" => ">", "greater_equal" => ">=", _ => throw new EngineException("INVALID_ARGUMENT", $"Unsupported comparison operator '{value}'.") };
     private static string OperatorConstant(string value) => value switch { "equal" => "EQUAL", "not_equal" => "NOT_EQUAL", "less" => "LESS_THAN", "less_equal" => "LESS_THAN_OR_EQUAL", "greater" => "GREATER_THAN", "greater_equal" => "GREATER_THAN_OR_EQUAL", _ => throw new EngineException("INVALID_ARGUMENT", $"Unsupported comparison operator '{value}'.") };
